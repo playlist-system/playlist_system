@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 2.1 • 12 ต.ค. 2569
+ *  เวอร์ชัน 2.4 • 14 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -34,7 +34,8 @@
  *   10. วิธีใช้ / ต้อนรับ / ระบบทำงานอย่างไร ............ vHelp, vWelcome, vHow
  *   11. ทัวร์แนะนำ ................................... TOURS, tourStart, tourDraw
  *   12. ปุ่มและเหตุการณ์ .............................. view, ACT, document.addEventListener
- *  (ส่วน 1–7 คือส่วนอ่าน Playlist และเติมใบเช็ค แก้จาก 1.0 เพียงเล็กน้อย ผลการเติมเหมือนเดิมทุกไบต์)
+ *  (เวอร์ชัน 2.4 ปรับกฎในส่วน 3, 5 และ 7 จากการเทียบกับใบเช็คที่ทีมทำมือเดือน ก.ย.–ต.ค. 2569
+ *   เช่น วันที่ 16 ทำต่อในรายการเดิม หมายเหตุ BKJ / Metro LED — ดูประวัติเวอร์ชันใน README.md)
  * ======================================================================
  */
 
@@ -274,7 +275,8 @@ function parseD(t) {
 }
 const serial = d => Math.round((d - Date.UTC(1899, 11, 30)) / 864e5),
   addD = (d, n) => new Date(d.getTime() + n * 864e5);
-const JUNK = /^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์/i,
+const JUNK =
+    /^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}\s*[A-Za-z]{3}/i,
   MTP = /^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i;
 /* เรียงแบบ Excel (A→Z): ไม่สนตัวพิมพ์, ข้าม - และ ', เครื่องหมายอื่น < ตัวเลข < A-Z < ภาษาไทย */
 const xk = s => {
@@ -414,15 +416,21 @@ function chkRows(scr, o, kind) {
       r.ad !== scr.c &&
       !/FastAds?/i.test(r.ad) &&
       !skipRow(scr, r) &&
+      !(SIGAL[scr.c] && r.cnt == null && /^Content/i.test(r.ty || '')) &&
       !(kind === 'jam' && (/^BJ\d*_\d+_/i.test(r.ad) || /weather/i.test(r.ad))),
   ).map(r => ({
-    ad: kind === 'jam' ? r.ad.replace(/^BKJ[12]?_/i, '') : r.ad,
+    ad: (kind === 'jam' ? r.ad.replace(/^BKJ[12]?_/i, '') : r.ad).replace(
+      /\s*\((?:O\/A|ออน)[^)]*\)\s*$/i,
+      '',
+    ),
     hash: /^Content/i.test(r.ty || ''),
     sp: kind === 'metro' && MTP.test(r.ad.trim()),
     sd: parseD(r.s),
     ed: parseD(r.e),
     st: r.st || '',
     off: r.off,
+    note: r.note || '',
+    loc: r.loc || '',
   }));
 }
 function mkStyles(doc) {
@@ -535,7 +543,14 @@ const modeS = (sh, col, a, b) => {
   return best;
 };
 /* สไตล์ของช่องที่มีชื่อหนัง (มีเส้นตาราง) กับช่องว่าง แยกกัน — กันเส้นตารางหายเมื่อรายการสั้น */
-const MARK = /^(FF)?(8AEDFE|82ECFE|002060|375623|FFFF00)$/i;
+const MARK = {
+  x: new Set(),
+  test(v) {
+    v = String(v || '').toUpperCase();
+    const h = v.length === 8 ? v.slice(2) : v;
+    return /^(8AEDFE|82ECFE|002060|375623|FFFF00|4472C4|2F5597|203864|1F4E79)$/.test(h) || this.x.has(h);
+  },
+}; /* สีที่ถือว่าเป็นแถบ/ไฮไลต์ รวมสีที่ผู้ใช้เลือก */
 const modeF = (sh, col, a, b, f, ST, inc) => {
   const c = new Map();
   for (let r = a; r <= b; r++) {
@@ -587,7 +602,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     if (hr) break;
   }
   if (!hr) hr = FIRST - 1;
-  const { two, P1, P, E } = per(W),
+  let { two, P1, P, E } = per(W);
+  const P2 = two ? P : null,
     SCAN = 1500,
     dd = +W,
     noNotes = W.getUTCDate() === 1;
@@ -658,12 +674,17 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       last = r;
       continue;
     }
-    if (B.some(b => vOf(b.lc, r) || /^ออกวันที่/.test(vOf(b.nc, r)))) last = r;
+    if (B.some(b => vOf(b.lc, r) || /^ออก(วันที่)?\s*\d/.test(vOf(b.nc, r)))) last = r;
   }
   const F = bars.length && bars[0][0] === hr ? bars[0][1] : null;
   let S = hr,
     hist = false,
     frozen = false;
+  const CONTM = two && o.r2 !== 'new' && !!F && +F === +P1;
+  if (CONTM) {
+    P = P1;
+    two = false;
+  } /* วันที่ 16 เป็นต้นไป: ทำต่อในรายการเดิม (แบบที่ทีมทำ) */
   if (two && F && +F === +P1) {
     /* มีรอบ 1–15 ของเดือนนี้อยู่แล้ว → ไม่แตะ แล้วเริ่มรอบ 16 ต่อข้างล่าง */
     frozen = true;
@@ -679,15 +700,21 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     }
   } else if (!F || +F === +P) hist = true; /* อ่านวันที่หัวตารางไม่ได้ → ถือว่ารอบเดียวกัน (ไม่ล้างของเดิม) */
   if (
+    !CONTM &&
     !two &&
     F &&
     +F === +P1 &&
     bars.some(
-      ([r, d]) => r > hr && d && d.getUTCDate() >= 16 && ISG.test(ST.fillOf(sh.getS(b0.lc, r) || '0')),
+      ([r, d], i) =>
+        r > hr &&
+        d &&
+        d.getUTCMonth() === P1.getUTCMonth() &&
+        d.getUTCDate() >= 16 &&
+        (i < bars.length - 1 || ISG.test(ST.fillOf(sh.getS(b0.lc, r) || '0'))),
     )
   )
     return {
-      skip: 'ชีตนี้มีรอบ 16–สิ้นเดือน (แถบเขียว) แล้ว แต่วันที่ทำงานอยู่ในรอบ 1–15 — ไม่ได้แก้ชีตนี้ ตรวจวันที่ทำงานอีกครั้ง',
+      skip: 'ชีตนี้มีรอบ 16–สิ้นเดือนแล้ว แต่วันที่ทำงานอยู่ในรอบ 1–15 — ไม่ได้แก้ชีตนี้ ตรวจวันที่ทำงานอีกครั้ง',
     };
   const Z = Math.max(last + 2, S + 400),
     lim = Math.min(+addD(W, +o.days || 0), +E),
@@ -705,7 +732,61 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     merged = 0,
     gone = 0,
     today = 0,
-    nost = 0;
+    nost = 0,
+    renew = 0,
+    back = 0;
+  /* BKJ: หมายเหตุ “ขึ้นเฉพาะ BKJ2-24,…” / “ยกเว้นจอ BKJ-12,…” / “ไม่ออน BKJ2-35” เทียบกับเลขจอที่หัวคอลัมน์ของใบเช็ค */
+  const jamNums = b => {
+    const s = new Set(),
+      c0 = col2n(b.lc);
+    for (let r = 8; r <= 14; r++) {
+      const x = wsv && wsv[b.lc + r];
+      if (!(x && /BANGKOK|BKJ|JAM|METRO/i.test(cl(x.v)))) continue;
+      for (let c = c0 + 1; c < c0 + 60; c++) {
+        const y = wsv[n2col(c) + r],
+          v = y ? cl(y.v) : '';
+        if (!/^\d{1,3}$/.test(v)) break;
+        s.add(+v);
+      }
+      break;
+    }
+    return s;
+  };
+  const nameSkip = (ad, nums) => {
+    const m = String(ad || '').match(/Screen\s*(\d+(?:\s*(?:and|&|,|_)\s*\d+)*)/i);
+    if (!m || !nums || !nums.size) return false;
+    const s = new Set(m[1].split(/\D+/).filter(Boolean).map(Number));
+    return ![...nums].some(x => s.has(x));
+  };
+  const locSkip = (loc, nums) => {
+    if (!loc || !nums || !nums.size) return false;
+    const inc = new Set(),
+      exc = new Set();
+    for (const m of String(loc).matchAll(/(!)?LEDMETRO_?(\d+)/gi)) (m[1] ? exc : inc).add(+m[2]);
+    return (
+      (inc.size > 0 && ![...nums].some(x => inc.has(x))) || (exc.size > 0 && [...nums].every(x => exc.has(x)))
+    );
+  };
+  const jamSkip = (note, nums) => {
+    if (!nums || !nums.size) return false;
+    const n = String(note || ''),
+      L = t => {
+        const s = new Set();
+        for (const m of t.matchAll(/BKJ\s*\d?\s*-\s*(\d{1,3})/gi)) s.add(+m[1]);
+        return s;
+      };
+    let m = n.match(/(?:ขึ้น|ออน)เ?ฉพาะ(.*)/);
+    if (m) {
+      const s = L(m[1]);
+      return s.size > 0 && ![...nums].some(x => s.has(x));
+    }
+    m = n.match(/(?:ยกเว้น(?:จอ)?|ไม่ออน(?:จอ)?)(.*)/);
+    if (m) {
+      const s = L(m[1].split(/ชดเชย/)[0]);
+      return s.size > 0 && [...nums].every(x => s.has(x));
+    }
+    return false;
+  };
   for (const b of B) {
     b.cnt = new Map();
     b.hist = [];
@@ -717,7 +798,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         continue;
       }
       const nm = vOf(b.lc, r);
-      if (!nm || /^ออกวันที่/.test(nm)) continue;
+      if (!nm || /^ออก(วันที่)?\s*\d/.test(nm)) continue;
       const k = sh.take(b.pc, r);
       if (k) {
         sh.setS(b.pc, r, b.bp);
@@ -727,7 +808,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         } else cleared++;
       }
       if (hist) {
-        const m = vOf(b.nc, r).match(/^ออกวันที่\s*(\d{1,2})/);
+        const m = vOf(b.nc, r).match(/^ออก(?:วันที่)?\s*(\d{1,2})/);
         b.hist.push({ nm, g, ned: m ? exitOf(+m[1], P) : 0 });
       }
     }
@@ -738,6 +819,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       pl = [],
       ent = [];
     b.later = [];
+    b.ratio = [];
     b.sp = b.rows.filter(r => r.sp);
     {
       const cap = b.scr.pd
@@ -746,7 +828,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       for (const r of b.scr.rows)
         if (r.off && r.ad) {
           const e0 = parseD(r.e),
-            ed = Math.min(e0 ? +e0 : Infinity, cap);
+            ed = Math.min(e0 && +e0 >= +P ? +e0 : Infinity, cap);
           if (!isFinite(ed) || ed < +P) continue;
           const k =
             (/^Content/i.test(r.ty || '') ? '#' : '') +
@@ -754,20 +836,41 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
           offEd.set(k, Math.max(offEd.get(k) || 0, ed));
         }
     } /* วันหมดของหนังที่ถอดแล้ว (ใช้ทำ “ออกวันที่”) */
+    const jn = b.kind === 'jam' || b.kind === 'metro' ? jamNums(b) : null,
+      fam = n => String(n).replace(/^#/, '').trim().toUpperCase(),
+      hb0 = b.hist.length > 0;
     for (const r of b.rows) {
       if (r.sp) continue;
-      if (r.ed && +r.ed < +P) continue;
-      const g = r.sd && +r.sd > +P ? +r.sd : +P;
+      if (jn && (b.kind === 'jam' ? jamSkip(r.note, jn) || nameSkip(r.ad, jn) : locSkip(r.loc, jn)))
+        continue; /* ยังอยู่ใน Playlist = ยังออนอยู่ แม้วันหมดในไฟล์ผ่านไปแล้ว */
+      let g = r.sd && +r.sd > +P ? +r.sd : +P;
+      const mid = String(r.note || '').match(
+          /(?:ออนแอร์|ขึ้น)ระหว่างวัน\s*(?:วันที่)?\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/,
+        ),
+        md = mid ? +new Date(Date.UTC(yy(mid[3]), +mid[2] - 1, +mid[1])) : 0;
+      if (md >= +P && md <= dd) g = md; /* หมายเหตุ “ออนแอร์ระหว่างวันวันที่ …” → ลงใต้แถบวันนั้น */
+      else if (NEWST.test(r.st || '') && g !== dd) {
+        if (g > dd) g = Math.max(dd, +P);
+        else if (hb0 && g > +P && !b.hist.some(h => h.g === g && fam(h.nm) === fam(r.ad))) g = dd;
+      } /* “ขึ้นใหม่” = ขึ้นวันนี้ */
       if (g > lim) {
-        b.later.push(r);
+        if (!b.hist.some(h => fam(h.nm) === fam(r.ad))) b.later.push(r);
         continue;
       }
+      const rnw =
+        CONTM &&
+        dd === +P2 &&
+        (NEWST.test(r.st || '') || CONT.test(r.st || '')) &&
+        r.sd &&
+        +r.sd === +P2; /* วันที่ 16: ต่อสัญญา/ขึ้นใหม่ที่เริ่ม 16 → แถวใหม่ใต้ 16 แถวเดิมใส่ “ออก 16” */
       pl.push({
         nm: (r.hash ? '#' : '') + r.ad,
         hash: r.hash,
         g,
-        ed: r.ed ? +r.ed : Infinity,
+        ed: r.ed && +r.ed >= dd ? +r.ed : Infinity,
         st: r.st || '',
+        rnw,
+        note: r.note || '',
       });
     }
     pl.sort((x, y) => x.g - y.g);
@@ -791,6 +894,46 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     for (const p of pl) {
       const c = ent.filter(e => e.nm === p.nm),
         tg = p.g > +P ? p.g : hb ? dd : +P;
+      {
+        const hs = c.filter(e => e.h && !e.m);
+        if (hb && hs.length && NEWST.test(p.st) && !p.rnw) {
+          const last = hs.reduce((a, e) => (e.g > a.g ? e : a));
+          if (
+            CONTM &&
+            dd >= +P2 &&
+            last.g < +P2 &&
+            last.ed &&
+            last.ed < dd - 864e5 &&
+            !c.some(e => e.g === dd)
+          ) {
+            ent.push({ nm: p.nm, hash: p.hash, g: dd, ed: p.ed, m: true });
+            back++;
+            continue;
+          }
+        } /* ครึ่งเดือนหลัง: หนังที่ลงไว้ในรอบ 1–15 ออกไปแล้วกลับมาขึ้นใหม่ → แถวใหม่ใต้วันนี้ (ในรอบ 1–15 ใช้แถวเดิม) */
+        const op = hs.filter(e => !(e.ed && e.ed < dd));
+        if (!p.rnw && op.length === 1 && hs.length > 1) {
+          op[0].ed = p.ed;
+          op[0].m = true;
+          continue;
+        }
+      } /* มีหลายแถว: ใช้แถวล่าสุดที่ยังไม่ออก */
+      if (p.rnw) {
+        for (const e of c)
+          if (e.g < +P2) {
+            e.m = true;
+            if (!(e.ed && e.ed < +P2)) e.ed = +P2 - 864e5;
+          }
+        const t = c.find(e => e.g === +P2);
+        if (t) {
+          t.ed = p.ed;
+          t.m = true;
+        } else {
+          ent.push({ nm: p.nm, hash: p.hash, g: +P2, ed: p.ed, m: true });
+          renew++;
+        }
+        continue;
+      }
       let t = c.find(e => e.g === p.g && !e.m) || (o.dedupe && c.find(e => e.g === p.g && e.m));
       if (t) {
         t.ed = t.m ? Math.max(t.ed, p.ed) : p.ed;
@@ -824,6 +967,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         continue;
       } /* สัญญาเริ่มก่อนรอบนี้ แต่ไม่เคยลงและไม่ได้ “ขึ้นใหม่” → ไม่เพิ่ม; ถ้าเริ่มในรอบนี้ ลงตามวันเริ่ม (กันพลาดเมื่อข้ามวัน) */
       if (tg !== p.g) today++;
+      if (hb && /16\s*[:：]\s*9|(?:^|[^\d])4\s*:\s*3/.test(p.note || ''))
+        b.ratio.push(p.nm); /* หมายเหตุชนิดจอ ระบบตรวจเองไม่ได้ → เตือน */
       ent.push({ nm: p.nm, hash: p.hash, g: tg, ed: p.ed, m: true });
     }
     b.ent = ent.filter(e => {
@@ -863,11 +1008,19 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     else sh.setS(b.lc, row, b.bl);
     note(b, r, row);
   };
+  for (const c of [o.col1, o.col2]) if (c) MARK.x.add(String(c).toUpperCase().slice(-6));
+  const BS = new Set();
+  for (const [br] of bars)
+    for (const b of B)
+      for (const c of [b.nc, b.pc]) {
+        const x = sh.getS(c, br);
+        if (x != null && x !== b.bp && x !== b.bn && x !== b.be && x !== b.bl) BS.add(x);
+      } /* สไตล์ของแถบเดิมทุกสี (รวมสีธีม) */
   for (const b of B) {
     for (let r = S + 1; r <= Z; r++) {
       {
         const ps = sh.getS(b.pc, r);
-        if (ps != null && (ps === b.hs[2] || MARK.test(ST.fillOf(ps)))) sh.setS(b.pc, r, b.bp);
+        if (ps != null && (ps === b.hs[2] || MARK.test(ST.fillOf(ps)) || BS.has(ps))) sh.setS(b.pc, r, b.bp);
       }
       sh.clear(b.lc, r);
       sh.clear(b.nc, r);
@@ -875,7 +1028,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       {
         const ns = sh.getS(b.nc, r);
         if (b.bn != null) sh.setS(b.nc, r, b.bn);
-        else if (ns != null && MARK.test(ST.fillOf(ns))) sh.setS(b.nc, r, null);
+        else if (ns != null && (MARK.test(ST.fillOf(ns)) || BS.has(ns))) sh.setS(b.nc, r, null);
       }
     }
     if (b.kind === 'metro' && hr > FIRST && !frozen)
@@ -900,33 +1053,57 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     const base = modeF(sh, L, hr + 1, hr + 400, null, ST);
     for (let r = S + 1; r <= Z; r++) {
       const st = sh.getS(L, r);
-      if (st != null && MARK.test(ST.fillOf(st))) sh.setS(L, r, base);
+      if (st != null && (MARK.test(ST.fillOf(st)) || BS.has(st))) sh.setS(L, r, base);
     }
   }
-  const hsx = st => {
-    if (st == null) return st;
-    const g = ISG.test(ST.fillOf(st));
-    return two
-      ? g
+  /* สีแถบ: เลือกเองได้ ถ้าไม่เลือก รอบ 1 ใช้สีหัวตารางเดิม รอบ 2 ใช้สีของแถบรอบ 2 ที่ชีตมีอยู่แล้ว ถ้ายังไม่มีใช้ฟ้า 4472C4 */
+  const R2 = {},
+    KEEP2 = two && !o.col2 && F && +F >= +P;
+  if ((two || CONTM) && !o.col2 && !KEEP2) {
+    const e = bars.find(
+      ([r, d]) =>
+        r > hr &&
+        d &&
+        +d >= +(CONTM ? P2 : P) &&
+        +d <= +E &&
+        sh.getS(b0.lc, r) != null &&
+        sh.getS(b0.lc, r) !== b0.hs[1],
+    );
+    if (e) {
+      for (const b of B) for (const c of [b.nc, b.lc, b.pc]) R2[c] = sh.getS(c, e[0]);
+      for (const [L] of HX) R2[L] = sh.getS(L, e[0]);
+    }
+  }
+  const C2 = o.col2 || 'FF4472C4',
+    fx = (st, c, k) =>
+      String(ST.fillOf(st) || '')
+        .toUpperCase()
+        .slice(-6) === String(c).toUpperCase().slice(-6)
         ? st
-        : ST.derive(st, 'grn', { fill: GRN })
-      : g
-        ? ST.derive(st, 'nvy', { fill: NAVY })
-        : st;
+        : ST.derive(st, k + c, { fill: c });
+  const hsx = (st, L, r2) => {
+    if (st == null) return st;
+    if (two || r2) {
+      if (KEEP2) return st;
+      return !o.col2 && L && R2[L] != null ? R2[L] : fx(st, C2, 'c2');
+    }
+    if (o.col1) return fx(st, o.col1, 'c1');
+    return ISG.test(ST.fillOf(st)) ? ST.derive(st, 'nvy', { fill: NAVY }) : st;
   };
   const hdr = (row, d) => {
+    const r2 = CONTM && +d >= +P2;
     for (const [L, st] of HX) {
       sh.clear(L, row);
-      sh.setS(L, row, hsx(st));
+      sh.setS(L, row, hsx(st, L, r2));
     }
     B.forEach((b, i) => {
       sh.clear(b.lc, row);
       if (i === 0) sh.setNum(b.nc, row, serial(d));
       else sh.setF(b.nc, row, B[i - 1].nc + row);
-      if (b.hs[0] != null) sh.setS(b.nc, row, hsx(b.hs[0]));
-      if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1]));
+      if (b.hs[0] != null) sh.setS(b.nc, row, hsx(b.hs[0], b.nc, r2));
+      if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1], b.lc, r2));
       sh.clear(b.pc, row);
-      if (b.hs[2] != null) sh.setS(b.pc, row, hsx(b.hs[2]));
+      if (b.hs[2] != null) sh.setS(b.pc, row, hsx(b.hs[2], b.pc, r2));
     });
   };
   hdr(S, P);
@@ -971,11 +1148,18 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     P,
     E,
     two,
+    contm: CONTM,
+    renew,
+    back,
     frozen,
     noNotes,
     hist,
     dates: dates.length,
     later: B.reduce((n, b) => n + b.later.length, 0),
+    laterL: B.map(b => [b.scr.c, b.later.map(r => r.ad + (r.s ? ' (เริ่ม ' + r.s + ')' : ''))]).filter(
+      x => x[1].length,
+    ),
+    ratioL: B.map(b => [b.scr.c, b.ratio]).filter(x => x[1].length),
     moved,
     dropped,
     cleared,
@@ -1192,13 +1376,21 @@ async function fillWb(f, on, metro, o) {
         rep.push([
           sn,
           'รูปแบบ',
-          (L.two
-            ? 'รอบ 16–' +
-              rd(L.E) +
-              ' (แถบวันที่สีเขียว) เริ่มแถว ' +
-              L.S +
-              (L.frozen ? ' ต่อท้ายรอบ 1–15 (รอบแรกไม่ถูกแก้)' : '')
-            : 'รอบ 1–15 หัววันที่แถว ' + L.hr) +
+          (L.contm
+            ? 'ทั้งเดือน (วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่สีรอบ 2) หัววันที่แถว ' +
+              L.hr +
+              (L.renew
+                ? ' • ต่อสัญญา/ขึ้นใหม่วันที่ 16 ' +
+                  L.renew +
+                  ' เรื่อง ลงใหม่ใต้แถบ 16 (แถวเดิมใส่ออกวันที่ 16)'
+                : '')
+            : L.two
+              ? 'รอบ 16–' +
+                rd(L.E) +
+                ' (แถบวันที่รอบ 2) เริ่มแถว ' +
+                L.S +
+                (L.frozen ? ' ต่อท้ายรอบ 1–15 (รอบแรกไม่ถูกแก้)' : '')
+              : 'รอบ 1–15 หัววันที่แถว ' + L.hr) +
             (L.noNotes ? ' • วันที่ 1 ยังไม่ใส่ “ออกวันที่”' : '') +
             (L.moved ? ' • ย้ายตัวเลขนับตามชื่อหนัง ' + L.moved + ' ช่อง' : '') +
             (L.today ? ' • หนังใหม่ของวันนี้ ' + L.today + ' เรื่อง ลงใต้แถบวันที่ ' + rd(L.W) : '') +
@@ -1207,9 +1399,25 @@ async function fillWb(f, on, metro, o) {
             (L.merged ? ' • ไฟล์เดิม/ต่อสัญญา ' + L.merged + ' แถว ใช้แถวเดิม ไม่ใส่ออกวันที่' : '') +
             (L.kept ? ' • เก็บหนังที่ลงไว้แล้วแต่ไม่มีใน Playlist วันนี้ ' + L.kept + ' แถว' : '') +
             (L.cleared ? ' • เริ่มรอบใหม่ ล้างตัวเลขนับของรอบก่อน ' + L.cleared + ' ช่อง' : '') +
+            (L.back
+              ? ' • หนังที่เคยออกแล้วกลับมาขึ้นใหม่ ' +
+                L.back +
+                ' เรื่อง ลงแถวใหม่ใต้แถบวันที่ ' +
+                new Date(L.W).getUTCDate()
+              : '') +
             (L.later ? ' • ยังไม่ใส่ ' + L.later + ' เรื่องที่เริ่มหลัง ' + fd(new Date(L.H)) : ''),
           0,
         ]);
+        for (const [c, l] of L.laterL || [])
+          rep.push([sn, c, 'ตรวจ: ยังไม่ใส่ เพราะวันเริ่มในไฟล์ยังไม่ถึง → ' + l.join(', '), 0]);
+        for (const [c, l] of L.ratioL || [])
+          rep.push([
+            sn,
+            c,
+            'ตรวจ: หนังใหม่วันนี้มีหมายเหตุระบุชนิดจอ (16:9 / 4:3) ระบบไม่รู้ว่าจอนี้เป็นแบบไหน จึงใส่ไว้ก่อน → ' +
+              l.join(', '),
+            0,
+          ]);
         for (const j of by[sn]) {
           const sig = !!SIGAL[j[3].c],
             z = [
@@ -1277,7 +1485,16 @@ const TABS = [
   ['tl', '③ แก้ทุกจอ'],
   ['fl', '④ เติมใบเช็ครูป'],
 ];
-const OP = { media: 'ทั้งหมด', sort: 'orig', newOnly: false, dedupe: true, off: false, hand: true, base: '' };
+const OP = {
+  media: 'ทั้งหมด',
+  sort: 'orig',
+  newOnly: false,
+  dedupe: true,
+  off: false,
+  hand: true,
+  base: '',
+  r2: 'cont',
+};
 let DB = [],
   tab = 'dat',
   fm = 'ทั้งหมด',
@@ -1368,7 +1585,7 @@ const SIGAL = {
   'Twin Tube': ['TWT', 'TWINTUBE'],
   PrudentialSathorn: ['สาทร', 'สาธร', 'TWTPLUS', 'PRUDENTIAL'],
   'Air Traveller Gateway': ['AOT'],
-  'The Big Y': ['AOT', 'BIGY', 'THEBIGY'],
+  'The Big Y': ['BIGY', 'THEBIGY'],
   'Ploenchit Interchange': ['PJ', 'PLOENCHIT'],
   'At Narong Interchange': ['AN', 'NARONG', 'ATNARONG'],
   'Exchange Tower': ['EXT'],
@@ -1399,13 +1616,14 @@ function noteSkip(scr, r) {
   const n = String(r.note || '');
   let m = n.match(/ไม่ออน(?:แอร์|จอ)*\s*(.*)/);
   if (m) return ntoks(m[1].split('//')[0]).some(t => al.includes(t));
-  m = n.match(/ออนเ?ฉพาะ\s*(.*)/);
+  m = n.match(/(?:ออน|ขึ้น)?เ?ฉพาะ(?:จอ)?\s*(.*)/);
   if (m) {
     const t = ntoks(m[1].split('//')[0]);
-    return t.length > 0 && !t.some(x => al.includes(x));
+    return t.some(x => ALLAL.has(x)) && !t.some(x => al.includes(x));
   }
   return false;
 }
+const ALLAL = new Set(Object.values(SIGAL).flat());
 const skipRow = (scr, r) => (SIGAL[scr.c] ? noteSkip(scr, r) : r.cnt === 0 && !MTP.test(r.ad.trim()));
 /* ไฟล์ Playlist แบบ Signature Max: 1 ชีต = 1 จอ หัวตารางมีคำว่า หนังโฆษณา และ “รายการปลด” แยกส่วนที่ถอดแล้ว */
 const SIGCODE = { 'Exchange Tower': 'Exchange Tower (SM)', 'Exchange Tower (2)': 'Exchange Tower (SM) 2' };
@@ -1511,6 +1729,8 @@ function parseMetro(wb) {
     gs = '',
     ge = '';
   const rows = [];
+  const cT = h >= 0 ? A[h].findIndex(x => /^Time$/i.test(cl(x))) : -1,
+    cG = h >= 0 ? A[h].findIndex(x => /^Tags?$/i.test(cl(x))) : -1;
   for (let r = h >= 0 ? h + 2 : 5; r < A.length; r++) {
     const row = A[r] || [];
     const c0 = cl(row[0]);
@@ -1533,6 +1753,7 @@ function parseMetro(wb) {
       s: fd(g(row, oS)) || fd(g(row, cS)) || gs,
       e: fd(g(row, oE)) || fd(g(row, cE)) || ge,
       note: cl(row[2]),
+      loc: [cl(g(row, cT)), cl(g(row, cG))].filter(x => /LEDMETRO/i.test(x)).join(' '),
       off,
     });
   }
@@ -1722,7 +1943,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.1 (12 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.4 (14 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -1783,6 +2004,8 @@ try {
   });
 } catch (_) {}
 
+OP.col1 = store.get('ps_col1') || '';
+OP.col2 = store.get('ps_col2') || '';
 let adv = false,
   HELP = false,
   HOW = false,
@@ -1835,6 +2058,55 @@ function say(t) {
   say.t = setTimeout(() => m.classList.remove('show'), 4500);
 }
 const esc2 = v => esc(v ?? '');
+const OPDEF = {
+  hand: true,
+  media: 'ทั้งหมด',
+  sort: 'orig',
+  newOnly: false,
+  dedupe: true,
+  off: false,
+  r2: 'cont',
+};
+const OPNAME = {
+  hand: 'จัดรูปแบบตามใบเช็คจริง',
+  media: 'สื่อ',
+  sort: 'เรียงลำดับ',
+  newOnly: 'เฉพาะหนัง “ขึ้นใหม่”',
+  dedupe: 'ตัดชื่อซ้ำในจอเดียวกัน',
+  off: 'รวมรายการปลดต่อท้าย',
+  r2: 'วันที่ 16 เป็นต้นไป',
+};
+const advChg = () => optChanged().filter(k => k !== 'hand').length;
+const optChanged = () =>
+  Object.keys(OPDEF)
+    .filter(k => (k !== 'sort' || !OP.hand) && (k !== 'r2' || OP.hand))
+    .filter(k => OP[k] !== OPDEF[k]);
+/* ----- สีแถบวันที่: ค่ากลาง (OP.col1/col2) และแยกรายไฟล์ (จำไว้ในเครื่องตามชื่อไฟล์) ----- */
+const COLS = [
+  ['', 'ตามชีต'],
+  ['FF002060', 'น้ำเงินเข้ม'],
+  ['FF4472C4', 'ฟ้า'],
+  ['FF2F5597', 'ฟ้าเข้ม'],
+  ['FF375623', 'เขียว'],
+];
+const swHex = c => (c ? '#' + String(c).slice(-6) : '');
+const colName = c => (COLS.find(x => x[0] === c) || [0, 'สีที่เลือกเอง'])[1];
+const fkey = n => 'ps_fcol:' + String(n).replace(/\.(xlsm|xlsx)$/i, '');
+const fcol = n => {
+  try {
+    const o = JSON.parse(store.get(fkey(n)) || '{}');
+    return { 1: o[1] || '', 2: o[2] || '' };
+  } catch (_) {
+    return { 1: '', 2: '' };
+  }
+};
+const effCol = (r, f) => (f && fcol(f.name)[r]) || OP['col' + r] || '';
+const shownCol = (r, f) => effCol(r, f) || (r === 2 ? 'FF4472C4' : 'FF002060');
+function vColPick(k) {
+  const cur = OP['col' + k],
+    custom = cur && !COLS.some(x => x[0] === cur);
+  return `<div class="swl" role="group" aria-label="สีแถบรอบ ${k === 2 ? '16–สิ้นเดือน' : '1–15'}">${COLS.map(([c, t]) => `<button class="swb ${cur === c ? 'on' : ''}" data-a="col" data-k="${k}|${c}" aria-pressed="${cur === c}" title="${t}">${c ? `<i style="background:${swHex(c)}"></i>` : '<i class="auto"></i>'}<span>${t}</span></button>`).join('')}<button class="swb ${custom ? 'on' : ''}" data-a="colc" data-k="${k}" aria-pressed="${!!custom}" title="เลือกสีเอง"><i class="${custom ? '' : 'rb'}" style="${custom ? 'background:' + swHex(cur) : ''}"></i><span>เลือกเอง</span></button></div>`;
+}
 
 /* ----- วันที่ทำงานที่พิมพ์เอง: ตรวจให้เข้มงวด รองรับปี พ.ศ. 2 หลัก (69 = 2569) และเดือนภาษาไทย ----- */
 function parseUserDate(s) {
@@ -2155,8 +2427,9 @@ const drop = (k, t, s, acc, tour, sm) =>
 const alertHTML = (k, t, body) =>
   `<div class="alert ${k}" role="${k === 'er' ? 'alert' : 'status'}">${k === 'ok' ? IC.okc : k === 'info' ? IC.info : IC.warn}<b>${t}</b><div>${body}</div></div>`;
 const rndHTML = wd => {
-  const pr = per(wd);
-  return `<span class="rnd ${pr.two ? 'p2' : ''}"><i>${end(wd)}</i>${pr.two ? `รอบ 16–${pr.E.getUTCDate()} ${TH[pr.E.getUTCMonth()]} แถบสีเขียว` : `รอบ 1–15 ${TH[pr.E.getUTCMonth()]} แถบสีน้ำเงิน`}</span>`;
+  const pr = per(wd),
+    c = shownCol(pr.two ? 2 : 1);
+  return `<span class="rnd"><i style="background:${swHex(c)}">${end(wd)}</i>${pr.two ? (OP.r2 === 'new' ? `รอบ 16–${pr.E.getUTCDate()} ${TH[pr.E.getUTCMonth()]} เริ่มรายการใหม่ ต่อท้ายรอบ 1–15 ในชีตเดิม` : `วันที่ 16–${pr.E.getUTCDate()} ${TH[pr.E.getUTCMonth()]} ทำต่อในรายการเดิม (แถบวันที่สีรอบ 2)`) : `รอบ 1–15 ${TH[pr.E.getUTCMonth()]}`}${effCol(pr.two ? 2 : 1) ? '' : ' (สีตามชีต)'}</span>`;
 };
 const vBusy = () =>
   BUSY
@@ -2347,7 +2620,16 @@ function vTl() {
 }
 
 /* ----- ขั้นที่ 3 ----- */
-function vCk(f, r, i) {
+function vCk(f, r, i, rk) {
+  const fc = fcol(f.name)[rk],
+    cust = fc && !COLS.some(x => x[0] === fc),
+    sel = `<label class="fcol"><span>สีแถบรอบ ${rk === 2 ? '16–สิ้นเดือน' : '1–15'}</span><select data-fcol="${esc(f.name)}" data-r="${rk}" aria-label="สีแถบของ ${esc(f.name)}"><option value="" ${fc ? '' : 'selected'}>ตามการตั้งค่า (${colName(OP['col' + rk])})</option>${COLS.slice(
+      1,
+    )
+      .map(([c, t]) => `<option value="${c}" ${fc === c ? 'selected' : ''}>${t}</option>`)
+      .join(
+        '',
+      )}${cust ? `<option value="${fc}" selected>สีที่เลือกเอง</option>` : ''}</select><i class="dot" style="background:${swHex(shownCol(rk, f))}"></i></label>`;
   const rm = `<button class="ib" data-a="rm" data-k="${i}" aria-label="เอา ${esc(f.name)} ออก" title="เอาไฟล์นี้ออก">${IC.x}</button>`;
   let pill,
     body = '';
@@ -2371,7 +2653,7 @@ function vCk(f, r, i) {
         '',
       )}${r.nf.length > 12 ? `<span class="need miss">และอีก ${r.nf.length - 12} จอ</span>` : ''}</div>${r.warn.length ? `<p class="nfline">ใช้รายการแทน (จะขึ้นใน “ควรตรวจ”): ${esc(r.warn.join(', '))}</p>` : ''}${r.skip.length ? `<p class="hint" style="margin-top:6px">ข้าม ${r.skip.length} จอตามตัวเลือก “สื่อ” (จะขึ้นใน “ควรตรวจ” ว่าไม่พบจอ)</p>` : ''}`;
   }
-  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}</div>`;
+  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}${r && !r.bad && !r.empty ? sel : ''}</div>`;
 }
 function vFl() {
   const ms = ['ทั้งหมด', ...new Set(DB.filter(s => /^(40|80|CITY|Spare)/.test(s.m)).map(s => s.m))];
@@ -2416,6 +2698,17 @@ function vFl() {
         alertHTML('ok', `ใบเช็ค ${nOk} ไฟล์พร้อมเติม`, '<p>มี Playlist ครบทุกจอที่ใบเช็คเหล่านี้ใช้</p>'),
       );
   }
+  {
+    const ch = optChanged();
+    if (ch.length)
+      lines.push(
+        alertHTML(
+          'wr',
+          `ตั้งค่าไม่ตรงกับค่าแนะนำ ${ch.length} ข้อ`,
+          `<p>${ch.map(k => OPNAME[k]).join(', ')} ตรวจว่าตั้งใจเปลี่ยนจริง ถ้าไม่แน่ใจ กด “คืนค่าแนะนำ”</p><button class="btn quiet" data-a="optreset">คืนค่าแนะนำ</button>`,
+        ),
+      );
+  }
   if (OP.media !== 'ทั้งหมด')
     lines.push(
       alertHTML(
@@ -2437,18 +2730,21 @@ function vFl() {
   return `${shead('เติมใบเช็ครูป', 'ใส่ใบเช็ครูปของวันก่อนหน้า จะใส่ของทุกคนพร้อมกัน หรือเฉพาะของคุณก็ได้ ระบบจะเติมรายชื่อหนังของวันนี้ลงไป')}
  <div class="s3"><div class="col">${drop('ck', C.length ? 'เพิ่มใบเช็ครูป' : 'ลากไฟล์ใบเช็ครูปมาวางที่นี่', 'ใบเช็คของวันก่อนหน้า (.xlsm หรือ .xlsx) หรือคลิกเพื่อเลือกไฟล์ เลือกหลายไฟล์ได้ ไฟล์ชื่อซ้ำจะแทนที่ของเดิม', '.xlsx,.xlsm', 'drop-ck', C.length > 0)}
  <section class="panel" data-tour="ready"><h3 class="sec-t">ใบเช็ครูปที่ใส่แล้ว<small>${C.length} ไฟล์</small></h3>
- ${C.length ? `<div class="ckl">${C.map((f, i) => vCk(f, R[i], i)).join('')}</div>` : '<p class="empty">ยังไม่มีใบเช็ครูป ลากไฟล์มาวางในกล่องด้านบน แล้วระบบจะบอกว่าแต่ละไฟล์ต้องใช้ Playlist แบบไหน</p>'}</section></div>
+ ${C.length ? `<div class="ckl">${C.map((f, i) => vCk(f, R[i], i, wd && per(wd).two ? 2 : 1)).join('')}</div>` : '<p class="empty">ยังไม่มีใบเช็ครูป ลากไฟล์มาวางในกล่องด้านบน แล้วระบบจะบอกว่าแต่ละไฟล์ต้องใช้ Playlist แบบไหน</p>'}</section></div>
  <aside class="panel set" data-tour="settings"><h3 class="sec-t">การตั้งค่า</h3>
  <label class="date"><span>วันที่ทำงาน (วันของ Playlist)</span><input id="o_base" class="${BASEERR ? 'bad' : ''}" placeholder="${end(ab) || 'เช่น 12-Oct-26'}" autocomplete="off" aria-invalid="${!!BASEERR}">${dmsg}${wd && !BASEERR ? rndHTML(wd) + (wd.getUTCDate() === 1 ? '<small>วันที่ 1 ยังไม่ใส่ “ออกวันที่”</small>' : '') : ''}</label>
- <label class="tgl"><span>จัดแบบที่ทำด้วยมือ<small># ขึ้นก่อน (ไฮไลต์เหลือง) แล้ว A–Z แยกตามวันเริ่ม และใส่ “ออกวันที่” ควรเปิดไว้เสมอ</small></span><span class="sw"><input type="checkbox" id="o_hand"><span></span></span></label>
- <button class="adv" data-a="adv" aria-expanded="${adv}">ตัวเลือกเพิ่มเติม${IC.chev}</button>
+ <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายตัวเลขนับตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
+ ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และตัวเลขที่นับไว้จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
+ <div class="cols"><p class="cl">สีแถบวันที่</p><div class="crow"><span>รอบ 1–15</span>${vColPick(1)}</div><div class="crow"><span>รอบ 16–สิ้นเดือน</span>${vColPick(2)}</div><small>“ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ (รอบ 16 ถ้าชีตยังไม่มีแถบรอบ 2 ใช้สีฟ้า) เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
+ <button class="adv" data-a="adv" aria-expanded="${adv}"><span>ตัวเลือกเพิ่มเติม${advChg() ? ` <em class="chg">เปลี่ยนจากค่าแนะนำ ${advChg()} ข้อ</em>` : ''}</span>${IC.chev}</button>
  <div class="advb" ${adv ? '' : 'hidden'}>
- <label class="fld"><span>สื่อ</span><select id="o_media">${ms.map(m => `<option>${esc(m)}</option>`).join('')}</select></label>
- <label class="fld"><span>เรียงลำดับ</span><select id="o_sort"><option value="orig">ตามไฟล์ Playlist</option><option value="az">ก-ฮ / A-Z</option><option value="new">ขึ้นใหม่ก่อน</option></select></label>
- <label class="cb"><input type="checkbox" id="o_new"> เฉพาะหนัง “ขึ้นใหม่”</label>
- <label class="cb"><input type="checkbox" id="o_dd"> ตัดชื่อซ้ำในจอเดียวกัน</label>
- <label class="cb"><input type="checkbox" id="o_off"> รวมรายการปลดต่อท้าย (ใช้ตรวจว่าถอดแล้ว)</label>
- <p class="hint">“สื่อ” จำกัดให้เติมเฉพาะจอของสื่อที่เลือก ส่วน “เรียงลำดับ” มีผลเมื่อปิดการจัดแบบที่ทำด้วยมือ</p></div></aside></div>
+ <div class="opt"><label class="fld"><span>สื่อ</span><select id="o_media" aria-describedby="d_media">${ms.map(m => `<option>${esc(m)}</option>`).join('')}</select></label><small id="d_media">เติมจอแยก (40/80 Blue/Red, CITY, Spare) เฉพาะสื่อที่เลือก ชีตจอแยกของสื่ออื่นจะไม่ถูกเติม ส่วน Signature Max, Show DC, BKJ และ Metro LED เติมตามปกติ ใช้เมื่ออยากเติมใหม่แค่สื่อเดียว <b>แนะนำ: ทั้งหมด</b></small></div>
+ <div class="opt"><label class="fld"><span>เรียงลำดับ</span><select id="o_sort" aria-describedby="d_sort" ${OP.hand ? 'disabled' : ''}><option value="orig">ตามไฟล์ Playlist</option><option value="az">ก-ฮ / A-Z</option><option value="new">ขึ้นใหม่ก่อน</option></select></label><small id="d_sort">${OP.hand ? 'ใช้ได้เฉพาะตอนปิด “จัดรูปแบบตามใบเช็คจริง” ตอนเปิด ระบบเรียง # ก่อน แล้ว A–Z ให้อยู่แล้ว' : 'ลำดับรายชื่อตอนวางเรียงลงมา: ตามไฟล์ Playlist / ตามตัวอักษร / หนังขึ้นใหม่อยู่บนสุด'}</small></div>
+ <div class="opt"><label class="cb"><input type="checkbox" id="o_new" aria-describedby="d_new"> เฉพาะหนัง “ขึ้นใหม่”</label><small id="d_new">ใส่เฉพาะหนังที่สถานะมีคำว่า “ขึ้นใหม่” หนังที่ออนต่อเนื่องจะถูกข้าม ใช้ดูว่าวันนี้มีหนังใหม่เรื่องไหน ไม่ใช่สำหรับไฟล์ส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
+ <div class="opt"><label class="cb"><input type="checkbox" id="o_dd" aria-describedby="d_dd"> ตัดชื่อซ้ำในจอเดียวกัน</label><small id="d_dd">หนังชื่อเดียวกันที่อยู่ใน Playlist 2 แถวในจอเดียว (เช่น ออน 2 ช่วงเวลา) ลงใบเช็คแถวเดียว ถ้าไม่ติ๊กจะลง 2 แถวซ้ำกัน <b>แนะนำ: ติ๊ก</b></small></div>
+ <div class="opt"><label class="fld"><span>วันที่ 16 เป็นต้นไป</span><select id="o_r2" aria-describedby="d_r2" ${OP.hand ? '' : 'disabled'}><option value="cont">ทำต่อในรายการเดิม</option><option value="new">เริ่มรายการใหม่ใต้แถบ 16</option></select></label><small id="d_r2"><b>ทำต่อในรายการเดิม</b> = แบบที่ทีมทำ: หนังเดิมอยู่ที่เดิม หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 และแถวเดิมใส่ “ออกวันที่ 16” <b>เริ่มรายการใหม่</b> = แบบเวอร์ชัน 2.3: ลงหนังที่ออนอยู่ทั้งหมดใหม่ใต้แถบ 16 ต่อท้ายรอบ 1–15 <b>แนะนำ: ทำต่อในรายการเดิม</b></small></div>
+ <div class="opt"><label class="cb"><input type="checkbox" id="o_off" aria-describedby="d_off"> รวมรายการปลดต่อท้าย</label><small id="d_off">เขียนรายชื่อหนังที่ปลด/ถอดแล้วต่อท้ายตาราง ใช้ตรวจว่าเรื่องไหนถอดไปแล้ว อย่าใช้กับไฟล์ที่จะส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
+ <button class="btn quiet" data-a="optreset" ${optChanged().length ? '' : 'disabled'}>คืนค่าแนะนำทั้งหมด</button></div></aside></div>
  <div class="fillbar">${lines.join('')}<button class="btn primary big" data-a="fill" data-tour="fill" ${can ? '' : 'disabled'}>เติมใบเช็ครูป${C.length ? ` ${C.length} ไฟล์` : ''}</button>${BASEERR ? '<p class="hint">แก้วันที่ทำงานให้ถูกต้องก่อน แล้วปุ่มนี้จะกดได้</p>' : DB.length && !C.length ? '<p class="hint">ใส่ใบเช็ครูปอย่างน้อย 1 ไฟล์ แล้วปุ่มนี้จะกดได้</p>' : ''}</div>`;
 }
 
@@ -2493,16 +2789,19 @@ const vHelp =
 <li><b>ขั้นที่ 3 เติมใบเช็ครูป</b><span>ลากใบเช็ครูปลงกล่อง ดูว่าแต่ละไฟล์ขึ้น “พร้อมเติม” วันที่ทำงานและรอบถูกต้อง แล้วกด “เติมใบเช็ครูป”</span></li>
 <li><b>ขั้นที่ 4 ผลการเติม</b><span>เปิดดูรายการ “ควรตรวจ” ของแต่ละไฟล์ แล้วกด “ดาวน์โหลดทั้งหมด (.zip)” ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันพรุ่งนี้</span></li></ol>
 <h3>ระบบจัดให้อย่างไร</h3><ul class="hr2">
-<li>วันแรกของรอบ (วันที่ 1 และ 16) ลงหนังที่ออนอยู่ทั้งหมด หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z</li>
+<li>วันที่ 1 ลงหนังที่ออนอยู่ทั้งหมด หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z</li>
 <li>วันถัดไป หนังที่ยังไม่มีในใบเช็คและสถานะ “ขึ้นใหม่” จะลงใต้แถบวันที่ของวันนั้น หนังที่มีอยู่แล้วอยู่ที่เดิม ไม่ซ้ำ</li>
-<li>“ออกวันที่ N” ใส่เมื่อถึงวันที่หนังออก (วันที่ 1 ยังไม่ใส่) ไฟล์เดิม / ต่อสัญญา ไม่ใส่ออกวันที่และไม่เพิ่มแถวซ้ำ</li>
+<li>หนังที่ยังอยู่ใน Playlist ถือว่ายังออนอยู่ “ออกวันที่ N” ใส่เมื่อหนังย้ายไปอยู่ในรายการถอด (วันที่ 1 ยังไม่ใส่) ไฟล์เดิม / ต่อสัญญากลางรอบ ใช้แถวเดิม ไม่เพิ่มแถวซ้ำ</li>
 <li>ตัวเลขที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</li>
-<li>วันที่ 16 เริ่มรอบใหม่เป็นแถบสีเขียวต่อท้ายในชีตเดิม ไม่แตะรอบ 1–15 และแถบท้ายตารางเป็นวันถัดไปเสมอ</li></ul>
+<li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
+<li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ (Signature Max, Show DC), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น / ใช้รายการ THE CITY แทน</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง</li>
 <li><b>รหัสนี้อยู่ในหลายสื่อ</b> ตั้งชื่อชีตในใบเช็คให้มี 40/80 + Blue/Red, CITY หรือ Spare แล้วเติมใหม่</li>
 <li><b>ไม่ใส่ตามหมายเหตุ / จำนวนครั้ง = 0</b> บอกหนังที่ระบบตั้งใจไม่ใส่ ดูว่าตรงกับ Playlist</li>
+<li><b>ยังไม่ใส่ เพราะวันเริ่มในไฟล์ยังไม่ถึง</b> หนังที่เริ่มหลังวันที่ทำงาน ระบบจะใส่ให้เองเมื่อถึงวันเริ่ม</li>
+<li><b>หนังใหม่มีหมายเหตุระบุชนิดจอ (16:9 / 4:3)</b> ระบบไม่รู้ว่าจอเป็นแบบไหน จึงใส่ไว้ก่อน ดูว่าจอนี้ต้องมีหนังเรื่องนี้ไหม</li>
 <li><b>มีรอบ 16–สิ้นเดือนแล้ว แต่วันที่ทำงานอยู่ในรอบ 1–15</b> วันที่ทำงานน่าจะผิด แก้ในขั้นที่ 3 แล้วเติมใหม่</li>
 <li><b>ไม่ได้เติม / เติมไฟล์นี้ไม่ได้</b> ไฟล์เสีย หรือไม่ใช่ใบเช็ครูป (เช่น ใส่ไฟล์ Playlist ผิดขั้น) ไฟล์อื่นยังเติมตามปกติ ใส่ไฟล์ที่ถูกต้องแล้วเติมใหม่</li></ul>
 <p class="hn">ถ้าผลไม่ตรง เก็บไฟล์ Playlist ใบเช็คก่อนเติม และไฟล์ zip ของวันนั้นไว้ส่งให้ผู้ดูแลระบบ</p>
@@ -2517,7 +2816,7 @@ function vHow() {
   const sheet = `<div><div class="xl" role="img" aria-label="ตัวอย่างใบเช็ครูปหลังเติมวันที่ 3"><table><tbody><tr class="hdrrow"><td class="g"></td><td>วันที่ / หมายเหตุ</td><td>ชื่อหนังโฆษณา</td><td>นับ</td></tr>
  ${row(1, '1-Oct-26', '', '', 'xb')}${row(2, '', '#ประชาสัมพันธ์จอ', '12', '', 'y')}${row('', '', '#ข่าวสารเมือง', '12', '', 'y')}${row(3, '', 'กาแฟ ก รสใหม่', '11')}${row(4, 'ออกวันที่ 3', 'ธนาคาร ข แอปใหม่', '12', '', '', 'rd')}${row(5, '', 'รถยนต์ ค รุ่นใหม่', '10')}
  ${row(6, '2-Oct-26', '', '', 'xb')}${row('', '', 'ประกัน ง แผนครอบครัว', '6')}${row('', '3-Oct-26', '', '', 'xb')}${row('', '', 'มือถือ จ รุ่นพับได้', '3')}${row(7, '4-Oct-26', '', '', 'xb')}</tbody></table></div>
- <div class="xl" style="margin-top:10px" role="img" aria-label="แถบวันที่สีเขียวของรอบ 16"><table><tbody>${row(8, '16-Oct-26', '', '', 'xb2')}</tbody></table></div><p class="fine">ตัวอย่างใบเช็คหลังเติมวันที่ 3 ชื่อหนังเป็นชื่อสมมติ</p></div>`;
+ <div class="xl" style="margin-top:10px" role="img" aria-label="แถบวันที่ของรอบ 16"><table><tbody>${row(8, '16-Oct-26', '', '', 'xb2')}</tbody></table></div><p class="fine">ตัวอย่างใบเช็คหลังเติมวันที่ 3 ชื่อหนังเป็นชื่อสมมติ</p></div>`;
   return `<div class="ov page"><div class="pg" role="dialog" aria-modal="true" aria-labelledby="howt"><div class="pgbar"><b>ระบบทำงานอย่างไร</b><button class="btn secondary" data-a="how" data-focus>${IC.x}ปิด</button></div><div class="pgin">
  <header class="pghero"><h1 id="howt">จาก Playlist 11 ไฟล์ ถึงใบเช็ครูปของทุกคน ในครั้งเดียว</h1><p>ทุกวันผู้ตรวจต้องนำรายชื่อหนังโฆษณาจาก Playlist ไปลงใบเช็ครูปของแต่ละคน ระบบนี้ทำส่วนนั้นให้ตามกฎที่ทีมใช้ทำมือ แล้วให้คนตรวจผลก่อนใช้งานจริง</p></header>
  <section class="flow" aria-label="เส้นทางของไฟล์">
@@ -2536,7 +2835,7 @@ function vHow() {
  <li><span class="cn">5</span><span><b>ตัวเลขในคอลัมน์ “นับ”</b> ที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</span></li>
  <li><span class="cn">6</span><span><b>หนังใหม่ของแต่ละวัน</b> (สถานะ “ขึ้นใหม่”) ลงใต้แถบวันที่ของวันนั้น ไม่ซ้ำกับของเดิม</span></li>
  <li><span class="cn">7</span><span><b>แถบท้ายตารางเป็นวันถัดไป</b> ไว้ลงหนังของพรุ่งนี้</span></li>
- <li><span class="cn">8</span><span><b>วันที่ 16 เริ่มรอบใหม่</b> เป็นแถบสีเขียวต่อท้ายในชีตเดิม ไม่แตะรอบ 1–15</span></li></ol></div></section>
+ <li><span class="cn">8</span><span><b>วันที่ 16 ทำต่อในรายการเดิม</b> แถบวันที่ 16 เป็นต้นไปเป็นอีกสี (ค่าเริ่มต้นสีฟ้า เลือกสีได้) หนังที่ต่อสัญญาวันที่ 16 ลงใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16”</span></li></ol></div></section>
  <section class="pgtwo"><div><h2>ข้อมูลลูกค้าปลอดภัย</h2><ul><li>ไฟล์ Playlist และใบเช็คประมวลผลในเบราว์เซอร์ของเครื่องนี้ ไม่ถูกอัปโหลดไปที่ใด แม้เปิดระบบจากลิงก์</li><li>ใช้แบบออฟไลน์ได้ โดยดาวน์โหลดไฟล์ระบบไปเปิดในเครื่อง</li><li>ทุกครั้งที่เติม ระบบสรุปรายการ “ควรตรวจ” ให้คนตรวจซ้ำ คนเป็นผู้ตัดสินสุดท้ายก่อนใช้งานจริง</li></ul></div>
  <div><h2>สร้างด้วยอะไร</h2><ul><li><b>Claude</b> (AI ของ Anthropic) ช่วยถอดกฎจากใบเช็คที่ทีมทำมือ เขียนระบบ และทดสอบกับไฟล์จริง</li><li><b>SheetJS</b> อ่านไฟล์ Excel และ <b>JSZip</b> แก้ไฟล์ .xlsm โดยมาโครอยู่ครบ</li><li><b>n8n</b> (ไม่บังคับ) รวบรวม Playlist จาก Gmail ลง Google Drive ทุกชั่วโมง พร้อมอีเมลบอกว่าได้ครบหรือยัง</li></ul></div></section>
  <div class="pgcta"><button class="btn primary big" data-a="how">เริ่มใช้งาน</button><button class="btn secondary big" data-a="howtour">${IC.tour}ดูทัวร์แนะนำ</button></div>
@@ -2564,7 +2863,7 @@ const TOURS = {
     {
       t: 'date',
       h: 'วันที่ของ Playlist',
-      p: 'ต้องเป็นวันที่จะเติม แถบสีบอกรอบ: น้ำเงิน = 1–15 เขียว = 16–สิ้นเดือน ถ้าไม่ตรง แก้ได้ในขั้นที่ 3',
+      p: 'ต้องเป็นวันที่จะเติม และบอกว่าเป็นรอบ 1–15 หรือ 16–สิ้นเดือน ถ้าไม่ตรง แก้ได้ในขั้นที่ 3',
     },
     {
       t: 'next1',
@@ -2622,7 +2921,7 @@ const TOURS = {
     {
       t: 'settings',
       h: 'วันที่และรอบ',
-      p: 'ปกติเว้นว่างไว้ ระบบใช้วันที่จากชื่อไฟล์ Playlist ถ้าพิมพ์เอง ระบบจะบอกวันที่ที่อ่านได้ใต้ช่อง ดูแถบสีว่ารอบถูกต้อง และเปิด “จัดแบบที่ทำด้วยมือ” ไว้เสมอ',
+      p: 'ปกติเว้นว่างไว้ ระบบใช้วันที่จากชื่อไฟล์ Playlist ถ้าพิมพ์เอง ระบบจะบอกวันที่ที่อ่านได้ใต้ช่อง ดูว่ารอบถูกต้อง เปิด “จัดรูปแบบตามใบเช็คจริง” ไว้เสมอ และเลือกสีแถบวันที่ได้ (ปกติใช้ “ตามชีต”) ตัวเลือกเพิ่มเติมทุกตัวมีคำอธิบายใต้ตัวเลือก',
     },
     { t: 'fill', h: 'กดเติม', p: 'ระบบเติมทุกไฟล์ในครั้งเดียว ใช้เวลาไม่กี่วินาที แล้วพาไปหน้าผลการเติม' },
   ],
@@ -2762,6 +3061,7 @@ function view() {
     $('#o_dd').checked = OP.dedupe;
     $('#o_off').checked = OP.off;
     $('#o_hand').checked = OP.hand;
+    $('#o_r2').value = OP.r2;
     $('#o_base').value = BASEERR || OP.base;
   }
   for (const id in kv) {
@@ -3130,6 +3430,23 @@ const ACT = {
     store.set('ps_theme', t);
     setTheme(t);
   },
+  col: k => {
+    const [r, c] = k.split('|');
+    OP['col' + r] = c || '';
+    store.set('ps_col' + r, c || '');
+  },
+  colc: k => {
+    const p = $('#colpick');
+    if (!p) return;
+    p.dataset.k = k;
+    p.value = swHex(OP['col' + k]) || '#4472c4';
+    p.click();
+  },
+  optreset: () => {
+    Object.assign(OP, OPDEF);
+    note = 'คืนค่าแนะนำแล้ว';
+    FOCUSSEL = '#o_hand';
+  },
   clrx: () => {
     PLX = [];
     FOCUSSEL = '[data-dz="pl"]';
@@ -3407,7 +3724,7 @@ const ACT = {
           };
         else
           try {
-            r = await fillWb(f, on, metro, o);
+            r = await fillWb(f, on, metro, { ...o, col1: effCol(1, f), col2: effCol(2, f) });
           } catch (e) {
             r = {
               rep: [
@@ -3504,6 +3821,20 @@ document.addEventListener('change', e => {
     OP.dedupe = $('#o_dd').checked;
     OP.off = $('#o_off').checked;
     OP.hand = $('#o_hand').checked;
+    OP.r2 = $('#o_r2').value;
+    softView();
+    return;
+  }
+  if (t.id === 'colpick') {
+    OP['col' + t.dataset.k] = 'FF' + t.value.slice(1).toUpperCase();
+    store.set('ps_col' + t.dataset.k, OP['col' + t.dataset.k]);
+    view();
+    return;
+  }
+  if (t.dataset.fcol != null) {
+    const m = fcol(t.dataset.fcol);
+    m[t.dataset.r] = t.value;
+    store.set(fkey(t.dataset.fcol), JSON.stringify(m));
     softView();
     return;
   }
