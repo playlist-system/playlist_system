@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 2.4 • 14 ต.ค. 2569
+ *  เวอร์ชัน 2.5 • 15 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -35,7 +35,9 @@
  *   11. ทัวร์แนะนำ ................................... TOURS, tourStart, tourDraw
  *   12. ปุ่มและเหตุการณ์ .............................. view, ACT, document.addEventListener
  *  (เวอร์ชัน 2.4 ปรับกฎในส่วน 3, 5 และ 7 จากการเทียบกับใบเช็คที่ทีมทำมือเดือน ก.ย.–ต.ค. 2569
- *   เช่น วันที่ 16 ทำต่อในรายการเดิม หมายเหตุ BKJ / Metro LED — ดูประวัติเวอร์ชันใน README.md)
+ *   เช่น วันที่ 16 ทำต่อในรายการเดิม หมายเหตุ BKJ / Metro LED — ดูประวัติเวอร์ชันใน README.md
+ *   เวอร์ชัน 2.5 แก้ส่วน 2, 5 และ 6: จอที่ไม่มีใน Playlist ของวันนั้นคงรายการเดิมไว้ในชีต
+ *   ให้แถบวันที่ตรงกันทั้งชีต อ่านแถบวันที่ที่เป็นสูตร =F45 ได้ และลบ calcChain กัน Excel ซ่อมไฟล์)
  * ======================================================================
  */
 
@@ -178,13 +180,18 @@ class Sheet {
     e.textContent = String(v);
     c.appendChild(e);
   }
-  setF(col, n, f) {
+  setF(col, n, f, v) {
     const c = this.cell(col, n);
     while (c.firstChild) c.removeChild(c.firstChild);
     c.removeAttribute('t');
     const e = this.doc.createElementNS(NS, 'f');
     e.textContent = f;
     c.appendChild(e);
+    if (v != null) {
+      const x = this.doc.createElementNS(NS, 'v');
+      x.textContent = String(v);
+      c.appendChild(x);
+    }
   }
   numRow(col, a, b) {
     for (let r = a; r <= b; r++) {
@@ -609,7 +616,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     noNotes = W.getUTCDate() === 1;
   const B = jobs.map(j => {
     const kind = j[4],
-      all = chkRows(j[3], { ...o, off: true }, kind),
+      all = kind === 'keep' ? [] : chkRows(j[3], { ...o, off: true }, kind),
       lc = j[1],
       nc = pv(lc),
       pc = nx(lc);
@@ -618,6 +625,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       nc,
       pc,
       kind,
+      n: j[5] || 1,
       all,
       scr: j[3],
       rows: o.off ? all : all.filter(r => !r.off),
@@ -652,15 +660,44 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     },
     b0 = B[0];
   /* ปีในหัววันที่ที่พิมพ์ผิด (เช่น 2025 แทน 2026) ให้ถือเป็นปีของรอบนี้ */
-  const barD = r => {
-    const x = wsv && wsv[b0.nc + r];
-    if (!(x && typeof x.v === 'number' && x.v > 20000 && x.v < 80000)) return null;
-    const d = s2d(x.v),
-      y = P.getUTCFullYear();
-    return Math.abs(d.getUTCFullYear() - y) === 1
-      ? new Date(Date.UTC(y, d.getUTCMonth(), d.getUTCDate()))
-      : d;
-  };
+  const fOf = (c, r) => {
+    const x = wsv && wsv[c + r];
+    if (x && typeof x.f === 'string') return x.f;
+    const e = sh.cell(c, r, false),
+      f = e && e.getElementsByTagNameNS(NS, 'f')[0];
+    return f ? f.textContent : null;
+  }; /* SheetJS ไม่อ่านช่องสูตรที่ไม่มีค่าที่คำนวณไว้ → ดูสูตรจาก XML ของชีต */
+  const numAt = (c, r, k = 0) => {
+    const f = k < 4 && fOf(c, r),
+      m = f && f.replace(/^=/, '').match(/^\$?([A-Z]{1,3})\$?(\d+)\s*(?:([+-])\s*(\d+))?$/);
+    if (m) {
+      const v = numAt(m[1], +m[2], k + 1);
+      if (v != null) return v + (m[3] ? (m[3] === '-' ? -1 : 1) * +m[4] : 0);
+    }
+    const x = wsv && wsv[c + r];
+    return x && typeof x.v === 'number' ? x.v : null;
+  }; /* แถบวันที่ที่เป็นสูตรอ้างช่องอื่น (เช่น =F45) อ่านจากช่องต้นทาง */
+  const inB = n => n != null && n > 20000 && n < 80000,
+    barD = r => {
+      let v = numAt(b0.nc, r);
+      if (!inB(v)) {
+        v = null;
+        if (!B.some(b => vOf(b.lc, r)))
+          for (const b of B.slice(1)) {
+            const n = numAt(b.nc, r);
+            if (inB(n)) {
+              v = n;
+              break;
+            }
+          }
+      }
+      if (v == null) return null;
+      const d = s2d(v),
+        y = P.getUTCFullYear();
+      return Math.abs(d.getUTCFullYear() - y) === 1
+        ? new Date(Date.UTC(y, d.getUTCMonth(), d.getUTCDate()))
+        : d;
+    };
   const isBar = r => {
     if (barD(r)) return true;
     const st = sh.getS(b0.lc, r);
@@ -715,6 +752,18 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   )
     return {
       skip: 'ชีตนี้มีรอบ 16–สิ้นเดือนแล้ว แต่วันที่ทำงานอยู่ในรอบ 1–15 — ไม่ได้แก้ชีตนี้ ตรวจวันที่ทำงานอีกครั้ง',
+    };
+  const KB = B.filter(
+    b => b.kind === 'keep',
+  ); /* จอในชีตเดียวกันใช้แถวและแถบวันที่ร่วมกัน: จอที่ไม่มีใน Playlist ต้องคงรายการเดิมไว้ในแถวที่ตรงกัน */
+  if (KB.length && (!hist || KB.some(b => b.n > 1)))
+    return {
+      skip:
+        'ไม่พบจอ ' +
+        KB.map(b => b.scr.c).join(', ') +
+        ' ใน Playlist ที่ใส่มา และ' +
+        (hist ? 'จอนี้มีช่องนับหลายคอลัมน์' : 'ชีตนี้กำลังเริ่มรอบใหม่') +
+        ' — ไม่ได้แก้ชีตนี้ (จอในชีตเดียวกันใช้แถบวันที่ร่วมกัน) ใส่ Playlist ที่มีจอนี้ด้วย เช่นไฟล์ล่าสุดของวันก่อน แล้วเติมใหม่',
     };
   const Z = Math.max(last + 2, S + 400),
     lim = Math.min(+addD(W, +o.days || 0), +E),
@@ -809,7 +858,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       }
       if (hist) {
         const m = vOf(b.nc, r).match(/^ออก(?:วันที่)?\s*(\d{1,2})/);
-        b.hist.push({ nm, g, ned: m ? exitOf(+m[1], P) : 0 });
+        b.hist.push({ nm, g, ned: m ? exitOf(+m[1], P) : 0, raw: m ? vOf(b.nc, r) : '' });
       }
     }
   }
@@ -880,6 +929,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         hash: h.nm.startsWith('#'),
         g: h.g,
         ed: h.ned || offEd.get(h.nm) || 0,
+        raw: h.raw,
         h: true,
         m: false,
       });
@@ -971,15 +1021,18 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         b.ratio.push(p.nm); /* หมายเหตุชนิดจอ ระบบตรวจเองไม่ได้ → เตือน */
       ent.push({ nm: p.nm, hash: p.hash, g: tg, ed: p.ed, m: true });
     }
-    b.ent = ent.filter(e => {
-      if (e.m) return true;
-      if (e.g > dd) {
-        gone++;
-        return false;
-      }
-      kept++;
-      return true;
-    });
+    b.ent =
+      b.kind === 'keep'
+        ? ent
+        : ent.filter(e => {
+            if (e.m) return true;
+            if (e.g > dd) {
+              gone++;
+              return false;
+            }
+            kept++;
+            return true;
+          });
   }
   const seen = new Set();
   for (const b of B) for (const e of b.ent) if (e.g > +P) seen.add(e.g);
@@ -1006,7 +1059,11 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     sh.setText(b.lc, row, r.nm);
     if (r.hash) sh.setS(b.lc, row, ST.derive(b.bl, 'yel', { fill: 'FFFFFF00' }));
     else sh.setS(b.lc, row, b.bl);
-    note(b, r, row);
+    if (b.kind !== 'keep') note(b, r, row);
+    else if (r.raw) {
+      sh.setText(b.nc, row, r.raw);
+      sh.setS(b.nc, row, ST.derive(b.bn, 'red', { color: 'FFFF0000', right: true }));
+    }
   };
   for (const c of [o.col1, o.col2]) if (c) MARK.x.add(String(c).toUpperCase().slice(-6));
   const BS = new Set();
@@ -1099,7 +1156,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     B.forEach((b, i) => {
       sh.clear(b.lc, row);
       if (i === 0) sh.setNum(b.nc, row, serial(d));
-      else sh.setF(b.nc, row, B[i - 1].nc + row);
+      else sh.setF(b.nc, row, B[i - 1].nc + row, serial(d));
       if (b.hs[0] != null) sh.setS(b.nc, row, hsx(b.hs[0], b.nc, r2));
       if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1], b.lc, r2));
       sh.clear(b.pc, row);
@@ -1149,6 +1206,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     E,
     two,
     contm: CONTM,
+    keep: KB.map(b => b.scr.c).join(', '),
     renew,
     back,
     frozen,
@@ -1353,6 +1411,31 @@ async function fillWb(f, on, metro, o) {
   }
   const by = {};
   for (const j of jobs) (by[j[0]] = by[j[0]] || []).push(j);
+  const KEEP = {};
+  for (const sn in by) {
+    const ws = wb.Sheets[sn],
+      av = [];
+    for (const k of Object.keys(ws)) {
+      const m = k.match(/^([A-Z]+)9$/);
+      if (m && ws[k].f && /^AVERAGE/.test(ws[k].f)) av.push(col2n(m[1]));
+    }
+    av.sort((x, y) => x - y);
+    const own = by[sn].map(j => col2n(j[1]));
+    for (const cs of av.filter(c => !av.includes(c - 1))) {
+      let ce = cs;
+      while (av.includes(ce + 1)) ce++;
+      if (own.some(l => l >= cs - 1 && l <= ce)) continue;
+      const lc = n2col(cs - 1);
+      let has = false;
+      for (let r = FIRST; r < FIRST + 400 && !has; r++) {
+        const x = ws[lc + r];
+        if (x && typeof x.v === 'string' && x.v.trim() && !/^ออก/.test(x.v.trim())) has = true;
+      }
+      if (!has) continue;
+      const label = cl((ws[lc + '10'] || {}).v) || cl((ws[n2col(cs) + '11'] || {}).v) || lc;
+      (KEEP[sn] = KEEP[sn] || []).push([sn, lc, [], { c: label, rows: [], pd: 0 }, 'keep', ce - cs + 1]);
+    }
+  } /* จอที่ไม่มีใน Playlist วันนี้ แต่อยู่ในชีตเดียวกับจอที่เติม */
   const ST = o.hand
       ? mkStyles(
           new DOMParser().parseFromString(await zip.file('xl/styles.xml').async('string'), 'application/xml'),
@@ -1362,7 +1445,7 @@ async function fillWb(f, on, metro, o) {
   for (const sn in by) {
     const sh = new Sheet(await zip.file(path[sn]).async('string'));
     if (ST && W && by[sn].every(j => j[3])) {
-      const L = layoutChk(sh, by[sn], o, ST, W, wb.Sheets[sn]);
+      const L = layoutChk(sh, [...by[sn], ...(KEEP[sn] || [])], o, ST, W, wb.Sheets[sn]);
       if (L.skip) rep.push([sn, 'รูปแบบ', 'ตรวจ: ' + L.skip, 0]);
       else {
         if (L.dropped)
@@ -1405,7 +1488,10 @@ async function fillWb(f, on, metro, o) {
                 ' เรื่อง ลงแถวใหม่ใต้แถบวันที่ ' +
                 new Date(L.W).getUTCDate()
               : '') +
-            (L.later ? ' • ยังไม่ใส่ ' + L.later + ' เรื่องที่เริ่มหลัง ' + fd(new Date(L.H)) : ''),
+            (L.later ? ' • ยังไม่ใส่ ' + L.later + ' เรื่องที่เริ่มหลัง ' + fd(new Date(L.H)) : '') +
+            (L.keep
+              ? ' • คงรายการเดิมของ ' + L.keep + ' (ไม่มีใน Playlist ที่ใส่มา) แถบวันที่ยังตรงกันทั้งชีต'
+              : ''),
           0,
         ]);
         for (const [c, l] of L.laterL || [])
@@ -1467,6 +1553,24 @@ async function fillWb(f, on, metro, o) {
     else wx.documentElement.appendChild(cp);
   }
   cp.setAttribute('fullCalcOnLoad', '1');
+  if (zip.file('xl/calcChain.xml')) {
+    zip.remove('xl/calcChain.xml');
+    for (const r of [...rels.getElementsByTagName('Relationship')])
+      if (/calcChain$/i.test(r.getAttribute('Type') || '')) r.parentNode.removeChild(r);
+    zip.file(
+      'xl/_rels/workbook.xml.rels',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+        new XMLSerializer().serializeToString(rels.documentElement),
+      { createFolders: false },
+    );
+    const ct = zip.file('[Content_Types].xml');
+    if (ct)
+      zip.file(
+        '[Content_Types].xml',
+        (await ct.async('string')).replace(/<Override[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/gi, ''),
+        { createFolders: false },
+      );
+  } /* ลบลำดับการคำนวณเดิม (Excel สร้างใหม่เอง) กัน Excel ขึ้น “ซ่อมแซมไฟล์” */
   zip.file(
     'xl/workbook.xml',
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
@@ -1943,7 +2047,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.4 (14 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.5 (15 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
