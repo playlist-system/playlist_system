@@ -569,6 +569,8 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
    if(tg!==p.g)today++;
    ent.push({nm:p.nm,hash:p.hash,g:tg,ed:p.ed,m:true})}
   b.ent=b.kind==='keep'?ent:ent.filter(e=>{if(e.m)return true;if(e.g>dd){gone++;return false}kept++;return true})}
+ if(CONTM)for(const b of B){if(b.kind==='keep')continue;const nw=new Map();for(const e of b.ent)if(e.g===+P2&&e.ed&&isFinite(e.ed)&&+addD(new Date(e.ed),1)<=H)nw.set(e.nm,e.ed);
+  for(const e of b.ent)if(e.g<+P2&&e.ed===+P2-864e5&&nw.has(e.nm))e.ed=nw.get(e.nm)} /* ต่อสัญญาวันที่ 16: แถวเดิม “ออกวันที่ 16” ไว้ก่อน พอหนังถอดจริง ใส่วันถอดจริงทั้งแถวเดิมและแถวใต้ 16 (แบบที่ทีมทำ) */
  const seen=new Set();for(const b of B)for(const e of b.ent)if(e.g>+P)seen.add(e.g);
  for(let d=+P+864e5;d<=dd;d+=864e5)seen.add(d); /* แถบวันที่ทุกวันจนถึงวันที่เติม แม้วันนั้นไม่มีหนังใหม่ (แบบที่ทีมทำ) */
  const dates=[...seen].sort((x,y)=>x-y);
@@ -747,7 +749,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 2.7.1 (15 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 2.8 (15 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -1015,7 +1017,7 @@ function vFl(){const ms=['ทั้งหมด',...new Set(DB.filter(s=>/^(40|8
  <div class="opt"><label class="fld"><span>เรียงลำดับ</span><select id="o_sort" aria-describedby="d_sort" ${OP.hand?'disabled':''}><option value="orig">ตามไฟล์ Playlist</option><option value="az">ก-ฮ / A-Z</option><option value="new">ขึ้นใหม่ก่อน</option></select></label><small id="d_sort">${OP.hand?'ใช้ได้เฉพาะตอนปิด “จัดรูปแบบตามใบเช็คจริง” ตอนเปิด ระบบเรียง # ก่อน แล้ว A–Z ให้อยู่แล้ว':'ลำดับรายชื่อตอนวางเรียงลงมา: ตามไฟล์ Playlist / ตามตัวอักษร / หนังขึ้นใหม่อยู่บนสุด'}</small></div>
  <div class="opt"><label class="cb"><input type="checkbox" id="o_new" aria-describedby="d_new"> เฉพาะหนัง “ขึ้นใหม่”</label><small id="d_new">ใส่เฉพาะหนังที่สถานะมีคำว่า “ขึ้นใหม่” หนังที่ออนต่อเนื่องจะถูกข้าม ใช้ดูว่าวันนี้มีหนังใหม่เรื่องไหน ไม่ใช่สำหรับไฟล์ส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
  <div class="opt"><label class="cb"><input type="checkbox" id="o_dd" aria-describedby="d_dd"> ตัดชื่อซ้ำในจอเดียวกัน</label><small id="d_dd">หนังชื่อเดียวกันที่อยู่ใน Playlist 2 แถวในจอเดียว (เช่น ออน 2 ช่วงเวลา) ลงใบเช็คแถวเดียว ถ้าไม่ติ๊กจะลง 2 แถวซ้ำกัน <b>แนะนำ: ติ๊ก</b></small></div>
- <div class="opt"><label class="fld"><span>วันที่ 16 เป็นต้นไป</span><select id="o_r2" aria-describedby="d_r2" ${OP.hand?'':'disabled'}><option value="cont">ทำต่อในรายการเดิม</option><option value="new">เริ่มรายการใหม่ใต้แถบ 16</option></select></label><small id="d_r2"><b>ทำต่อในรายการเดิม</b> = แบบที่ทีมทำ: หนังเดิมอยู่ที่เดิม หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 และแถวเดิมใส่ “ออกวันที่ 16” <b>เริ่มรายการใหม่</b> = แบบเวอร์ชัน 2.3: ลงหนังที่ออนอยู่ทั้งหมดใหม่ใต้แถบ 16 ต่อท้ายรอบ 1–15 <b>แนะนำ: ทำต่อในรายการเดิม</b></small></div>
+ <div class="opt"><label class="fld"><span>วันที่ 16 เป็นต้นไป</span><select id="o_r2" aria-describedby="d_r2" ${OP.hand?'':'disabled'}><option value="cont">ทำต่อในรายการเดิม</option><option value="new">เริ่มรายการใหม่ใต้แถบ 16</option></select></label><small id="d_r2"><b>ทำต่อในรายการเดิม</b> = แบบที่ทีมทำ: หนังเดิมอยู่ที่เดิม หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 และแถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว <b>เริ่มรายการใหม่</b> = แบบเวอร์ชัน 2.3: ลงหนังที่ออนอยู่ทั้งหมดใหม่ใต้แถบ 16 ต่อท้ายรอบ 1–15 <b>แนะนำ: ทำต่อในรายการเดิม</b></small></div>
  <div class="opt"><label class="cb"><input type="checkbox" id="o_off" aria-describedby="d_off"> รวมรายการปลดต่อท้าย</label><small id="d_off">เขียนรายชื่อหนังที่ปลด/ถอดแล้วต่อท้ายตาราง ใช้ตรวจว่าเรื่องไหนถอดไปแล้ว อย่าใช้กับไฟล์ที่จะส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
  <button class="btn quiet" data-a="optreset" ${optChanged().length?'':'disabled'}>คืนค่าแนะนำทั้งหมด</button></div></aside></div>
  <div class="fillbar">${lines.join('')}<button class="btn primary big" data-a="fill" data-tour="fill" ${can?'':'disabled'}>เติมใบเช็ครูป${C.length?` ${C.length} ไฟล์`:''}</button>${BASEERR?'<p class="hint">แก้วันที่ทำงานให้ถูกต้องก่อน แล้วปุ่มนี้จะกดได้</p>':DB.length&&!C.length?'<p class="hint">ใส่ใบเช็ครูปอย่างน้อย 1 ไฟล์ แล้วปุ่มนี้จะกดได้</p>':''}</div>`}
@@ -1048,7 +1050,7 @@ const vHelp=()=>`<div class="ov"><div class="dlg" role="dialog" aria-modal="true
 <li>วันถัดไป หนังที่ยังไม่มีในใบเช็คและสถานะ “ขึ้นใหม่” จะลงใต้แถบวันที่ของวันนั้น หนังที่มีอยู่แล้วอยู่ที่เดิม ไม่ซ้ำ</li>
 <li>หนังที่ยังอยู่ใน Playlist ถือว่ายังออนอยู่ “ออกวันที่ N” ใส่เมื่อหนังย้ายไปอยู่ในรายการถอด (วันที่ 1 ยังไม่ใส่) ไฟล์เดิม / ต่อสัญญากลางรอบ ใช้แถวเดิม ไม่เพิ่มแถวซ้ำ</li>
 <li>ตัวเลขที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</li>
-<li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
+<li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
 <li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ (Signature Max, Show DC), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
@@ -1086,7 +1088,7 @@ function vHow(){const row=(g,c0,c1,c2,cls='',k1='',k0='')=>`<tr class="${cls}"><
  <li><span class="cn">5</span><span><b>ตัวเลขในคอลัมน์ “นับ”</b> ที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</span></li>
  <li><span class="cn">6</span><span><b>หนังใหม่ของแต่ละวัน</b> (สถานะ “ขึ้นใหม่”) ลงใต้แถบวันที่ของวันนั้น ไม่ซ้ำกับของเดิม</span></li>
  <li><span class="cn">7</span><span><b>แถบท้ายตารางเป็นวันถัดไป</b> ไว้ลงหนังของพรุ่งนี้</span></li>
- <li><span class="cn">8</span><span><b>วันที่ 16 ทำต่อในรายการเดิม</b> แถบวันที่ 16 เป็นต้นไปเป็นอีกสี (ค่าเริ่มต้นสีฟ้า เลือกสีได้) หนังที่ต่อสัญญาวันที่ 16 ลงใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16”</span></li></ol></div></section>
+ <li><span class="cn">8</span><span><b>วันที่ 16 ทำต่อในรายการเดิม</b> แถบวันที่ 16 เป็นต้นไปเป็นอีกสี (ค่าเริ่มต้นสีฟ้า เลือกสีได้) หนังที่ต่อสัญญาวันที่ 16 ลงใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอถอดจริงใส่วันถอดทั้งสองแถว</span></li></ol></div></section>
  <section class="pgtwo"><div><h2>ข้อมูลลูกค้าปลอดภัย</h2><ul><li>ไฟล์ Playlist และใบเช็คประมวลผลในเบราว์เซอร์ของเครื่องนี้ ไม่ถูกอัปโหลดไปที่ใด แม้เปิดระบบจากลิงก์</li><li>ใช้แบบออฟไลน์ได้ โดยดาวน์โหลดไฟล์ระบบไปเปิดในเครื่อง</li><li>ทุกครั้งที่เติม ระบบสรุปรายการ “ควรตรวจ” ให้คนตรวจซ้ำ คนเป็นผู้ตัดสินสุดท้ายก่อนใช้งานจริง</li></ul></div>
  <div><h2>สร้างด้วยอะไร</h2><ul><li><b>Claude</b> (AI ของ Anthropic) ช่วยถอดกฎจากใบเช็คที่ทีมทำมือ เขียนระบบ และทดสอบกับไฟล์จริง</li><li><b>SheetJS</b> อ่านไฟล์ Excel และ <b>JSZip</b> แก้ไฟล์ .xlsm โดยมาโครอยู่ครบ</li><li><b>n8n</b> (ไม่บังคับ) รวบรวม Playlist จาก Gmail ลง Google Drive ทุกชั่วโมง พร้อมอีเมลบอกว่าได้ครบหรือยัง</li></ul></div></section>
  <div class="pgcta"><button class="btn primary big" data-a="how">เริ่มใช้งาน</button><button class="btn secondary big" data-a="howtour">${IC.tour}ดูทัวร์แนะนำ</button></div>
