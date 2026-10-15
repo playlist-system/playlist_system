@@ -558,11 +558,12 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
    let t=c.find(e=>e.g===p.g&&!e.m)||(o.dedupe&&c.find(e=>e.g===p.g&&e.m));
    if(t){t.ed=t.m?Math.max(t.ed,p.ed):p.ed;t.m=true;continue}
    if(p.g<=dd){t=c.find(e=>e.h&&!e.m&&e.g<=dd&&e.g>=p.g);       /* ลงไว้แล้วในวันก่อนหน้า → อยู่ที่เดิม */
-    if(t){t.ed=p.ed;t.m=true;continue}}
+    if(t){t.ed=p.ed;t.m=true;continue}
+    if(o.dedupe){t=c.find(e=>e.m&&e.g>p.g&&e.g<=dd);if(t){t.ed=Math.max(t.ed||0,p.ed);continue}}} /* Playlist มีหนังเรื่องเดียวกันหลายแถว (วันเริ่มสัญญาต่างกัน) และลงไว้แล้วใต้แถบที่หลังกว่า → ใช้แถวนั้น ไม่เพิ่มแถวซ้ำใต้วันเริ่มสัญญาที่เก่ากว่า */
    t=c.find(e=>e.h&&!e.m&&e.g>dd);                       /* เคยวางล่วงหน้าไว้ แต่วันเริ่มเปลี่ยน → ย้ายตาม Playlist */
    if(t){t.g=tg;t.ed=p.ed;t.m=true;continue}
    t=c.filter(e=>e.g<=tg).pop();                         /* ไฟล์เดิมต่อเนื่อง หรือยังออนอยู่ → แถวเดิม ไม่เพิ่มซ้ำ */
-   if(t&&(CONT.test(p.st)||!t.ed||t.ed>=p.g)){t.ed=Math.max(t.ed||0,p.ed);t.m=true;merged++;continue}
+   if(t&&(CONT.test(p.st)||!t.ed||t.ed>=p.g||(t.g>=+P2)===(tg>=+P2))){t.ed=t.ed&&t.ed<p.g?p.ed:Math.max(t.ed||0,p.ed);t.m=true;merged++;continue} /* ครึ่งเดือนเดียวกัน: หนังที่ออกไปแล้วกลับมาขึ้นอีก ใช้แถวเดิม (แบบที่ทีมทำ — ใบเช็คมือ ก.ย. ไม่มีหนังซ้ำ 2 แถวในครึ่งเดือนเดียวกัน) */
    if(gate&&!NEWST.test(p.st)&&p.g===+P){nost++;continue} /* สัญญาเริ่มก่อนรอบนี้ แต่ไม่เคยลงและไม่ได้ “ขึ้นใหม่” → ไม่เพิ่ม; ถ้าเริ่มในรอบนี้ ลงตามวันเริ่ม (กันพลาดเมื่อข้ามวัน) */
    if(tg!==p.g)today++;
    if(hb&&/16\s*[:：]\s*9|(?:^|[^\d])4\s*:\s*3/.test(p.note||''))b.ratio.push(p.nm); /* หมายเหตุชนิดจอ ระบบตรวจเองไม่ได้ → เตือน */
@@ -745,7 +746,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 2.5 (15 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 2.6 (15 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
