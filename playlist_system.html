@@ -419,6 +419,8 @@ const n2col=n=>{let s='';while(n){const r=(n-1)%26;s=String.fromCharCode(65+r)+s
 function mediaOf(t){const n=t.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
  if(n.includes('CITY')||n.includes('CYTY'))return'CITY';if(n.includes('SPARE'))return'Spare';
  for(const z of['40','80']){if(n.includes(z)&&n.includes('BLUE'))return z+'Blue';if(n.includes(z)&&n.includes('RED'))return z+'Red'}return null}
+/* ชีตสรุป/ชีตว่างของแม่แบบ ไม่ใช่ชีตจอ: ไม่อ่านและไม่เขียนเลย ไม่ว่าจะจัดหน้าแบบไหน (ใบเช็คแต่ละคนจัดชีต Analysis ไม่เหมือนกัน) */
+const notChk=sn=>{const u=String(sn).toUpperCase().replace(/[^A-Z]/g,'');return/^X+$/.test(u)||/ANALYS|SUMMARY|DASHBOARD/.test(u)||/^\s*(สรุป|วิเคราะห์)/.test(sn)};
 /* ---------- check sheet xml ---------- */
 class Sheet{constructor(xml){this.doc=new DOMParser().parseFromString(xml,'application/xml');this.sd=this.doc.getElementsByTagNameNS(NS,'sheetData')[0];this.rows=new Map();for(const r of this.sd.children)this.rows.set(+r.getAttribute('r'),r)}
  row(n,mk=true){if(this.rows.has(n))return this.rows.get(n);if(!mk)return null;const el=this.doc.createElementNS(NS,'row');el.setAttribute('r',n);
@@ -613,8 +615,11 @@ async function fillWb(f,on,metro,o){const rep=[];const buf=f.buf.slice(0);
  const rid={};for(const r of rels.getElementsByTagName('Relationship'))rid[r.getAttribute('Id')]=r.getAttribute('Target');
  const path={};for(const s of wx.getElementsByTagNameNS(NS,'sheet')){const t=rid[s.getAttributeNS(RNS,'id')];path[s.getAttribute('name')]=t.startsWith('/')?t.slice(1):'xl/'+t}
  const jobs=[];
- for(const sn of wb.SheetNames){const ws=wb.Sheets[sn],media=mediaOf(sn),blocks=[];
+ for(const sn of wb.SheetNames){if(notChk(sn))continue;const ws=wb.Sheets[sn],media=mediaOf(sn),blocks=[];
   let brow=0;for(const rw of[11,10,12]){if(blocks.length)break;for(const k of Object.keys(ws)){const m=k.match(new RegExp('^([A-Z]+)'+rw+'$')),c=m&&codeOf(ws[k].v);if(c)blocks.push([col2n(m[1]),c])}if(blocks.length)brow=rw}
+  if(blocks.length&&!media&&!Object.keys(ws).some(k=>/^[A-Z]+9$/.test(k)&&ws[k].f&&/^AVERAGE/.test(ws[k].f))){
+   const zx=path[sn]&&zip.file(path[sn]),xs=zx?await zx.async('string'):'';
+   if(!/<c r="[A-Z]+9"[^>]*>\s*<f[^>]*>\s*AVERAGE/.test(xs)){rep.push([sn,'-','ข้าม (มีรหัสจอแต่ไม่มีคอลัมน์ผลวิเคราะห์ในแถว 9 — ไม่ใช่ชีตจอ)',0]);continue}}
   if(media&&brow===11){const av=[];for(const k of Object.keys(ws)){const m=k.match(/^([A-Z]+)9$/);if(m&&ws[k].f&&/^AVERAGE/.test(ws[k].f))av.push(col2n(m[1]))}
    for(const cn of av){if(blocks.some(x=>x[0]===cn))continue;const raw=cl((ws[n2col(cn)+'11']||{}).v);if(!raw||nrm(raw).length<3)continue;
     const hit=[...on.keys()].filter(k=>nrm(k.split('|')[1])===nrm(raw)),own=hit.filter(k=>k.startsWith(media+'|')),pick=own.length===1?own[0]:hit.length===1?hit[0]:null;
@@ -760,7 +765,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 2.9.1 (15 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 2.9.2 (15 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -851,8 +856,9 @@ function sheetNeeds(buf,name){const u=new Uint8Array(buf,0,Math.min(4,buf.byteLe
  if(!wb||!wb.SheetNames||!wb.SheetNames.length)return{bad:'ไม่พบชีตในไฟล์นี้'};
  if(wb.SheetNames.includes('Index')||wb.SheetNames.some(n=>/^รายการหนังโฆษณา/.test(cl(((wb.Sheets[n]||{}).A1||{}).v)))||/สรุปรายการหนัง|รายการหนัง/.test(String(name||'')))return{bad:'ไฟล์นี้เป็นไฟล์ Playlist ไม่ใช่ใบเช็ครูป (ใส่ไว้ในขั้นที่ 1)'};
  const S=[],named=[],avOf=ws=>{const av=[];for(const key of Object.keys(ws)){const m=key.match(/^([A-Z]+)9$/);if(m&&ws[key].f&&/^AVERAGE/.test(ws[key].f))av.push(col2n(m[1]))}return av.sort((x,y)=>x-y)};
- for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];if(!ws)continue;const media=mediaOf(sn),blocks=[];let brow=0;
+ for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];if(!ws||notChk(sn))continue;const media=mediaOf(sn),blocks=[];let brow=0;
   for(const rw of[11,10,12]){if(blocks.length)break;for(const k of Object.keys(ws)){const m=k.match(new RegExp('^([A-Z]+)'+rw+'$')),c=m&&codeOf(ws[k].v);if(c)blocks.push([col2n(m[1]),c])}if(blocks.length)brow=rw}
+  if(blocks.length&&!media&&!avOf(ws).length)blocks.length=0;
   const names=[];if(media&&brow===11)for(const cn of avOf(ws)){if(blocks.some(x=>x[0]===cn))continue;const raw=cl((ws[n2col(cn)+'11']||{}).v);if(raw&&nrm(raw).length>=3)names.push(raw)}
   if(blocks.length||names.length){S.push({sn,media,codes:blocks.map(b=>b[1]),names});continue}
   if(media)continue;                                                     /* fillWb: ข้าม (ไม่พบรหัสจอ) */

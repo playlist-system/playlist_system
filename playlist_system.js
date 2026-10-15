@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 2.9.1 • 15 ต.ค. 2569
+ *  เวอร์ชัน 2.9.2 • 15 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -44,7 +44,8 @@
  *   และ 2.7.1: จอ CITY ที่ไม่มีใน Playlist ใช้รายการ THE CITY เป็นเรื่องปกติ
  *   เวอร์ชัน 2.8 แก้ส่วน 5: ต่อสัญญาวันที่ 16 พอหนังถอดจริง ใส่วันถอดทั้งแถวเดิมและแถวใต้ 16
  *   เวอร์ชัน 2.9 เพิ่มในส่วน 9 และ 12: บันทึกทับไฟล์เดิม (Chrome / Edge) เปิดใบเช็คทั้งโฟลเดอร์ และใช้ผลเติมวันถัดไป
- *   2.9.1: วันที่ไม่มีหนังใหม่ไม่ต้องมีแถบวันที่ (ยกเลิกแถบทุกวันของ 2.7))
+ *   2.9.1: วันที่ไม่มีหนังใหม่ไม่ต้องมีแถบวันที่ (ยกเลิกแถบทุกวันของ 2.7)
+ *   2.9.2: ไม่เขียนลงชีต Analysis / XXXX / ชีตสรุป ไม่ว่าจะจัดหน้าแบบไหน)
  * ======================================================================
  */
 
@@ -81,6 +82,13 @@ function mediaOf(t) {
   }
   return null;
 }
+/* ชีตสรุป/ชีตว่างของแม่แบบ ไม่ใช่ชีตจอ: ไม่อ่านและไม่เขียนเลย ไม่ว่าจะจัดหน้าแบบไหน (ใบเช็คแต่ละคนจัดชีต Analysis ไม่เหมือนกัน) */
+const notChk = sn => {
+  const u = String(sn)
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '');
+  return /^X+$/.test(u) || /ANALYS|SUMMARY|DASHBOARD/.test(u) || /^\s*(สรุป|วิเคราะห์)/.test(sn);
+};
 /* ---------- check sheet xml ---------- */
 class Sheet {
   constructor(xml) {
@@ -1274,6 +1282,7 @@ async function fillWb(f, on, metro, o) {
   }
   const jobs = [];
   for (const sn of wb.SheetNames) {
+    if (notChk(sn)) continue;
     const ws = wb.Sheets[sn],
       media = mediaOf(sn),
       blocks = [];
@@ -1286,6 +1295,18 @@ async function fillWb(f, on, metro, o) {
         if (c) blocks.push([col2n(m[1]), c]);
       }
       if (blocks.length) brow = rw;
+    }
+    if (
+      blocks.length &&
+      !media &&
+      !Object.keys(ws).some(k => /^[A-Z]+9$/.test(k) && ws[k].f && /^AVERAGE/.test(ws[k].f))
+    ) {
+      const zx = path[sn] && zip.file(path[sn]),
+        xs = zx ? await zx.async('string') : '';
+      if (!/<c r="[A-Z]+9"[^>]*>\s*<f[^>]*>\s*AVERAGE/.test(xs)) {
+        rep.push([sn, '-', 'ข้าม (มีรหัสจอแต่ไม่มีคอลัมน์ผลวิเคราะห์ในแถว 9 — ไม่ใช่ชีตจอ)', 0]);
+        continue;
+      }
     }
     if (media && brow === 11) {
       const av = [];
@@ -2109,7 +2130,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.9.1 (15 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.9.2 (15 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -2374,7 +2395,7 @@ function sheetNeeds(buf, name) {
     };
   for (const sn of wb.SheetNames) {
     const ws = wb.Sheets[sn];
-    if (!ws) continue;
+    if (!ws || notChk(sn)) continue;
     const media = mediaOf(sn),
       blocks = [];
     let brow = 0;
@@ -2387,6 +2408,7 @@ function sheetNeeds(buf, name) {
       }
       if (blocks.length) brow = rw;
     }
+    if (blocks.length && !media && !avOf(ws).length) blocks.length = 0;
     const names = [];
     if (media && brow === 11)
       for (const cn of avOf(ws)) {
