@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 2.8 • 15 ต.ค. 2569
+ *  เวอร์ชัน 2.9 • 15 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -42,7 +42,8 @@
  *   และหนังที่ออกแล้วกลับมาในครึ่งเดือนเดียวกันใช้แถวเดิม
  *   เวอร์ชัน 2.7 แก้ส่วน 5, 6 และ 9: แถบวันที่ทุกวัน, ไม่เตือนหมายเหตุ 16:9 / 4:3, จอ Spare ใช้รายการสื่ออื่นได้
  *   และ 2.7.1: จอ CITY ที่ไม่มีใน Playlist ใช้รายการ THE CITY เป็นเรื่องปกติ
- *   เวอร์ชัน 2.8 แก้ส่วน 5: ต่อสัญญาวันที่ 16 พอหนังถอดจริง ใส่วันถอดทั้งแถวเดิมและแถวใต้ 16)
+ *   เวอร์ชัน 2.8 แก้ส่วน 5: ต่อสัญญาวันที่ 16 พอหนังถอดจริง ใส่วันถอดทั้งแถวเดิมและแถวใต้ 16
+ *   เวอร์ชัน 2.9 เพิ่มในส่วน 9 และ 12: บันทึกทับไฟล์เดิม (Chrome / Edge) เปิดใบเช็คทั้งโฟลเดอร์ และใช้ผลเติมวันถัดไป)
  * ======================================================================
  */
 
@@ -1630,6 +1631,46 @@ let DB = [],
   last = null,
   note = '',
   dirty = 0;
+const FSA =
+  typeof window.showDirectoryPicker === 'function'; /* บันทึกทับไฟล์เดิมได้เฉพาะ Chrome / Edge บนคอม */
+let CKDIR = null;
+const HDB = {
+  p: null,
+  db() {
+    return (
+      this.p ||
+      (this.p = new Promise((ok, no) => {
+        const r = indexedDB.open('ps_fs', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('h');
+        r.onsuccess = () => ok(r.result);
+        r.onerror = () => no(r.error);
+      }))
+    );
+  },
+  async get(k) {
+    const d = await this.db();
+    return new Promise(ok => {
+      const q = d.transaction('h').objectStore('h').get(k);
+      q.onsuccess = () => ok(q.result || null);
+      q.onerror = () => ok(null);
+    });
+  },
+  async set(k, v) {
+    const d = await this.db();
+    return new Promise(ok => {
+      const t = d.transaction('h', 'readwrite');
+      t.objectStore('h').put(v, k);
+      t.oncomplete = () => ok();
+      t.onerror = () => ok();
+    });
+  },
+}; /* จำโฟลเดอร์ใบเช็คไว้ในเครื่องนี้ */
+const isoD = d =>
+  d.getUTCFullYear() +
+  '-' +
+  String(d.getUTCMonth() + 1).padStart(2, '0') +
+  '-' +
+  String(d.getUTCDate()).padStart(2, '0');
 const saveBlob = (n, d) => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([d]));
@@ -2069,7 +2110,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.8 (15 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.9 (15 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -2853,7 +2894,7 @@ function vFl() {
       ? `<small>เว้นว่าง = ใช้ ${thd(ab)} จากไฟล์ Playlist ถ้าจะเปลี่ยน พิมพ์ เช่น 12-Oct-26 หรือ 12/10/2569</small>`
       : '<small>ไม่พบวันที่ใน Playlist กรุณาใส่เอง เช่น 12-Oct-26</small>';
   return `${shead('เติมใบเช็ครูป', 'ใส่ใบเช็ครูปของวันก่อนหน้า จะใส่ของทุกคนพร้อมกัน หรือเฉพาะของคุณก็ได้ ระบบจะเติมรายชื่อหนังของวันนี้ลงไป')}
- <div class="s3"><div class="col">${drop('ck', C.length ? 'เพิ่มใบเช็ครูป' : 'ลากไฟล์ใบเช็ครูปมาวางที่นี่', 'ใบเช็คของวันก่อนหน้า (.xlsm หรือ .xlsx) หรือคลิกเพื่อเลือกไฟล์ เลือกหลายไฟล์ได้ ไฟล์ชื่อซ้ำจะแทนที่ของเดิม', '.xlsx,.xlsm', 'drop-ck', C.length > 0)}
+ <div class="s3"><div class="col">${drop('ck', C.length ? 'เพิ่มใบเช็ครูป' : 'ลากไฟล์ใบเช็ครูปมาวางที่นี่', 'ใบเช็คของวันก่อนหน้า (.xlsm หรือ .xlsx) หรือคลิกเพื่อเลือกไฟล์ เลือกหลายไฟล์ได้ ไฟล์ชื่อซ้ำจะแทนที่ของเดิม', '.xlsx,.xlsm', 'drop-ck', C.length > 0)}${FSA ? `<button class="btn quiet ckdir" data-a="ckdir">${IC.folder}เปิดใบเช็คทั้งโฟลเดอร์${CKDIR ? ` (ล่าสุด: ${esc(CKDIR.name)})` : ''}</button>` : ''}
  <section class="panel" data-tour="ready"><h3 class="sec-t">ใบเช็ครูปที่ใส่แล้ว<small>${C.length} ไฟล์</small></h3>
  ${C.length ? `<div class="ckl">${C.map((f, i) => vCk(f, R[i], i, wd && per(wd).two ? 2 : 1)).join('')}</div>` : '<p class="empty">ยังไม่มีใบเช็ครูป ลากไฟล์มาวางในกล่องด้านบน แล้วระบบจะบอกว่าแต่ละไฟล์ต้องใช้ Playlist แบบไหน</p>'}</section></div>
  <aside class="panel set" data-tour="settings"><h3 class="sec-t">การตั้งค่า</h3>
@@ -2892,9 +2933,10 @@ function vRes() {
     nb = R.reduce((n, r) => n + r.bad.length, 0),
     nf = last.res.filter(r => r.blob).length,
     ne = last.res.length - nf;
-  return `${shead('ผลการเติม', 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กดดาวน์โหลดก่อนปิดหน้านี้', `<div class="go"><button class="btn secondary" data-a="tab" data-k="fl">${IC.back}กลับไปเติมใหม่</button></div>`)}
- <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span><span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ควรตรวจ</span><span class="sp"></span><button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button></div>
- <div class="stack">${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}
+  return `${shead('ผลการเติม', last.saved ? 'บันทึกใบเช็คที่เติมแล้ว ใส่ Playlist ของวันถัดไปต่อได้เลย (กด “ใช้ผลนี้เติมวันถัดไป” ด้านล่าง)' : FSA ? 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กด “บันทึกทับไฟล์เดิม” หรือดาวน์โหลดก่อนปิดหน้านี้' : 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กดดาวน์โหลดก่อนปิดหน้านี้', `<div class="go"><button class="btn secondary" data-a="tab" data-k="fl">${IC.back}กลับไปเติมใหม่</button></div>`)}
+ <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span><span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ควรตรวจ</span><span class="sp"></span>${FSA ? `<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf ? '' : 'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>` : `<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
+ <div class="stack">${last.sv ? (last.sv.bad.length ? alertHTML('er', `บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`, `<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`) : alertHTML('ok', `บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`, `<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu ? ` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่` : ''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)) : ''}
+ ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}
  ${nb ? alertHTML('wr', '“ควรตรวจ” คืออะไร', '<p>จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน หรือหนังที่ระบบตั้งใจไม่ใส่ เปิดดูในแต่ละไฟล์แล้วตรวจในใบเช็คก่อนใช้งาน ความหมายของข้อความที่พบบ่อยอยู่ในปุ่ม “วิธีใช้”</p>') : alertHTML('ok', 'ไม่มีรายการที่ต้องตรวจเพิ่ม', '<p>ดาวน์โหลดแล้วเปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p>')}</div>
  <div class="rlist" data-tour="rlist">${last.res
    .map((r, i) => {
@@ -2931,7 +2973,7 @@ function vRes() {
  }</div>`;
    })
    .join('')}</div>
- <p class="hint" style="margin-top:14px">ไฟล์ zip มีใบเช็ครูปทุกไฟล์ที่เติมได้ (ชื่อเดิม) และ รายงาน.txt ใบเช็คที่ได้วันนี้คือไฟล์ตั้งต้นของวันพรุ่งนี้</p>`;
+ <div class="nextday"><p>${FSA ? '“บันทึกทับไฟล์เดิม” เขียนใบเช็คที่เติมแล้วทับไฟล์ในโฟลเดอร์เดิม (เลือกโฟลเดอร์ครั้งแรกครั้งเดียว) และเก็บไฟล์ก่อนเติมไว้ใน สำรองก่อนเติม ส่วน zip มีใบเช็คทุกไฟล์และ รายงาน.txt' : 'ไฟล์ zip มีใบเช็ครูปทุกไฟล์ที่เติมได้ (ชื่อเดิม) และ รายงาน.txt'} ใบเช็คที่ได้วันนี้คือไฟล์ตั้งต้นของวันพรุ่งนี้</p><button class="btn secondary" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button></div>`;
 }
 
 /* ----- หน้าต่าง: วิธีใช้ / ต้อนรับ / วางรายชื่อ / ระบบทำงานอย่างไร ----- */
@@ -3778,6 +3820,133 @@ const ACT = {
     dirty = 0;
     note = 'บันทึกโปรเจกต์แล้ว';
   },
+  ckdir: async () => {
+    if (!FSA) return;
+    let d;
+    try {
+      d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      note = 'เปิดโฟลเดอร์ไม่ได้';
+      return;
+    }
+    const fs = [];
+    for await (const [n, x] of d.entries())
+      if (x.kind === 'file' && /\.xls[xm]$/i.test(n) && !n.startsWith('~$')) fs.push(await x.getFile());
+    if (!fs.length) {
+      note = `ไม่พบไฟล์ใบเช็ค (.xlsm / .xlsx) ในโฟลเดอร์ “${d.name}”`;
+      return;
+    }
+    CKDIR = d;
+    HDB.set('ck', d).catch(() => {});
+    fs.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+    await addChecks(fs, `เปิดใบเช็ค ${fs.length} ไฟล์จากโฟลเดอร์ “${d.name}”`);
+  },
+  savedir: async k => {
+    if (!last || !FSA) return;
+    let d = k === 'pick' ? null : CKDIR;
+    try {
+      if (!d && k !== 'pick') {
+        const x = await HDB.get('ck').catch(() => null);
+        if (x) d = x;
+      }
+      if (
+        d &&
+        (await d.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
+        (await d.requestPermission({ mode: 'readwrite' })) !== 'granted'
+      )
+        d = null;
+      if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      note = 'เลือกโฟลเดอร์ไม่ได้';
+      return;
+    }
+    CKDIR = d;
+    HDB.set('ck', d).catch(() => {});
+    const day = isoD(new Date(last.W));
+    const bk = await (
+      await d.getDirectoryHandle('สำรองก่อนเติม', { create: true })
+    ).getDirectoryHandle(day, { create: true });
+    const has = async (dir, n) => {
+      try {
+        return await (await dir.getFileHandle(n)).getFile();
+      } catch (_) {
+        return null;
+      }
+    };
+    let ok = 0,
+      neu = 0;
+    const bad = [];
+    for (const r of last.res) {
+      if (!r.blob) continue;
+      try {
+        const old = await has(d, r.name);
+        if (old) {
+          if (!(await has(bk, r.name))) {
+            const w = await (await bk.getFileHandle(r.name, { create: true })).createWritable();
+            await w.write(await old.arrayBuffer());
+            await w.close();
+          }
+        } else neu++;
+        const w = await (await d.getFileHandle(r.name, { create: true })).createWritable();
+        await w.write(r.blob);
+        await w.close();
+        ok++;
+      } catch (e) {
+        bad.push(r.name);
+      }
+    }
+    try {
+      const w = await (await bk.getFileHandle('รายงาน.txt', { create: true })).createWritable();
+      await w.write(last.txt || '');
+      await w.close();
+    } catch (_) {}
+    last.sv = { dir: d.name, ok, neu, bad, day };
+    if (!bad.length) last.saved = true;
+    note = bad.length
+      ? `บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`
+      : `บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`;
+  },
+  next: () => {
+    if (!last) return;
+    if (
+      !last.saved &&
+      !confirm(
+        'ผลการเติมนี้ยังไม่ได้บันทึกหรือดาวน์โหลด ใช้เป็นใบเช็คตั้งต้นของวันถัดไปเลยไหม? (ยังดาวน์โหลดผลนี้ได้จนกว่าจะเติมครั้งถัดไป)',
+      )
+    )
+      return;
+    const old = new Map(C.map(f => [f.name, f]));
+    C = last.res
+      .filter(r => r.blob)
+      .map(r => {
+        const o = old.get(r.name) || {};
+        const x = {
+          ...o,
+          name: r.name,
+          buf: r.blob.buffer.slice(r.blob.byteOffset, r.blob.byteOffset + r.blob.byteLength),
+        };
+        delete x.nd;
+        return x;
+      });
+    DB = [];
+    PLD = null;
+    PLM = {};
+    PLX = [];
+    OP.base = '';
+    BASEERR = '';
+    LIT = new Set();
+    RO.clear();
+    cs = null;
+    fm = 'ทั้งหมด';
+    q = '';
+    TQ = '';
+    dirty = 0;
+    tab = 'dat';
+    window.scrollTo(0, 0);
+    note = `ใบเช็คที่เติมแล้ว ${C.length} ไฟล์พร้อมเป็นไฟล์ตั้งต้น ใส่ Playlist ของวันถัดไปได้เลย`;
+  },
   dlz: () => {
     if (!last) return;
     saveBlob('ใบเช็ครูป_เติมแล้ว.zip', last.zip);
@@ -3851,6 +4020,14 @@ const ACT = {
     }
     const list = [...C];
     if (!list.length) return;
+    if (
+      last &&
+      !last.saved &&
+      !confirm(
+        'ผลการเติมครั้งก่อนยังไม่ได้บันทึกหรือดาวน์โหลด ถ้าเติมใหม่ ผลเดิมจะหายไป ต้องการเติมใหม่เลยไหม?',
+      )
+    )
+      return;
     FILLING = true;
     try {
       const on = buildOn(o),
@@ -3902,7 +4079,13 @@ const ACT = {
         );
       }
       out.file('รายงาน.txt', L.join('\n'));
-      last = { res, zip: await out.generateAsync({ type: 'blob' }), saved: false };
+      last = {
+        res,
+        zip: await out.generateAsync({ type: 'blob' }),
+        saved: false,
+        W: o.W ? +o.W : Date.now(),
+        txt: L.join('\n'),
+      };
       note = 'เติมเสร็จแล้ว';
       tab = 'res';
       cs = null;
