@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 2.6 • 15 ต.ค. 2569
+ *  เวอร์ชัน 2.6.1 • 15 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -2056,7 +2056,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.6 (15 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 2.6.1 (15 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -2870,6 +2870,7 @@ function vRes() {
     ok: r.rep.filter(isFilled).length,
     bad: r.rep.filter(isWarn),
     inf: r.rep.filter(x => x[1] === 'รูปแบบ' && !/^ตรวจ/.test(x[2])),
+    scr: r.rep.filter(isFilled),
     sh: new Set(r.rep.filter(isFilled).map(x => x[0])).size,
   }));
   const tot = R.reduce((n, r) => n + r.ok, 0),
@@ -2886,7 +2887,21 @@ function vRes() {
        open = RO.has(i);
      return `<div class="rfile"><div class="rhead"><span class="fn"><b>${esc(r.name)}</b><small>${r.blob ? o.sh + ' ชีต' : 'ไม่ได้เติม'}</small></span>${r.blob ? `<span class="pill ok">เติมแล้ว ${o.ok} จอ</span>` : '<span class="pill er">ไม่ได้เติม</span>'}${o.bad.length ? `<span class="pill wr">ควรตรวจ ${o.bad.length}</span>` : ''}
  <button class="ib" data-a="dlf" data-k="${i}" aria-label="ดาวน์โหลด ${esc(r.name)}" title="ดาวน์โหลดไฟล์นี้" ${r.blob ? '' : 'disabled'}>${IC.dl}</button><button class="ib tog" data-a="rx" data-k="${i}" aria-expanded="${open}" aria-label="ดูรายละเอียด ${esc(r.name)}" title="ดูรายละเอียด">${IC.chev}</button></div>
- ${open ? `<div class="issues">${o.bad.map(x => `<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}${o.inf.length ? `<p class="ish">สรุปการจัดแต่ละชีต</p>${o.inf.map(x => `<div class="iss inf"><b>${esc(x[0])}</b><span>${esc(x[2])}</span></div>`).join('')}` : ''}</div>` : ''}</div>`;
+ ${
+   open
+     ? `<div class="issues">${o.bad.map(x => `<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}${
+         o.scr.length
+           ? `<p class="ish">สรุปการจัดแต่ละชีต</p>${[...new Set(o.scr.map(x => x[0]))]
+               .map(sn => {
+                 const L = o.scr.filter(x => x[0] === sn),
+                   f = o.inf.find(x => x[0] === sn);
+                 return `<div class="iss inf"><b>${esc(sn)}</b><span><span class="scrs">เติม ${L.length} จอ: ${L.map(x => esc(String(x[1]).split(' → ')[0]) + ' (' + x[3] + ' เรื่อง)').join(', ')}</span>${f ? esc(f[2]) : ''}</span></div>`;
+               })
+               .join('')}`
+           : ''
+       }</div>`
+     : ''
+ }</div>`;
    })
    .join('')}</div>
  <p class="hint" style="margin-top:14px">ไฟล์ zip มีใบเช็ครูปทุกไฟล์ที่เติมได้ (ชื่อเดิม) และ รายงาน.txt ใบเช็คที่ได้วันนี้คือไฟล์ตั้งต้นของวันพรุ่งนี้</p>`;
