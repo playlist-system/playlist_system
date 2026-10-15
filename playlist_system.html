@@ -458,7 +458,7 @@ const JUNK=/^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(
 const xk=s=>{s=s.toLowerCase().replace(/[-']/g,'');let k='';for(const ch of s){const c=ch.codePointAt(0),r=/[0-9]/.test(ch)?1:/[a-z]/.test(ch)?2:/\p{L}/u.test(ch)?3:0;k+=String.fromCharCode(48+r)+String.fromCharCode(c<0xFFFF?c:0xFFFF)}return k};
 const cmpN=(a,b)=>{const x=xk(a),y=xk(b);return x<y?-1:x>y?1:(a<b?-1:a>b?1:0)};
 /* วันที่ทำงาน = วันของ Playlist: จากชื่อไฟล์ (…แยกจอ_DD_…, …_1-10-26) หรือที่พิมพ์เอง */
-let PLD=null,PLM={},PLX=[]; /* PLM: สื่อ → {f:ชื่อไฟล์, d:วันที่} • PLX: ไฟล์ที่อ่านไม่ได้ */
+let PLD=null,PLM={},PLX=[],PLI=[]; /* PLI: ด่านตรวจ Playlist {f,lv:'stop'|'info',t} */ /* PLM: สื่อ → {f:ชื่อไฟล์, d:วันที่} • PLX: ไฟล์ที่อ่านไม่ได้ */
 const THM={'ม.ค.':0,'ก.พ.':1,'มี.ค.':2,'เม.ย.':3,'พ.ค.':4,'มิ.ย.':5,'ก.ค.':6,'ส.ค.':7,'ก.ย.':8,'ต.ค.':9,'พ.ย.':10,'ธ.ค.':11};
 const yy=y=>{y=+y;if(y<100)y+=y>=60?2500:2000;if(y>2400)y-=543;return y};
 /* วันที่ที่เขียนไว้ชัดในชื่อไฟล์ เช่น 2-10-26, 02.10.2026, 2 ต.ค. 69, 2Oct26 */
@@ -647,6 +647,7 @@ async function fillWb(f,on,metro,o){const rep=[];const buf=f.buf.slice(0);
     if(!scr){rep.push([sn,label||code||n2col(cn),/^BASE$/.test(nrm(sn))?'ไม่พบจอ Base ใน Playlist — นำเข้า Playlist ที่มีจอ Base ก่อน แล้วเติมใหม่':'ไม่พบจอนี้ใน Playlist',0]);continue}
     const ads=listOf(scr,o);jobs.push([sn,lc,ads,scr,'']);rep.push([sn,label+' → '+scr.c,'เติมแล้ว',ads.length])}}
   else if(!blocks.length&&media)rep.push([sn,'-','ข้าม (ไม่พบรหัสจอ DGT/ID-xx ในแถว 10-11)',0])}
+ for(const j of jobs){if(!j[3]||!j[3].rows)continue;const nq=noteQ(j[3],j[4],j[4]==='jam'?jamNumsOf(wb.Sheets[j[0]],j[1]):null);if(nq.length)rep.push([j[0],j[3].c,'ตรวจ: หมายเหตุใน Playlist ที่ระบบยังอ่านไม่ออก แต่พูดถึงจอนี้ → '+nq.join(' • '),0])}
  const by={};for(const j of jobs)(by[j[0]]=by[j[0]]||[]).push(j);
  const KEEP={};for(const sn in by){const ws=wb.Sheets[sn],av=[];for(const k of Object.keys(ws)){const m=k.match(/^([A-Z]+)9$/);if(m&&ws[k].f&&/^AVERAGE/.test(ws[k].f))av.push(col2n(m[1]))}av.sort((x,y)=>x-y);
   const own=by[sn].map(j=>col2n(j[1]));for(const cs of av.filter(c=>!av.includes(c-1))){let ce=cs;while(av.includes(ce+1))ce++;if(own.some(l=>l>=cs-1&&l<=ce))continue;
@@ -729,43 +730,92 @@ function parseMetro(wb){let sn=wb.SheetNames[wb.SheetNames.length-1],best=-1;for
   const ad=cl(row[cV]);if(!ad)continue;if(c0){gs=fd(g(row,cS));ge=fd(g(row,cE))}
   rows.push({ad,ty:cl(row[3]),len:+row[cV+1]||0,cnt:+row[cV+2]||0,st:'',s:fd(g(row,oS))||fd(g(row,cS))||gs,e:fd(g(row,oE))||fd(g(row,cE))||ge,note:cl(row[2]),loc:[cl(g(row,cT)),cl(g(row,cG))].filter(x=>/LEDMETRO/i.test(x)).join(' '),off})}
  return[fixMetro({m:'MetroLED',c:'METRO',n:'7-Eleven Metro LED',f:'LED',ed:0,rows})]}
-function parsePlaylist(f){const out=[];
- if(/Metro.*LED/i.test(f.name))return parseMetro(XLSX.read(f.buf,{type:'array',cellDates:true}));
- if(!/แยกจอ/.test(f.name)){const wb=XLSX.read(f.buf,{type:'array'});
-  if(wb.SheetNames.some(n=>bkjCode(n))){const sg=parseSig(wb,'Bangkok Jams',bkjCode);return sg.length?sg:null}
-  const sg=parseSig(wb,/show\s*_*\s*dc|prudential/i.test(f.name)?'Show DC / Prudential':'Signature Max');return sg.length?sg:null}
- /* สรุปรายการหนังแยกจอ: สื่ออยู่ในชื่อไฟล์ เช่น …แยกจอ_01_40Blue, …แยกจอ_2026_10_02_80Red */
- const bn=f.name.replace(/\.xlsx$/i,'').replace(/\s*\(\d+\)$/,''),rest=bn.replace(/^.*แยกจอ/,'').replace(/\d{4}[-_.]\d{1,2}[-_.]\d{1,2}/g,'').replace(/\d{1,2}[-_.]\d{1,2}[-_.]\d{2,4}/g,'').replace(/^[_\s]+|[_\s]+$/g,'').replace(/^\d{1,2}[_\s]+(?=\D)/,''),media=mediaOf(rest)||rest;if(!media)return null;
- const wb=XLSX.read(f.buf,{type:'array'}),names={};
+/* ด่านตรวจ Playlist (3.0): สรุปรายการหนังแยกจอ อ่านคอลัมน์ตามชื่อหัวตาราง ถ้าทีม Playlist แทรก/สลับคอลัมน์ก็ยังอ่านถูก หาไม่เจอ → ใช้ตำแหน่งเดิมและเตือน */
+const SPLIT_DEF={ty:1,len:2,cnt:3,st:4,s:6,e:7,note:8},
+ SPLIT_L={ty:[/^Type$/i,'Type'],len:[/^ความยาว/,'ความยาว'],cnt:[/^จำนวน/,'จำนวนครั้ง'],st:[/^สถานะ/,'สถานะ spot'],s:[/^วันเริ่ม/,'วันเริ่มสัญญา'],e:[/^วันหมด/,'วันหมดสัญญา'],note:[/^(ข้อมูลการออน|หมายเหตุ)/,'ข้อมูลการออน']},
+ SPLIT_KNOWN=/^(หนังโฆษณา|Type|ความยาว|จำนวน|สถานะ|เวลา|วันเริ่ม|วันหมด|ข้อมูลการออน|หมายเหตุ)/i;
+const splitSheet=sn=>!(sn==='Index'||sn.startsWith('data')||sn.startsWith('Blank'));
+const splitMedia=wb=>{const ms=[...new Set(wb.SheetNames.filter(splitSheet).map(mediaOf).filter(Boolean))];return ms.length===1?ms[0]:null};
+const isSplitWb=wb=>wb.SheetNames.some(sn=>{const ws=wb.Sheets[sn];if(!ws||!splitSheet(sn)||/^รายการหนังโฆษณา/.test(cl((ws.A1||{}).v)))return false;
+ const A=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',range:{s:{r:0,c:0},e:{r:1,c:60}}});return(A[1]||[]).some((x,i)=>cl(x)==='หนังโฆษณา'&&codeOf((A[0]||[])[i]))});
+function parseSplit(wb,media,I){const out=[],names={},iss=(lv,t)=>{if(!I.some(x=>x.t===t))I.push({lv,t})};
  if(wb.Sheets.Index)for(const r of XLSX.utils.sheet_to_json(wb.Sheets.Index,{header:1,defval:''}).slice(2))for(const i of[1,5,9]){const nm=cl(r[i]);if(nm)names[nm.split(/[_ ]/)[0]]=nm}
- for(const sn of wb.SheetNames){if(sn==='Index'||sn.startsWith('data')||sn.startsWith('Blank'))continue;
+ for(const sn of wb.SheetNames){if(!splitSheet(sn))continue;
   const A=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});if(!A.length)continue;
-  for(let c0=1;c0<A[0].length;c0+=9){const code=cl(A[0][c0]);if(!code)continue;let off=false;const rows=[];
-   for(let r=2;r<A.length;r++){const ad=cl(A[r][c0]);if(!ad)continue;if(ad==='หนังโฆษณา'){off=true;continue}
-    if(/^[\d.]+$/.test(ad)&&!cl(A[r][c0+1]))continue;if(cl(A[r][c0+4])==='ถอด')off=true;
-    rows.push({ad,ty:cl(A[r][c0+1]),len:+A[r][c0+2]||0,cnt:+A[r][c0+3]||0,st:cl(A[r][c0+4]),s:fd(A[r][c0+6]),e:fd(A[r][c0+7]),note:cl(A[r][c0+8]),off})}
-   out.push({m:media,c:code,n:names[code]||code,f:cl(A[0][c0+2]).replace(/[, ]+$/,''),ed:0,rows})}}
- return out.length?out:null}
+  const hr=A.slice(0,6).findIndex(r=>r.some(x=>cl(x)==='หนังโฆษณา')),blocks=[];
+  if(hr<1){if(A[0].length>1)iss('stop',`ชีต ${sn}: ไม่พบหัวตาราง “หนังโฆษณา” จึงอ่านตามตำแหน่งคอลัมน์เดิม อาจอ่านผิด`);
+   for(let c0=1;c0<A[0].length;c0+=9)blocks.push([c0,SPLIT_DEF,1])}
+  else{const H=A[hr].map(x=>cl(x)),st=H.map((x,i)=>x==='หนังโฆษณา'?i:-1).filter(i=>i>=0);
+   if(hr!==1)iss('info',`ชีต ${sn}: หัวตารางย้ายไปอยู่แถว ${hr+1} (เดิมแถว 2) ระบบอ่านตามหัวตารางแล้ว`);
+   st.forEach((c0,k)=>{const end=k+1<st.length?st[k+1]:H.length,o={};
+    for(const key in SPLIT_L){let x=-1;for(let c=c0+1;c<end;c++)if(SPLIT_L[key][0].test(H[c])){x=c-c0;break}
+     if(x<0){o[key]=SPLIT_DEF[key];iss('stop',`ชีต ${sn}: หาคอลัมน์ “${SPLIT_L[key][1]}” ไม่เจอ จึงอ่านตามตำแหน่งเดิม อาจอ่านผิด`)}else o[key]=x}
+    for(let c=c0+1;c<end;c++)if(H[c]&&!SPLIT_KNOWN.test(H[c]))iss('info',`ชีต ${sn}: มีคอลัมน์ใหม่ “${H[c]}” ระบบไม่ได้ใช้`);
+    if(Object.keys(SPLIT_DEF).some(key=>o[key]!==SPLIT_DEF[key]))iss('info',`ชีต ${sn}: คอลัมน์ย้ายตำแหน่งจากแบบเดิม ระบบอ่านตามชื่อหัวตารางแล้ว`);
+    blocks.push([c0,o,hr])})}
+  for(const[c0,o,h]of blocks){const top=A[h-1]||[],code=cl(top[c0]);if(!code)continue;let off=false;const rows=[];
+   for(let r=h+1;r<A.length;r++){const R=A[r],ad=cl(R[c0]);if(!ad)continue;if(ad==='หนังโฆษณา'){off=true;continue}
+    if(/^[\d.]+$/.test(ad)&&!cl(R[c0+o.ty]))continue;if(cl(R[c0+o.st])==='ถอด')off=true;
+    rows.push({ad,ty:cl(R[c0+o.ty]),len:+R[c0+o.len]||0,cnt:+R[c0+o.cnt]||0,st:cl(R[c0+o.st]),s:fd(R[c0+o.s]),e:fd(R[c0+o.e]),note:cl(R[c0+o.note]),off})}
+   out.push({m:media,c:code,n:names[code]||code,f:cl(top[c0+o.len]).replace(/[, ]+$/,''),ed:0,rows})}}
+ return out}
+function parsePlaylist(f){const I=[],ret=x=>{if(x&&x.length){x.iss=I;return x}return null};
+ if(/Metro.*LED/i.test(f.name))return ret(parseMetro(XLSX.read(f.buf,{type:'array',cellDates:true})));
+ if(!/แยกจอ/.test(f.name)){const wb=XLSX.read(f.buf,{type:'array'});
+  if(wb.SheetNames.some(n=>bkjCode(n)))return ret(parseSig(wb,'Bangkok Jams',bkjCode));
+  if(isSplitWb(wb)){const m=splitMedia(wb);if(!m)return null;
+   I.push({lv:'info',t:`ชื่อไฟล์ไม่มีคำว่า “แยกจอ” แต่เนื้อในเป็นสรุปรายการหนังแยกจอ (${m}) ระบบอ่านให้แล้ว`});return ret(parseSplit(wb,m,I))}
+  return ret(parseSig(wb,/show\s*_*\s*dc|prudential/i.test(f.name)?'Show DC / Prudential':'Signature Max'))}
+ /* สรุปรายการหนังแยกจอ: สื่ออยู่ในชื่อไฟล์ เช่น …แยกจอ_01_40Blue, …แยกจอ_2026_10_02_80Red ถ้าชื่อไฟล์ไม่บอก ใช้ชื่อชีต (40Blue, 80Red_1 …) */
+ const bn=f.name.replace(/\.xlsx$/i,'').replace(/\s*\(\d+\)$/,''),rest=bn.replace(/^.*แยกจอ/,'').replace(/\d{4}[-_.]\d{1,2}[-_.]\d{1,2}/g,'').replace(/\d{1,2}[-_.]\d{1,2}[-_.]\d{2,4}/g,'').replace(/^[_\s]+|[_\s]+$/g,'').replace(/^\d{1,2}[_\s]+(?=\D)/,'');
+ const wb=XLSX.read(f.buf,{type:'array'}),sm=splitMedia(wb);let media=mediaOf(rest);
+ if(media&&sm&&sm!==media)I.push({lv:'stop',t:`ชื่อไฟล์บอกสื่อ ${media} แต่ชีตในไฟล์เป็น ${sm} ระบบใช้ตามชื่อไฟล์ ตรวจว่าใส่ไฟล์ถูก`});
+ if(!media&&sm){media=sm;I.push({lv:'info',t:`ชื่อไฟล์ไม่บอกสื่อ ระบบใช้ชื่อชีตในไฟล์ (${sm}) แทน`})}
+ if(!media){if(!rest)return null;media=rest.replace(/^\d{4}[-_. ]\d{1,2}[-_. ]\d{1,2}[_\s]*/,'')||rest;I.push({lv:'stop',t:`สื่อ “${media}” ระบบยังไม่รู้จัก หนังในไฟล์นี้จึงยังไม่ได้ใช้เติม ส่งไฟล์ให้ผู้ดูแลระบบ`})}
+ return ret(parseSplit(wb,media,I))}
+/* ด่านตรวจ Playlist: สถานะที่ไม่รู้จัก และวันที่ที่อ่านไม่ได้ (ทุกแบบไฟล์) */
+const KST=/ขึ้นใหม่|ไฟล์เดิม|ต่อสัญญา|อัปเดต|ถอด|ปรับความถี่|ชดเชย|On-?Air/i,NOEND=/กำหนด|จนกว่า|ปลด|ไม่มี/;
+function plCheck(p,I){const st=new Map(),bad=new Map(),all=new Set();
+ for(const s of p)for(const r of s.rows){if(!r.ad||r.ad===s.c||JUNK.test(String(r.ad).trim()))continue;all.add(r.ad);
+  const x=String(r.st||'').trim();if(x&&!KST.test(x)){if(!st.has(x))st.set(x,new Set());st.get(x).add(r.ad)}
+  for(const k of['s','e']){const v=String(r[k]||'').trim();if(v&&!parseD(v)&&!NOEND.test(v)){if(!bad.has(r.ad))bad.set(r.ad,(k==='s'?'วันเริ่ม':'วันหมด')+' “'+v+'”');break}}}
+ for(const[x,a]of st)I.push({lv:'stop',t:`สถานะ “${x}” ระบบไม่รู้จัก (${a.size} เรื่อง เช่น ${[...a].slice(0,2).join(', ')}) หนังเหล่านี้จะไม่ถูกนับว่า “ขึ้นใหม่” จึงไม่ลงใต้แถบของวันนี้`});
+ if(bad.size){const many=bad.size>=10||bad.size>=all.size*0.1,ex=[...bad].slice(0,3).map(([a,v])=>`${a} (${v})`).join(', ');
+  I.push({lv:many?'stop':'info',t:`อ่านวันที่ไม่ได้ ${bad.size} เรื่อง${many?' รูปแบบวันที่อาจเปลี่ยน':''}: ${ex}${bad.size>3?' …':''}`})}}
+const plRep=()=>PLI.length?['','ด่านตรวจ Playlist',...PLI.map(x=>`  ${x.lv==='stop'?'ต้องตรวจ':'ข้อสังเกต'}${x.ack?' (กดตรวจแล้ว)':''} | ${x.f} | ${x.t}`)]:[];
+/* ตอนเติม: หมายเหตุที่พูดถึงจอที่กำลังเติม (ไม่ออน / ยกเว้น / เฉพาะ …) แต่ระบบอ่านกติกาไม่ออก → ขึ้นใน “ควรตรวจ” ไม่เปลี่ยนผลการเติม */
+const RULEW=/ยกเว้น|ไม่ออน|ไม่ขึ้น|ไม่รับ|ฉพาะ|ห้าม|งด/,NORMN=t=>String(t||'').replace(/([ัิ-ฺ็-๎])\1+/g,'$1');
+const jamNumsOf=(ws,lc)=>{const s=new Set(),c0=col2n(lc);if(!ws)return s;
+ for(let r=8;r<=14;r++){const x=ws[lc+r];if(!(x&&/BANGKOK|BKJ|JAM|METRO/i.test(cl(x.v))))continue;
+  for(let c=c0+1;c<c0+60;c++){const y=ws[n2col(c)+r],v=y?cl(y.v):'';if(!/^\d{1,3}$/.test(v))break;s.add(+v)}break}return s};
+function noteQ(scr,kind,nums){const out=new Map(),al=SIGAL[scr.c];
+ for(const r of scr.rows||[]){if(r.off||!r.ad||r.ad===scr.c||JUNK.test(String(r.ad).trim())||/FastAds?/i.test(r.ad)||MTP.test(String(r.ad).trim())||(kind==='jam'&&(/^BJ\d*_\d+_/i.test(r.ad)||/weather/i.test(r.ad))))continue;const n0=String(r.note||''),n=NORMN(n0);if(!n.trim())continue;let hit=false;
+  if(kind==='jam'){if(nums&&nums.size){const L=new Set([...n.matchAll(/BKJ\s*\d?\s*-\s*(\d{1,3})/gi)].map(m=>+m[1]));
+    hit=RULEW.test(n)&&[...nums].every(x=>L.has(x))&&!/(?:ขึ้น|ออน)เ?ฉพาะ/.test(n0)&&!/ยกเว้น|ไม่ออน/.test(n0)}}
+  else if(al)hit=RULEW.test(n)&&ntoks(n).some(t=>al.includes(t))&&!/ไม่ออน/.test(n0)&&!/(?:ออน|ขึ้น)?เ?ฉพาะ/.test(n0);
+  if(!hit&&/(?:ออนแอร์|ขึ้น)ระหว่างวัน/.test(n)&&/\d/.test(n)&&!/(?:ออนแอร์|ขึ้น)ระหว่างวัน\s*(?:วันที่)?\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.test(n0))hit=true;
+  if(hit&&!out.has(r.ad))out.set(r.ad,n0.trim().replace(/\s+/g,' '))}
+ return[...out].map(([a,x])=>`${a}: “${x.length>90?x.slice(0,90)+'…':x}”`)}
 function listOf(s,o){let L=s.rows.filter(r=>o.off||!r.off);if(o.newOnly)L=L.filter(isNew);
  if(o.sort==='az')L=[...L].sort((a,b)=>a.ad.localeCompare(b.ad,'th'));if(o.sort==='new')L=[...L].sort((a,b)=>isNew(b)-isNew(a));
  const n=L.map(r=>r.ad);return o.dedupe?[...new Set(n)]:n}
 function buildOn(o){const on=new Map();for(const s of DB){if(s.m==='MetroLED'||!/^(40|80|CITY|Spare)/.test(s.m))continue;if(o.media!=='ทั้งหมด'&&s.m!==o.media)continue;on.set(s.m+'|'+s.c,listOf(s,o))}return on}
 async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({name:f.name,buf:await f.arrayBuffer()});
  if(kind==='ck'){C.push(...arr);note=`เพิ่มใบเช็ครูป ${arr.length} ไฟล์`;return view()}
- if(kind==='pj'){try{const o=JSON.parse(new TextDecoder().decode(arr[0].buf));if(Array.isArray(o)){DB=o;PLD=null;PLM={}}else{DB=o.DB||[];PLD=plDate()||(o.PLD?new Date(o.PLD):null)}note='เปิดโปรเจกต์แล้ว';}catch(e){note='ไฟล์โปรเจกต์ไม่ถูกต้อง'}return view()}
+ if(kind==='pj'){PLI=[];try{const o=JSON.parse(new TextDecoder().decode(arr[0].buf));if(Array.isArray(o)){DB=o;PLD=null;PLM={}}else{DB=o.DB||[];PLD=plDate()||(o.PLD?new Date(o.PLD):null)}note='เปิดโปรเจกต์แล้ว';}catch(e){note='ไฟล์โปรเจกต์ไม่ถูกต้อง'}return view()}
  note='กำลังอ่าน Playlist …';view();await new Promise(r=>setTimeout(r,30));let n=0,skip=[];
- const ok=[],emp=[],got=[];let _i=0;for(const f of arr){_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name);let p;try{p=parsePlaylist(f)}catch(e){p=null}PLX=PLX.filter(x=>x.f!==f.name);if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
+ const ok=[],emp=[],got=[];let _i=0;for(const f of arr){_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name);let p;try{p=parsePlaylist(f)}catch(e){p=null}PLX=PLX.filter(x=>x.f!==f.name);PLI=PLI.filter(x=>x.f!==f.name);if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
   if(!p.some(s=>s.rows.some(r=>!r.off))){emp.push(f.name);PLX.push({f:f.name,why:'อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) — ใช้ข้อมูลเดิมไว้ก่อน'});continue} /* อ่านได้แต่ไม่มีรายการหนังเลย → ไม่ลบข้อมูลเดิม */
-  const fd0=fullNameDate(f.name)||dataDate(p)||nameDate(f.name,autoBase());for(const x of p){x.pf=f.name;x.pd=fd0?+fd0:0}got.push({f,p,d:fd0?+fd0:0})}
+  const fd0=fullNameDate(f.name)||dataDate(p)||nameDate(f.name,autoBase());for(const x of p){x.pf=f.name;x.pd=fd0?+fd0:0}{const I=p.iss||[];plCheck(p,I);for(const x of I)PLI.push({f:f.name,...x})}got.push({f,p,d:fd0?+fd0:0})}
  got.sort((a,b)=>a.d-b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
  for(const{f,p}of got){
   if(p.every(x=>x.rep==='screen')){const ks=new Set(p.map(x=>x.m+'|'+x.c));DB=DB.filter(x=>!ks.has(x.m+'|'+x.c))}else{const ms=new Set(p.map(x=>x.m));DB=DB.filter(x=>!ms.has(x.m))}
   DB.push(...p);n+=p.length;ok.push(f.name)}
- if(ok.length){PLD=plDate();OP.base=''}
+ if(ok.length){PLD=plDate();OP.base=''}{const live=new Set(DB.map(s=>s.pf));PLI=PLI.filter(x=>live.has(x.f))}
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 2.9.2 (15 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.0 (15 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -937,6 +987,9 @@ function vWall(wd){const S=KINDS.map(K=>({K,s:kState(K,wd)})),n=S.filter(x=>x.s.
  ${n&&n<11?`<p class="wnote">ถ้าเติมเฉพาะใบเช็คของตัวเอง ใส่เฉพาะแบบที่ใบเช็คนั้นใช้ก็ได้ ขั้นที่ 3 จะบอกว่าใบเช็คแต่ละไฟล์ต้องใช้แบบไหน</p>`:''}
  ${mis.length?`<p class="wnote">ไฟล์ที่ใส่ทีหลังจะแทนที่ไฟล์เดิมของจอเดียวกัน ใส่ไฟล์ของวันที่ถูกต้องอีกครั้งเพื่อแทนที่</p>`:''}
  ${extra.length?`<p class="wnote">ไฟล์อื่นที่อ่านได้: ${extra.map(esc).join(', ')}</p>`:''}</section>`}
+const vPLI=()=>{const P=PLI.filter(x=>!x.ack);if(!P.length)return'';const st=P.filter(x=>x.lv==='stop'),inf=P.filter(x=>x.lv!=='stop'),grp=a=>{const M=new Map();for(const x of a){if(!M.has(x.f))M.set(x.f,[]);M.get(x.f).push(x.t)}return`<ul>${[...M].map(([f,t])=>`<li><b>${esc(f)}</b><ul>${t.map(y=>`<li>${esc(y)}</li>`).join('')}</ul></li>`).join('')}</ul>`};
+ return(st.length?alertHTML('wr',`ด่านตรวจ Playlist: ต้องตรวจ ${st.length} เรื่องก่อนเติม`,grp(st)+'<p>ระบบยังเติมได้ แต่ส่วนนี้อาจอ่านผิด ตรวจกับไฟล์ Playlist ก่อน ถ้ารูปแบบไฟล์เปลี่ยนจริง ส่งไฟล์ให้ผู้ดูแลระบบ ตอนกดเติม ระบบจะถามยืนยันอีกครั้ง</p><button class="btn quiet" data-a="clri">ตรวจแล้ว ซ่อนรายการนี้</button>'):'')+
+  (inf.length?alertHTML('info',`ด่านตรวจ Playlist: ข้อสังเกต ${inf.length} เรื่อง`,grp(inf)+'<p>ระบบจัดการให้แล้ว หรือไม่กระทบการเติม แจ้งไว้ให้รู้</p>'):'')};
 function vData(){const has=DB.length>0,wd=has?workDate():null,sdc=KINDS.find(K=>K.latest);
  const fl=(()=>{const M=new Map();for(const x of DB)if(x.pf&&(!M.has(x.pf)||x.pd>M.get(x.pf)))M.set(x.pf,x.pd||0);return[...M]})();
  const isSdc=([f])=>DB.some(s=>s.pf===f&&sdc.has(s)); /* Show DC มีช่องบอกสถานะของตัวเอง ไม่นับเป็น “หลายวันปนกัน” */
@@ -945,6 +998,7 @@ function vData(){const has=DB.length>0,wd=has?workDate():null,sdc=KINDS.find(K=>
  <div class="s1">${drop('pl',has?'เพิ่มหรือเปลี่ยนไฟล์ Playlist':'ลากไฟล์ Playlist มาวางที่นี่','หรือคลิกเพื่อเลือกไฟล์ .xlsx เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม','.xlsx,.xlsm','drop-pl',has)}${vDateCard(wd,has)}</div>
  ${vWall(wd)}
  <div class="stack">${PLX.length?alertHTML('er',`อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`,`<ul>${PLX.map(x=>`<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`):''}
+ ${vPLI()}
  ${ds.length>1?alertHTML('wr',`ไฟล์ Playlist มีหลายวันปนกัน (${ds.map(d=>thd(new Date(d))).join(', ')})`,`<p>ระบบใช้ ${thd(wd)} เป็นวันทำงาน ช่องไฟเหลืองในเช็กลิสต์คือแบบที่ไฟล์เป็นวันอื่น ใส่ไฟล์ของวันที่ถูกต้องแทน หรือกด “ล้าง Playlist (เริ่มวันใหม่)” แล้วใส่เฉพาะไฟล์ของวันนั้น</p>`):''}</div>
  ${fl.length?`<details class="files" ${FLOPEN?'open':''}><summary>ไฟล์ Playlist ที่ใส่แล้ว ${fl.length} ไฟล์</summary><div class="flist">${fl.map(([f,d])=>`<span class="fchip">${esc(f)}${d?`<em>${thd(new Date(d))}</em>`:''}</span>`).join('')}</div></details>`:''}
  <div class="actbar"><div class="tools">${has?`<button class="btn quiet" data-a="savepj">${IC.save}บันทึกโปรเจกต์</button>`:''}<button class="btn quiet" data-a="pick" data-k="pj">${IC.folder}เปิดโปรเจกต์</button>${has?`<button class="btn quiet" data-a="expx">${IC.dl}ส่งออก Playlist (.xlsx)</button><button class="btn quiet" data-a="reset">${IC.reset}ล้าง Playlist (เริ่มวันใหม่)</button>`:''}</div>
@@ -1013,6 +1067,7 @@ function vFl(){const ms=['ทั้งหมด',...new Set(DB.filter(s=>/^(40|8
   if(nBad)lines.push(alertHTML('er',`${nBad} ไฟล์เปิดไม่ได้หรือไม่ใช่ใบเช็ครูป`,'<p>ไฟล์เหล่านี้จะไม่ถูกเติม ไฟล์อื่นยังเติมได้ตามปกติ เอาออกด้วยปุ่ม × แล้วใส่ไฟล์ที่ถูกต้องแทน</p>'));
   if(nMiss)lines.push(alertHTML('wr',`ใบเช็ค ${nMiss} ไฟล์ยังขาด Playlist หรือหาจอไม่พบ`,'<p>กดเติมได้เลย แต่จอที่ไม่มีใน Playlist จะไม่ถูกเติม และจะขึ้นในรายการ “ควรตรวจ” ถ้าต้องการให้ครบ กลับไปใส่ Playlist ที่ขาดในขั้นที่ 1 ก่อน</p>'));
   if(nOk&&!nBad&&!nMiss)lines.push(alertHTML('ok',`ใบเช็ค ${nOk} ไฟล์พร้อมเติม`,'<p>มี Playlist ครบทุกจอที่ใบเช็คเหล่านี้ใช้</p>'))}
+ {const ps=PLI.filter(x=>x.lv==='stop'&&!x.ack).length;if(DB.length&&ps)lines.push(alertHTML('wr',`ด่านตรวจ Playlist: ต้องตรวจ ${ps} เรื่อง`,'<p>ดูรายละเอียดในขั้นที่ 1 ระบบเติมได้ แต่ส่วนนั้นอาจอ่านผิด ตอนกดเติมจะถามยืนยันอีกครั้ง</p>'))}
  {const ch=optChanged();if(ch.length)lines.push(alertHTML('wr',`ตั้งค่าไม่ตรงกับค่าแนะนำ ${ch.length} ข้อ`,`<p>${ch.map(k=>OPNAME[k]).join(', ')} ตรวจว่าตั้งใจเปลี่ยนจริง ถ้าไม่แน่ใจ กด “คืนค่าแนะนำ”</p><button class="btn quiet" data-a="optreset">คืนค่าแนะนำ</button>`))}
  if(OP.media!=='ทั้งหมด')lines.push(alertHTML('info',`ตั้งค่าให้เติมจอแยกเฉพาะสื่อ ${esc(OP.media)}`,'<p>จอแยกของสื่ออื่น (40/80 Blue/Red, CITY, Spare) จะไม่ถูกเติม ส่วน Signature Max, Show DC, BKJ และ Metro LED ยังเติมตามปกติ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”</p>'));
  const can=C.length&&DB.length&&!BASEERR;
@@ -1065,6 +1120,7 @@ const vHelp=()=>`<div class="ov"><div class="dlg" role="dialog" aria-modal="true
 <li><b>ขั้นที่ 4 ผลการเติม</b><span>เปิดดูรายการ “ควรตรวจ” ของแต่ละไฟล์ แล้วกด “ดาวน์โหลดทั้งหมด (.zip)” ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันพรุ่งนี้</span></li></ol>
 <h3>ระบบจัดให้อย่างไร</h3><ul class="hr2">
 <li>วันที่ 1 ลงหนังที่ออนอยู่ทั้งหมด หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z</li>
+<li>ด่านตรวจ Playlist: ระบบอ่านคอลัมน์ตามชื่อหัวตาราง ถ้าเจอสิ่งที่ไม่รู้จัก (หาคอลัมน์ไม่เจอ สถานะใหม่ วันที่อ่านไม่ได้ สื่อใหม่) จะเตือนในขั้นที่ 1 และถามยืนยันก่อนเติม หมายเหตุที่พูดถึงจอที่กำลังเติมแต่ระบบอ่านไม่ออกจะขึ้นใน “ควรตรวจ”</li>
 <li>วันถัดไป หนังที่ยังไม่มีในใบเช็คและสถานะ “ขึ้นใหม่” จะลงใต้แถบวันที่ของวันนั้น หนังที่มีอยู่แล้วอยู่ที่เดิม ไม่ซ้ำ</li>
 <li>หนังที่ยังอยู่ใน Playlist ถือว่ายังออนอยู่ “ออกวันที่ N” ใส่เมื่อหนังย้ายไปอยู่ในรายการถอด (วันที่ 1 ยังไม่ใส่) ไฟล์เดิม / ต่อสัญญากลางรอบ ใช้แถวเดิม ไม่เพิ่มแถวซ้ำ</li>
 <li>ตัวเลขที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</li>
@@ -1233,9 +1289,10 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
  colc:k=>{const p=$('#colpick');if(!p)return;p.dataset.k=k;p.value=swHex(OP['col'+k])||'#4472c4';p.click()},
  optreset:()=>{Object.assign(OP,OPDEF);note='คืนค่าแนะนำแล้ว';FOCUSSEL='#o_hand'},
  clrx:()=>{PLX=[];FOCUSSEL='[data-dz="pl"]'},
+ clri:()=>{for(const x of PLI)x.ack=1;note='ซ่อนรายการด่านตรวจแล้ว (ยังบันทึกไว้ในรายงาน)';FOCUSSEL='[data-dz="pl"]'},
  pick:k=>{if(!BUSY&&!FILLING)openPicker(k)},
  adv:()=>{adv=!adv},rx:k=>{RO.has(+k)?RO.delete(+k):RO.add(+k)},tab:k=>{if(BUSY||FILLING)return;if(k==='res'&&!last)return;tab=k;cs=null;window.scrollTo(0,0)},media:k=>{fm=k},open:k=>{if(DB[+k])cs=+k},back:()=>{cs=null},
- reset:()=>{if(confirm('ล้าง Playlist ใบเช็ครูป และผลการเติมที่ใส่ไว้ทั้งหมด เพื่อเริ่มวันใหม่?')){DB=[];PLD=null;PLM={};PLX=[];OP.base='';OP.media='ทั้งหมด';BASEERR='';C=[];last=null;RO.clear();fm='ทั้งหมด';q='';TQ='';cs=null;dirty=0;LIT=new Set();note='ล้างแล้ว เริ่มใส่ Playlist ของวันใหม่ได้เลย'}},
+ reset:()=>{if(confirm('ล้าง Playlist ใบเช็ครูป และผลการเติมที่ใส่ไว้ทั้งหมด เพื่อเริ่มวันใหม่?')){DB=[];PLD=null;PLM={};PLX=[];PLI=[];OP.base='';OP.media='ทั้งหมด';BASEERR='';C=[];last=null;RO.clear();fm='ทั้งหมด';q='';TQ='';cs=null;dirty=0;LIT=new Set();note='ล้างแล้ว เริ่มใส่ Playlist ของวันใหม่ได้เลย'}},
  add:()=>{const s=curS();if(!s)return;const i=s.rows.findIndex(r=>r.off),at=i<0?s.rows.length:i;s.rows.splice(at,0,{ad:'',ty:'',len:15,cnt:1,st:'ขึ้นใหม่',s:'',e:'',note:'',off:false});touch(s);FOCUSNEW=at},
  paste:()=>{if(curS())PASTE=true},pastecancel:()=>{PASTE=false},
  pasteok:()=>{const s=curS(),t=($('#pastebox')||{}).value||'';PASTE=false;if(!s)return;const L=t.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!L.length)return;const i=s.rows.findIndex(r=>r.off);s.rows.splice(i<0?s.rows.length:i,0,...L.map(ad=>({ad,ty:'',len:15,cnt:1,st:'',s:'',e:'',note:'',off:false})));touch(s);note=`เพิ่มแล้ว ${L.length} เรื่อง`},
@@ -1267,7 +1324,7 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
   note=bad.length?`บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`:`บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`},
  next:()=>{if(!last)return;if(!last.saved&&!confirm('ผลการเติมนี้ยังไม่ได้บันทึกหรือดาวน์โหลด ใช้เป็นใบเช็คตั้งต้นของวันถัดไปเลยไหม? (ยังดาวน์โหลดผลนี้ได้จนกว่าจะเติมครั้งถัดไป)'))return;
   const old=new Map(C.map(f=>[f.name,f]));C=last.res.filter(r=>r.blob).map(r=>{const o=old.get(r.name)||{};const x={...o,name:r.name,buf:r.blob.buffer.slice(r.blob.byteOffset,r.blob.byteOffset+r.blob.byteLength)};delete x.nd;return x});
-  DB=[];PLD=null;PLM={};PLX=[];OP.base='';BASEERR='';LIT=new Set();RO.clear();cs=null;fm='ทั้งหมด';q='';TQ='';dirty=0;tab='dat';window.scrollTo(0,0);
+  DB=[];PLD=null;PLM={};PLX=[];PLI=[];OP.base='';BASEERR='';LIT=new Set();RO.clear();cs=null;fm='ทั้งหมด';q='';TQ='';dirty=0;tab='dat';window.scrollTo(0,0);
   note=`ใบเช็คที่เติมแล้ว ${C.length} ไฟล์พร้อมเป็นไฟล์ตั้งต้น ใส่ Playlist ของวันถัดไปได้เลย`},
  dlz:()=>{if(!last)return;saveBlob('ใบเช็ครูป_เติมแล้ว.zip',last.zip);last.saved=true},dlf:k=>{const r=last&&last.res[+k];if(r&&r.blob){saveBlob(r.name,r.blob);(last.dl=last.dl||new Set()).add(+k);if(last.res.every((x,i)=>!x.blob||last.dl.has(i)))last.saved=true}},
  expx:()=>{const A=[['สื่อ','รหัสจอ','ชื่อจอ','รายการ','ลำดับ','หนังโฆษณา','Type','สถานะ spot','ความยาว (วิ)','จำนวนครั้ง','วันเริ่ม','วันสิ้นสุด','ข้อมูลการออน / หมายเหตุ']];
@@ -1276,8 +1333,8 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
  /* เติมใบเช็ค: เหมือนเวอร์ชัน 1.0 แต่ล็อกหน้าจอระหว่างเติม และไฟล์ที่เปิดไม่ได้ไม่ทำให้ไฟล์อื่นล้ม */
  fill:async()=>{if(FILLING||BUSY)return;if(!DB.length){note='ยังไม่ได้ใส่ Playlist ของวันนี้ — ใส่ไฟล์ที่ขั้นที่ 1 ก่อน';return}if(BASEERR){note='แก้วันที่ทำงานให้ถูกต้องก่อน';return}
   const o={...OP,W:workDate()};if(o.hand&&!o.W){note='ไม่พบวันที่ Playlist — ใส่วันที่ทำงานเอง เช่น 2-Oct-26';return}
-  const list=[...C];if(!list.length)return;if(last&&!last.saved&&!confirm('ผลการเติมครั้งก่อนยังไม่ได้บันทึกหรือดาวน์โหลด ถ้าเติมใหม่ ผลเดิมจะหายไป ต้องการเติมใหม่เลยไหม?'))return;FILLING=true;
-  try{const on=buildOn(o),ms=DB.find(s=>s.m==='MetroLED'),metro=ms?listOf(ms,o):[],out=new JSZip(),res=[],L=['รายงานการเติมใบเช็ครูป'];let i=0;
+  const list=[...C];if(!list.length)return;{const ps=PLI.filter(x=>x.lv==='stop'&&!x.ack);if(ps.length&&!confirm(`ด่านตรวจ Playlist พบ ${ps.length} เรื่องที่ระบบอาจอ่านผิด:\n\n${ps.slice(0,6).map(x=>'• '+x.f+': '+x.t).join('\n')}${ps.length>6?'\n…':''}\n\nเติมต่อเลยไหม? (กด Cancel เพื่อกลับไปตรวจ)`))return}if(last&&!last.saved&&!confirm('ผลการเติมครั้งก่อนยังไม่ได้บันทึกหรือดาวน์โหลด ถ้าเติมใหม่ ผลเดิมจะหายไป ต้องการเติมใหม่เลยไหม?'))return;FILLING=true;
+  try{const on=buildOn(o),ms=DB.find(s=>s.m==='MetroLED'),metro=ms?listOf(ms,o):[],out=new JSZip(),res=[],L=['รายงานการเติมใบเช็ครูป',...plRep()];let i=0;
    for(const f of list){i++;await busyStep('กำลังเติมใบเช็ครูป',i,list.length,f.name);let r;
     const rd=f.nd?readyOf(f):null;
     if(rd&&(rd.bad||rd.empty))r={rep:[['ทั้งไฟล์','ไม่ได้เติม','ตรวจ: '+(rd.bad||'ไม่พบชีตของใบเช็ครูปในไฟล์นี้')+' จึงไม่ได้เติม',0]],blob:null};
