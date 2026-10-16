@@ -588,6 +588,9 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  const note=(b,r,row)=>{if(noNotes||!r.ed||!isFinite(r.ed))return;const nd=+addD(new Date(r.ed),1);if(nd>+P&&nd<=H){sh.setText(b.nc,row,'ออกวันที่ '+new Date(nd).getUTCDate());sh.setS(b.nc,row,ST.derive(b.bn,'red',{color:'FFFF0000',right:true}))}};
  const put=(b,r,row)=>{const q=b.cnt.get(r.nm);if(q&&q.length){sh.give(b.pc,row,q.shift());moved++}sh.setText(b.lc,row,r.nm);if(r.hash)sh.setS(b.lc,row,ST.derive(b.bl,'yel',{fill:'FFFFFF00'}));else sh.setS(b.lc,row,b.bl);if(b.kind!=='keep')note(b,r,row);else if(r.raw){sh.setText(b.nc,row,r.raw);sh.setS(b.nc,row,ST.derive(b.bn,'red',{color:'FFFF0000',right:true}))}};
  for(const c of[o.col1,o.col2])if(c)MARK.x.add(String(c).toUpperCase().slice(-6));
+ /* แถบรอบ 2 ที่ชีตมีอยู่แล้ว (สีต่างจากหัวตาราง): จำสไตล์ไว้ก่อนล้างแถว */
+ const E2=(two||CONTM)&&!o.col2?bars.find(([r,d])=>r>hr&&d&&+d>=+(CONTM?P2:P)&&+d<=+E&&sh.getS(b0.lc,r)!=null&&sh.getS(b0.lc,r)!==b0.hs[1]):null,SNAP={};
+ if(E2){const a=Math.min(...B.map(b=>col2n(b.nc))),z=Math.max(...B.map(b=>col2n(b.pc)))+12;for(let c=a;c<=z;c++){const L=n2col(c);SNAP[L]=sh.getS(L,E2[0])}}
  const BS=new Set();for(const[br]of bars)for(const b of B)for(const c of[b.nc,b.pc]){const x=sh.getS(c,br);if(x!=null&&x!==b.bp&&x!==b.bn&&x!==b.be&&x!==b.bl)BS.add(x)} /* สไตล์ของแถบเดิมทุกสี (รวมสีธีม) */
  for(const b of B){const beNo=b.be==null||!ST.hasBorder(b.be);
   for(let r=S+1;r<=Z;r++){const ps0=sh.getS(b.pc,r);{const ps=ps0;if(ps!=null&&(ps===b.hs[2]||MARK.test(ST.fillOf(ps))||BS.has(ps)))sh.setS(b.pc,r,b.bp)}sh.clear(b.lc,r);sh.clear(b.nc,r);sh.setS(b.lc,r,beNo&&ps0!=null&&ST.hasBorder(ps0)&&!ST.fillOf(ps0)?b.bl:b.be); /* ช่องว่างไม่มีเส้น แต่ช่องนับข้างๆ เป็นตาราง (มีเส้น ไม่มีสี) → ใช้เส้นแบบแถวหนัง ให้ตารางต่อเนื่อง */{const ns=sh.getS(b.nc,r);if(b.bn!=null)sh.setS(b.nc,r,b.bn);else if(ns!=null&&(MARK.test(ST.fillOf(ns))||BS.has(ns)))sh.setS(b.nc,r,null)}}
@@ -597,7 +600,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  for(let c=c0;c<=c1;c++){const L=n2col(c),st=sh.getS(L,hr);if(!own.has(L)&&st!=null&&DKB.test(ST.fillOf(st)))HX.push([L,st])}
  for(const[L]of HX){const base=modeF(sh,L,hr+1,hr+400,null,ST);for(let r=S+1;r<=Z;r++){const st=sh.getS(L,r);if(st!=null&&(MARK.test(ST.fillOf(st))||BS.has(st)))sh.setS(L,r,base)}}
  /* สีแถบ: เลือกเองได้ ถ้าไม่เลือก รอบ 1 ใช้สีหัวตารางเดิม รอบ 2 ใช้สีของแถบรอบ 2 ที่ชีตมีอยู่แล้ว ถ้ายังไม่มีใช้ฟ้า 4472C4 */
- const R2={},KEEP2=two&&!o.col2&&F&&+F>=+P;if((two||CONTM)&&!o.col2&&!KEEP2){const e=bars.find(([r,d])=>r>hr&&d&&+d>=+(CONTM?P2:P)&&+d<=+E&&sh.getS(b0.lc,r)!=null&&sh.getS(b0.lc,r)!==b0.hs[1]);if(e){for(const b of B)for(const c of[b.nc,b.lc,b.pc])R2[c]=sh.getS(c,e[0]);for(const[L]of HX)R2[L]=sh.getS(L,e[0])}}
+ const R2={},KEEP2=two&&!o.col2&&F&&+F>=+P;if((two||CONTM)&&!o.col2&&!KEEP2){const e=E2;if(e){for(const b of B)for(const c of[b.nc,b.lc,b.pc])R2[c]=SNAP[c];for(const[L]of HX)R2[L]=SNAP[L]}}
  const C2=o.col2||'FF4472C4',fx=(st,c,k)=>String(ST.fillOf(st)||'').toUpperCase().slice(-6)===String(c).toUpperCase().slice(-6)?st:ST.derive(st,k+c,{fill:c});
  const hsx=(st,L,r2)=>{if(st==null)return st;if(two||r2){if(KEEP2)return st;return(!o.col2&&L&&R2[L]!=null)?R2[L]:fx(st,C2,'c2')}if(o.col1)return fx(st,o.col1,'c1');return ISG.test(ST.fillOf(st))?ST.derive(st,'nvy',{fill:NAVY}):st};
  const hdr=(row,d)=>{const r2=CONTM&&+d>=+P2;for(const[L,st]of HX){sh.clear(L,row);sh.setS(L,row,hsx(st,L,r2))}B.forEach((b,i)=>{sh.clear(b.lc,row);if(i===0)sh.setNum(b.nc,row,serial(d));else sh.setF(b.nc,row,B[i-1].nc+row,serial(d));if(b.hs[0]!=null)sh.setS(b.nc,row,hsx(b.hs[0],b.nc,r2));if(b.hs[1]!=null)sh.setS(b.lc,row,hsx(b.hs[1],b.lc,r2));sh.clear(b.pc,row);if(b.hs[2]!=null)sh.setS(b.pc,row,hsx(b.hs[2],b.pc,r2))})};
@@ -818,7 +821,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.0.2 (16 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.0.3 (16 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
