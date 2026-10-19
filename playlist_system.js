@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.1 • 19 ต.ค. 2569
+ *  เวอร์ชัน 3.2 • 19 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -53,7 +53,9 @@
  *   3.0.2 แก้ส่วน 5: แถวว่างใต้แถบสุดท้ายในช่องชื่อหนังมีเส้นตารางตามช่องนับ
  *   3.0.3 แก้ส่วน 5: สีแถบรอบ 2 แบบ “สีตามชีต” ใช้สีแถบรอบ 2 เดิมของชีต (อ่านก่อนล้างแถว) ถ้ายังไม่มีใช้ฟ้า
  *   เวอร์ชัน 3.1 แก้ส่วน 1, 5, 7 และ 9: Metro LED อ่านสถานะจากสีแถวและอ่านระยะสัญญา (parseMetro)
- *   แถว #FAST_ADS / FastAd ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม (FASTN))
+ *   แถว #FAST_ADS / FastAd ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม (FASTN)
+ *   เวอร์ชัน 3.2 แก้ส่วน 5 และ 9: วันที่ถ่าย (ช่องหลังชื่อหนัง) ของบล็อกที่มีหลายจอ เช่น BKJ / Metro LED
+ *   ย้ายตามชื่อหนังครบทุกคอลัมน์ และขึ้นเดือนใหม่ล้างทุกคอลัมน์ (b.pcs ใน layoutChk))
  * ======================================================================
  */
 
@@ -693,6 +695,38 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       f = e && e.getElementsByTagNameNS(NS, 'f')[0];
     return f ? f.textContent : null;
   }; /* SheetJS ไม่อ่านช่องสูตรที่ไม่มีค่าที่คำนวณไว้ → ดูสูตรจาก XML ของชีต */
+  /* ช่องหลังชื่อหนัง (วันที่ถ่าย) ของจอที่มีหลายจอในบล็อกเดียว เช่น BKJ / Metro LED: คอลัมน์ติดกันที่แถว 9 เป็นสูตร AVERAGE เป็นของบล็อกเดียวกัน → ย้ายตามชื่อหนังทุกช่อง */
+  {
+    const f9 = c => {
+        const x = wsv && wsv[c + 9];
+        if (x && typeof x.f === 'string') return x.f;
+        const R = sh.row(9, false);
+        if (R)
+          for (const e of R.children)
+            if (e.getAttribute('r') === c + 9) {
+              const f = e.getElementsByTagNameNS(NS, 'f')[0];
+              return f ? f.textContent : null;
+            }
+        return null;
+      },
+      avg = c => /^=?\s*AVERAGE/i.test(f9(c) || ''),
+      ownC = new Set(B.flatMap(b => [b.nc, b.lc]));
+    for (const b of B) {
+      b.pcs = [b.pc];
+      if (avg(b.pc))
+        for (let c = col2n(b.pc) + 1; c < col2n(b.pc) + 60; c++) {
+          const L = n2col(c);
+          if (!avg(L) || ownC.has(L)) break;
+          b.pcs.push(L);
+        }
+      b.bps = b.pcs.map((L, i) => (i ? modeF(sh, L, hr + 1, hr + 400, null, ST) : b.bp));
+      b.hss = b.pcs.map((L, i) => (i ? sh.getS(L, hr) : b.hs[2]));
+    }
+  }
+  const PCZ = Math.max(
+    Math.max(...B.map(b => col2n(b.pc))) + 12,
+    ...B.map(b => col2n(b.pcs[b.pcs.length - 1])),
+  );
   const numAt = (c, r, k = 0) => {
     const f = k < 4 && fOf(c, r),
       m = f && f.replace(/^=/, '').match(/^\$?([A-Z]{1,3})\$?(\d+)\s*(?:([+-])\s*(\d+))?$/);
@@ -782,13 +816,12 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   const KB = B.filter(
     b => b.kind === 'keep',
   ); /* จอในชีตเดียวกันใช้แถวและแถบวันที่ร่วมกัน: จอที่ไม่มีใน Playlist ต้องคงรายการเดิมไว้ในแถวที่ตรงกัน */
-  if (KB.length && (!hist || KB.some(b => b.n > 1)))
+  if (KB.length && !hist)
     return {
       skip:
         'ไม่พบจอ ' +
         KB.map(b => b.scr.c).join(', ') +
-        ' ใน Playlist ที่ใส่มา และ' +
-        (hist ? 'จอนี้มีช่องนับหลายคอลัมน์' : 'ชีตนี้กำลังเริ่มรอบใหม่') +
+        ' ใน Playlist ที่ใส่มา และชีตนี้กำลังเริ่มรอบใหม่' +
         ' — ไม่ได้แก้ชีตนี้ (จอในชีตเดียวกันใช้แถบวันที่ร่วมกัน) ใส่ Playlist ที่มีจอนี้ด้วย เช่นไฟล์ล่าสุดของวันก่อน แล้วเติมใหม่',
     };
   const Z = Math.max(last + 2, S + 400),
@@ -799,7 +832,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     if (n < ref.getUTCDate()) d = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth() + 1, n));
     return +addD(d, -1);
   };
-  /* เก็บตัวเลขที่ผู้ตรวจนับไว้ (ช่องข้างชื่อหนัง) — ย้ายตามชื่อหนังเฉพาะในรอบเดียวกัน */
+  /* เก็บวันที่ถ่าย/ตัวเลขที่ใส่ไว้ในช่องหลังชื่อหนัง (ทุกจอของบล็อก) — ย้ายตามชื่อหนังเฉพาะในเดือนเดียวกัน ขึ้นเดือนใหม่ล้างทุกช่อง */
   let moved = 0,
     dropped = 0,
     cleared = 0,
@@ -875,14 +908,19 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       }
       const nm = vOf(b.lc, r);
       if (!nm || /^ออก(วันที่)?\s*\d/.test(nm)) continue;
-      const k = sh.take(b.pc, r),
-        fx = FASTN.test(nm);
-      if (k) {
-        sh.setS(b.pc, r, b.bp);
-        if (hist && !fx) {
-          if (!b.cnt.has(nm)) b.cnt.set(nm, []);
-          b.cnt.get(nm).push(k);
-        } else if (!hist) cleared++;
+      const fx = FASTN.test(nm);
+      let t = null;
+      for (let i = 0; i < b.pcs.length; i++) {
+        const k = sh.take(b.pcs[i], r);
+        if (k) {
+          sh.setS(b.pcs[i], r, b.bps[i]);
+          if (hist && !fx) (t || (t = b.pcs.map(() => null)))[i] = k;
+          else if (!hist) cleared++;
+        }
+      }
+      if (t) {
+        if (!b.cnt.has(nm)) b.cnt.set(nm, []);
+        b.cnt.get(nm).push(t);
       }
       if (fx) {
         if (hist) fdrop++;
@@ -894,6 +932,13 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       }
     }
   }
+  if (!hist && !frozen)
+    for (const b of B)
+      for (let r = FIRST; r <= last; r++)
+        if (r > S || vOf(b.lc, r))
+          for (const L of b.pcs)
+            if (sh.take(L, r))
+              cleared++; /* ขึ้นเดือนใหม่: ล้างวันที่ถ่ายที่เหลือด้วย — แถว # เหนือหัววันที่ (เช่น #BANGKOK JAM_ETA, #EDA) และตัวเลขที่ค้างในแถวที่ไม่มีชื่อหนัง (สูตรไม่แตะ) */
   /* รวมรายการ: ของเดิมในชีต + Playlist วันนี้ */
   for (const b of B) {
     const offEd = new Map(),
@@ -1105,10 +1150,13 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   };
   const put = (b, r, row) => {
     const q = b.cnt.get(r.nm);
-    if (q && q.length) {
-      sh.give(b.pc, row, q.shift());
-      moved++;
-    }
+    if (q && q.length)
+      q.shift().forEach((k, i) => {
+        if (k) {
+          sh.give(b.pcs[i], row, k);
+          moved++;
+        }
+      });
     sh.setText(b.lc, row, r.nm);
     if (r.hash) sh.setS(b.lc, row, ST.derive(b.bl, 'yel', { fill: 'FFFFFF00' }));
     else sh.setS(b.lc, row, b.bl);
@@ -1135,7 +1183,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     SNAP = {};
   if (E2) {
     const a = Math.min(...B.map(b => col2n(b.nc))),
-      z = Math.max(...B.map(b => col2n(b.pc))) + 12;
+      z = PCZ;
     for (let c = a; c <= z; c++) {
       const L = n2col(c);
       SNAP[L] = sh.getS(L, E2[0]);
@@ -1144,9 +1192,10 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   const BS = new Set();
   for (const [br] of bars)
     for (const b of B)
-      for (const c of [b.nc, b.pc]) {
+      for (const c of [b.nc, ...b.pcs]) {
         const x = sh.getS(c, br);
-        if (x != null && x !== b.bp && x !== b.bn && x !== b.be && x !== b.bl) BS.add(x);
+        if (x != null && x !== b.bp && !b.bps.includes(x) && x !== b.bn && x !== b.be && x !== b.bl)
+          BS.add(x);
       } /* สไตล์ของแถบเดิมทุกสี (รวมสีธีม) */
   for (const b of B) {
     const beNo = b.be == null || !ST.hasBorder(b.be);
@@ -1155,6 +1204,11 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       {
         const ps = ps0;
         if (ps != null && (ps === b.hs[2] || MARK.test(ST.fillOf(ps)) || BS.has(ps))) sh.setS(b.pc, r, b.bp);
+      }
+      for (let i = 1; i < b.pcs.length; i++) {
+        const ps = sh.getS(b.pcs[i], r);
+        if (ps != null && (ps === b.hss[i] || MARK.test(ST.fillOf(ps)) || BS.has(ps)))
+          sh.setS(b.pcs[i], r, b.bps[i]);
       }
       sh.clear(b.lc, r);
       sh.clear(b.nc, r);
@@ -1175,8 +1229,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   }
   /* แถบหัววันที่ให้ยาวเท่าแถบเดิมของชีต (เช่น Metro ที่มีช่องนับหลายจอ) */
   const c0 = Math.min(...B.map(b => col2n(b.nc))),
-    c1 = Math.max(...B.map(b => col2n(b.pc))) + 12,
-    own = new Set(B.flatMap(b => [b.nc, b.lc, b.pc])),
+    c1 = PCZ,
+    own = new Set(B.flatMap(b => [b.nc, b.lc, ...b.pcs])),
     HX = [];
   for (let c = c0; c <= c1; c++) {
     const L = n2col(c),
@@ -1196,7 +1250,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   if ((two || CONTM) && !o.col2 && !KEEP2) {
     const e = E2;
     if (e) {
-      for (const b of B) for (const c of [b.nc, b.lc, b.pc]) R2[c] = SNAP[c];
+      for (const b of B) for (const c of [b.nc, b.lc, ...b.pcs]) R2[c] = SNAP[c];
       for (const [L] of HX) R2[L] = SNAP[L];
     }
   }
@@ -1216,11 +1270,14 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     if (o.col1) return fx(st, o.col1, 'c1');
     return ISG.test(ST.fillOf(st)) ? ST.derive(st, 'nvy', { fill: NAVY }) : st;
   };
+  const HXA = [...HX, ...B.flatMap(b => b.pcs.slice(1).map((L, i) => [L, b.hss[i + 1]]))].sort(
+    (x, y) => col2n(x[0]) - col2n(y[0]),
+  ); /* แถบวันที่คลุมทุกช่องวันที่ถ่ายของบล็อก (และคอลัมน์หัวสีเข้มอื่นที่เป็นส่วนของแถบ) */
   const hdr = (row, d) => {
     const r2 = CONTM && +d >= +P2;
-    for (const [L, st] of HX) {
+    for (const [L, st] of HXA) {
       sh.clear(L, row);
-      sh.setS(L, row, hsx(st, L, r2));
+      if (st != null) sh.setS(L, row, hsx(st, L, r2));
     }
     B.forEach((b, i) => {
       sh.clear(b.lc, row);
@@ -1236,7 +1293,13 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   const pad = (b, a, z) => {
     for (let row = a; row <= z; row++) {
       sh.setS(b.lc, row, ST.derive(b.bl, 'pad' + PADC, { fill: PADC, border: true }));
-      sh.setS(b.pc, row, ST.derive(b.bp != null ? b.bp : '0', 'pad' + PADC, { fill: PADC, border: true }));
+      b.pcs.forEach((L, i) =>
+        sh.setS(
+          L,
+          row,
+          ST.derive(b.bps[i] != null ? b.bps[i] : '0', 'pad' + PADC, { fill: PADC, border: true }),
+        ),
+      );
     }
   }; /* แถบสีฟ้าในช่องว่างต่อจากรายการที่สั้นกว่า */
   const mainLen = Math.max(0, ...B.map(b => b.main.length));
@@ -1266,7 +1329,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       for (const r of b.rows.filter(x => x.off)) sh.setText(b.lc, q++, r.ad);
     }
   }
-  for (const b of B) for (const q of b.cnt.values()) dropped += q.length;
+  for (const b of B) for (const q of b.cnt.values()) for (const t of q) dropped += t.filter(Boolean).length;
   return {
     hr,
     S,
@@ -1547,8 +1610,10 @@ async function fillWb(f, on, metro, o) {
         if (L.dropped)
           rep.push([
             sn,
-            'ตัวเลขนับ',
-            'ตรวจ: มีตัวเลขที่นับไว้ ' + L.dropped + ' ช่องของหนังที่ไม่อยู่ในรายการแล้ว จึงไม่ได้ย้ายมา',
+            'วันที่ถ่าย',
+            'ตรวจ: มีวันที่ถ่าย/ตัวเลขที่ใส่ไว้ ' +
+              L.dropped +
+              ' ช่องของหนังที่ไม่อยู่ในรายการแล้ว จึงไม่ได้ย้ายมา',
             0,
           ]);
         const rd = d => new Date(d).getUTCDate();
@@ -1571,13 +1636,13 @@ async function fillWb(f, on, metro, o) {
                 (L.frozen ? ' ต่อท้ายรอบ 1–15 (รอบแรกไม่ถูกแก้)' : '')
               : 'รอบ 1–15 หัววันที่แถว ' + L.hr) +
             (L.noNotes ? ' • วันที่ 1 ยังไม่ใส่ “ออกวันที่”' : '') +
-            (L.moved ? ' • ย้ายตัวเลขนับตามชื่อหนัง ' + L.moved + ' ช่อง' : '') +
+            (L.moved ? ' • ย้ายวันที่ถ่ายตามชื่อหนัง ' + L.moved + ' ช่อง (ทุกจอ)' : '') +
             (L.today ? ' • หนังใหม่ของวันนี้ ' + L.today + ' เรื่อง ลงใต้แถบวันที่ ' + rd(L.W) : '') +
             (L.nost ? ' • ไม่เพิ่ม ' + L.nost + ' เรื่องที่ยังไม่มีในใบเช็คแต่สถานะไม่ใช่ “ขึ้นใหม่”' : '') +
             (L.dates ? ' • แยกวันเริ่ม ' + L.dates + ' กลุ่ม' : '') +
             (L.merged ? ' • ไฟล์เดิม/ต่อสัญญา ' + L.merged + ' แถว ใช้แถวเดิม ไม่ใส่ออกวันที่' : '') +
             (L.kept ? ' • เก็บหนังที่ลงไว้แล้วแต่ไม่มีใน Playlist วันนี้ ' + L.kept + ' แถว' : '') +
-            (L.cleared ? ' • เริ่มรอบใหม่ ล้างตัวเลขนับของรอบก่อน ' + L.cleared + ' ช่อง' : '') +
+            (L.cleared ? ' • ขึ้นรอบใหม่ ล้างวันที่ถ่ายของรอบก่อน ' + L.cleared + ' ช่อง (ทุกจอ)' : '') +
             (L.back
               ? ' • หนังที่เคยออกแล้วกลับมาขึ้นใหม่ ' +
                 L.back +
@@ -2464,7 +2529,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.1 (19 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.2 (19 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -3298,8 +3363,8 @@ function vFl() {
  ${C.length ? `<div class="ckl">${C.map((f, i) => vCk(f, R[i], i, wd && per(wd).two ? 2 : 1)).join('')}</div>` : '<p class="empty">ยังไม่มีใบเช็ครูป ลากไฟล์มาวางในกล่องด้านบน แล้วระบบจะบอกว่าแต่ละไฟล์ต้องใช้ Playlist แบบไหน</p>'}</section></div>
  <aside class="panel set" data-tour="settings"><h3 class="sec-t">การตั้งค่า</h3>
  <label class="date"><span>วันที่ทำงาน (วันของ Playlist)</span><input id="o_base" class="${BASEERR ? 'bad' : ''}" placeholder="${end(ab) || 'เช่น 12-Oct-26'}" autocomplete="off" aria-invalid="${!!BASEERR}">${dmsg}${wd && !BASEERR ? rndHTML(wd) + (wd.getUTCDate() === 1 ? '<small>วันที่ 1 ยังไม่ใส่ “ออกวันที่”</small>' : '') : ''}</label>
- <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายตัวเลขนับตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
- ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และตัวเลขที่นับไว้จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
+ <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายวันที่ถ่าย (ช่องหลังชื่อหนัง ทุกจอ) ตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
+ ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และวันที่ถ่าย (ช่องหลังชื่อหนัง) จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
  <div class="cols"><p class="cl">สีแถบวันที่</p><div class="crow"><span>รอบ 1–15</span>${vColPick(1)}</div><div class="crow"><span>รอบ 16–สิ้นเดือน</span>${vColPick(2)}</div><small>“ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ (รอบ 16 ถ้าชีตยังไม่มีแถบรอบ 2 ใช้สีฟ้า) เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <button class="adv" data-a="adv" aria-expanded="${adv}"><span>ตัวเลือกเพิ่มเติม${advChg() ? ` <em class="chg">เปลี่ยนจากค่าแนะนำ ${advChg()} ข้อ</em>` : ''}</span>${IC.chev}</button>
  <div class="advb" ${adv ? '' : 'hidden'}>
@@ -3389,7 +3454,7 @@ const vHelp =
 <li>ด่านตรวจ Playlist: ระบบอ่านคอลัมน์ตามชื่อหัวตาราง ถ้าเจอสิ่งที่ไม่รู้จัก (หาคอลัมน์ไม่เจอ สถานะใหม่ วันที่อ่านไม่ได้ สื่อใหม่) จะเตือนในขั้นที่ 1 และถามยืนยันก่อนเติม หมายเหตุที่พูดถึงจอที่กำลังเติมแต่ระบบอ่านไม่ออกจะขึ้นใน “ควรตรวจ”</li>
 <li>วันถัดไป หนังที่ยังไม่มีในใบเช็คและสถานะ “ขึ้นใหม่” จะลงใต้แถบวันที่ของวันนั้น หนังที่มีอยู่แล้วอยู่ที่เดิม ไม่ซ้ำ</li>
 <li>หนังที่ยังอยู่ใน Playlist ถือว่ายังออนอยู่ “ออกวันที่ N” ใส่เมื่อหนังย้ายไปอยู่ในรายการถอด (วันที่ 1 ยังไม่ใส่) ไฟล์เดิม / ต่อสัญญากลางรอบ ใช้แถวเดิม ไม่เพิ่มแถวซ้ำ</li>
-<li>ตัวเลขที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</li>
+<li>วันที่ถ่าย (ช่องหลังชื่อหนังที่ทีมใส่เอง) ย้ายตามชื่อหนังให้เอง ทุกคอลัมน์ — จอที่มีหลายจอในบล็อกเดียว (BKJ, Metro LED) ย้ายครบทุกจอ • ขึ้นเดือนใหม่ (วันที่ 1) ล้างวันที่ถ่ายของเดือนก่อนให้ • ระบบดูแลแค่รายชื่อหนังกับ “ออกวันที่” ไม่เขียนวันที่ถ่ายเอง</li>
 <li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
 <li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ (Signature Max, Show DC), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li>
 <li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
@@ -3431,7 +3496,7 @@ function vHow() {
  <li><span class="cn">2</span><span><b>หนัง # ขึ้นก่อน</b> และไฮไลต์สีเหลือง</span></li>
  <li><span class="cn">3</span><span><b>หนังอื่นเรียง A–Z และ ก–ฮ</b> แบบเดียวกับที่ Excel เรียง</span></li>
  <li><span class="cn">4</span><span><b>“ออกวันที่ N” ตัวแดง</b> ใส่เมื่อถึงวันที่หนังออก ไฟล์เดิม / ต่อสัญญา ไม่ใส่</span></li>
- <li><span class="cn">5</span><span><b>ตัวเลขในคอลัมน์ “นับ”</b> ที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</span></li>
+ <li><span class="cn">5</span><span><b>วันที่ถ่ายในช่องหลังชื่อหนัง</b> (ทุกจอ) ย้ายตามชื่อหนังให้เอง ขึ้นเดือนใหม่ล้างให้</span></li>
  <li><span class="cn">6</span><span><b>หนังใหม่ของแต่ละวัน</b> (สถานะ “ขึ้นใหม่”) ลงใต้แถบวันที่ของวันนั้น ไม่ซ้ำกับของเดิม</span></li>
  <li><span class="cn">7</span><span><b>แถบท้ายตารางเป็นวันถัดไป</b> ไว้ลงหนังของพรุ่งนี้</span></li>
  <li><span class="cn">8</span><span><b>วันที่ 16 ทำต่อในรายการเดิม</b> แถบวันที่ 16 เป็นต้นไปเป็นอีกสี (ค่าเริ่มต้นสีฟ้า เลือกสีได้) หนังที่ต่อสัญญาวันที่ 16 ลงใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอถอดจริงใส่วันถอดทั้งสองแถว</span></li></ol></div></section>
