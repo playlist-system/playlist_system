@@ -559,7 +559,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
    let g=r.sd&&+r.sd>+P?+r.sd:+P;
    const stl=CONTM&&dd>=+P2&&/ต่อสัญญา/.test(r.st||'')&&r.ed&&+r.ed===+P2-864e5&&!(r.sd&&+r.sd>=+P2);if(stl)g=+P2; /* ต่อสัญญาวันที่ 16 แต่ Playlist ยังลงวันที่สัญญาเดิม (หมด 15) → ถือเป็นสัญญาใหม่เริ่ม 16 */
    const mid=String(r.note||'').match(/(?:ออนแอร์|ขึ้น)ระหว่างวัน\s*(?:วันที่)?\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/),md=mid?+new Date(Date.UTC(yy(mid[3]),+mid[2]-1,+mid[1])):0;
-   if(md>=+P&&md<=dd)g=md; /* หมายเหตุ “ออนแอร์ระหว่างวันวันที่ …” → ลงใต้แถบวันนั้น */
+   if(md>=+P&&md<=dd)g=CONTM&&dd>=+P2&&md<+P2&&!b.hist.some(h=>fam(h.nm)===fam(r.ad))?+P2:md; /* หมายเหตุ “ออนแอร์ระหว่างวันวันที่ …” → ลงใต้แถบวันนั้น — ครึ่งเดือนหลัง: หนังใหม่ที่หมายเหตุลงวันที่ 1–15 ลงใต้แถบ 16 (รอบ 1–15 ปิดแล้ว แบบที่ทีมทำ) */
    else if(NEWST.test(r.st||'')&&g!==dd){if(g>dd)g=Math.max(dd,+P);else if(hb0&&g>+P&&!b.hist.some(h=>h.g===g&&fam(h.nm)===fam(r.ad)))g=dd} /* “ขึ้นใหม่” = ขึ้นวันนี้ */
    if(g>lim){if(!b.hist.some(h=>fam(h.nm)===fam(r.ad)))b.later.push(r);continue}
    const rnw=CONTM&&dd===+P2&&(NEWST.test(r.st||'')||CONT.test(r.st||''))&&(r.sd&&+r.sd===+P2||stl); /* วันที่ 16: ต่อสัญญา/ขึ้นใหม่ที่เริ่ม 16 → แถวใหม่ใต้ 16 แถวเดิมใส่ “ออก 16” */
@@ -838,7 +838,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.2 (19 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.2.1 (19 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
