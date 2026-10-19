@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.0.3 • 16 ต.ค. 2569
+ *  เวอร์ชัน 3.1 • 19 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -51,7 +51,9 @@
  *   เตือนสถานะ / วันที่ / สื่อที่ไม่รู้จักก่อนเติม และหมายเหตุที่อ่านไม่ออกใน “ควรตรวจ”
  *   3.0.1 แก้ส่วน 5: วันที่ 16 สถานะต่อสัญญาที่ Playlist ยังลงวันที่สัญญาเดิม (หมด 15) ถือเป็นสัญญาใหม่เริ่ม 16
  *   3.0.2 แก้ส่วน 5: แถวว่างใต้แถบสุดท้ายในช่องชื่อหนังมีเส้นตารางตามช่องนับ
- *   3.0.3 แก้ส่วน 5: สีแถบรอบ 2 แบบ “สีตามชีต” ใช้สีแถบรอบ 2 เดิมของชีต (อ่านก่อนล้างแถว) ถ้ายังไม่มีใช้ฟ้า)
+ *   3.0.3 แก้ส่วน 5: สีแถบรอบ 2 แบบ “สีตามชีต” ใช้สีแถบรอบ 2 เดิมของชีต (อ่านก่อนล้างแถว) ถ้ายังไม่มีใช้ฟ้า
+ *   เวอร์ชัน 3.1 แก้ส่วน 1, 5, 7 และ 9: Metro LED อ่านสถานะจากสีแถวและอ่านระยะสัญญา (parseMetro)
+ *   แถว #FAST_ADS / FastAd ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม (FASTN))
  * ======================================================================
  */
 
@@ -305,7 +307,8 @@ const serial = d => Math.round((d - Date.UTC(1899, 11, 30)) / 864e5),
   addD = (d, n) => new Date(d.getTime() + n * 864e5);
 const JUNK =
     /^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}\s*[A-Za-z]{3}/i,
-  MTP = /^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i;
+  MTP = /^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i,
+  FASTN = /(^|[^a-z])Fast[\s_-]*Ads?/i; /* FastAd4-3_V2, #FAST_ADS: ไม่ใช่หนังโฆษณา ไม่ลงใบเช็ค */
 /* เรียงแบบ Excel (A→Z): ไม่สนตัวพิมพ์, ข้าม - และ ', เครื่องหมายอื่น < ตัวเลข < A-Z < ภาษาไทย */
 const xk = s => {
   s = s.toLowerCase().replace(/[-']/g, '');
@@ -444,7 +447,7 @@ function chkRows(scr, o, kind) {
       r.ad &&
       !JUNK.test(r.ad.trim()) &&
       r.ad !== scr.c &&
-      !/FastAds?/i.test(r.ad) &&
+      !FASTN.test(r.ad) &&
       !skipRow(scr, r) &&
       !(SIGAL[scr.c] && r.cnt == null && /^Content/i.test(r.ty || '')) &&
       !(kind === 'jam' && (/^BJ\d*_\d+_/i.test(r.ad) || /weather/i.test(r.ad))),
@@ -806,7 +809,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     today = 0,
     nost = 0,
     renew = 0,
-    back = 0;
+    back = 0,
+    fdrop = 0;
   /* BKJ: หมายเหตุ “ขึ้นเฉพาะ BKJ2-24,…” / “ยกเว้นจอ BKJ-12,…” / “ไม่ออน BKJ2-35” เทียบกับเลขจอที่หัวคอลัมน์ของใบเช็ค */
   const jamNums = b => {
     const s = new Set(),
@@ -871,14 +875,19 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       }
       const nm = vOf(b.lc, r);
       if (!nm || /^ออก(วันที่)?\s*\d/.test(nm)) continue;
-      const k = sh.take(b.pc, r);
+      const k = sh.take(b.pc, r),
+        fx = FASTN.test(nm);
       if (k) {
         sh.setS(b.pc, r, b.bp);
-        if (hist) {
+        if (hist && !fx) {
           if (!b.cnt.has(nm)) b.cnt.set(nm, []);
           b.cnt.get(nm).push(k);
-        } else cleared++;
+        } else if (!hist) cleared++;
       }
+      if (fx) {
+        if (hist) fdrop++;
+        continue;
+      } /* แถว #FAST_ADS ที่มีอยู่ในใบเช็ค → ลบออก */
       if (hist) {
         const m = vOf(b.nc, r).match(/^ออก(?:วันที่)?\s*(\d{1,2})/);
         b.hist.push({ nm, g, ned: m ? exitOf(+m[1], P) : 0, raw: m ? vOf(b.nc, r) : '' });
@@ -1266,6 +1275,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     E,
     two,
     contm: CONTM,
+    fdrop,
     keep: KB.map(b => b.scr.c).join(', '),
     renew,
     back,
@@ -1577,7 +1587,8 @@ async function fillWb(f, on, metro, o) {
             (L.later ? ' • ยังไม่ใส่ ' + L.later + ' เรื่องที่เริ่มหลัง ' + fd(new Date(L.H)) : '') +
             (L.keep
               ? ' • คงรายการเดิมของ ' + L.keep + ' (ไม่มีใน Playlist ที่ใส่มา) แถบวันที่ยังตรงกันทั้งชีต'
-              : ''),
+              : '') +
+            (L.fdrop ? ' • ลบแถว #FAST_ADS ' + L.fdrop + ' แถว (ไม่ใช่หนังโฆษณา)' : ''),
           0,
         ]);
         for (const [c, l] of L.laterL || [])
@@ -1604,7 +1615,7 @@ async function fillWb(f, on, metro, o) {
                       !/เมื่อมีไฟล์/.test(r.ad) &&
                       !JUNK.test(r.ad.trim()) &&
                       !MTP.test(r.ad.trim()) &&
-                      !/FastAds?/i.test(r.ad),
+                      !FASTN.test(r.ad),
                   )
                   .map(r => r.ad),
               ),
@@ -1922,7 +1933,34 @@ const bkjCode = sn => {
   return m ? 'BKJ2-' + m[1].toUpperCase() : null;
 };
 /* 7-Eleven Metro LED: ใช้ชีตของวันล่าสุด (เช่น “2 Oct”) และหาคอลัมน์จากหัวตาราง (การออกอากาศ Start/End, ระยะสัญญา Start/End) */
-function parseMetro(wb) {
+/* สถานะของ Metro อยู่ที่สีแถว: อ่านคำอธิบายสีในหัวชีต (เช่น Q1–Q3) แล้วเทียบกับสีช่อง Version ของแต่ละแถว */
+const MCOL = t =>
+    /ไฟล์เก่า|กลับมา/.test(t)
+      ? 'ขึ้นใหม่ไฟล์เดิม'
+      : /ต่อสัญญา/.test(t)
+        ? 'ต่อสัญญา'
+        : /ไฟล์ใหม่/.test(t)
+          ? 'ขึ้นใหม่'
+          : '',
+  fillKey = x => {
+    const s = x && x.s,
+      g = s && s.patternType && s.patternType !== 'none' && s.fgColor;
+    return !g
+      ? ''
+      : g.rgb
+        ? String(g.rgb).slice(-6).toUpperCase()
+        : g.theme != null
+          ? 't' + g.theme + '/' + (+g.tint || 0).toFixed(2)
+          : g.indexed != null
+            ? 'i' + g.indexed
+            : '';
+  },
+  laterD = (a, b) => {
+    const x = parseD(a),
+      y = parseD(b);
+    return !x ? b : !y ? a : +y > +x ? b : a;
+  };
+function parseMetro(wb, I) {
   let sn = wb.SheetNames[wb.SheetNames.length - 1],
     best = -1;
   for (const n of wb.SheetNames) {
@@ -1932,13 +1970,24 @@ function parseMetro(wb) {
       sn = n;
     }
   }
-  const A = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
+  const ws = wb.Sheets[sn],
+    A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }),
+    R0 = XLSX.utils.decode_range(ws['!ref'] || 'A1').s,
+    at = (r, c) => ws[XLSX.utils.encode_cell({ r: r + R0.r, c: c + R0.c })];
   const h = A.slice(0, 15).findIndex(r => r.some(x => cl(x) === 'Version'));
   let cV = 5,
     oS = 14,
     oE = 15,
     cS = -1,
     cE = -1;
+  const LEG = {};
+  for (let r = 0; r < (h >= 0 ? h : 5); r++)
+    (A[r] || []).forEach((x, c) => {
+      const t = cl(x),
+        st = t && MCOL(t),
+        k = st && fillKey(at(r, c));
+      if (k) LEG[k] = st;
+    });
   if (h >= 0) {
     cV = A[h].findIndex(x => cl(x) === 'Version');
     const st = [],
@@ -1957,7 +2006,8 @@ function parseMetro(wb) {
   const g = (row, i) => (i < 0 ? '' : row[i]);
   let off = false,
     gs = '',
-    ge = '';
+    ge = '',
+    nocol = 0;
   const rows = [];
   const cT = h >= 0 ? A[h].findIndex(x => /^Time$/i.test(cl(x))) : -1,
     cG = h >= 0 ? A[h].findIndex(x => /^Tags?$/i.test(cl(x))) : -1;
@@ -1974,19 +2024,33 @@ function parseMetro(wb) {
       gs = fd(g(row, cS));
       ge = fd(g(row, cE));
     }
+    const fk = fillKey(at(r, cV));
+    if (fk && !LEG[fk] && ad !== 'Version') nocol++;
+    const cs = fd(g(row, cS)) || gs,
+      ce = fd(g(row, cE)) || ge; /* ระยะสัญญาของแถวนี้ (แถวแรกของสัญญามีวันที่ แถวถัดไปใช้ของสัญญาเดียวกัน) */
     rows.push({
       ad,
       ty: cl(row[3]),
       len: +row[cV + 1] || 0,
       cnt: +row[cV + 2] || 0,
-      st: '',
-      s: fd(g(row, oS)) || fd(g(row, cS)) || gs,
+      st: LEG[fk] || '',
+      s: laterD(fd(g(row, oS)), cs),
       e: fd(g(row, oE)) || fd(g(row, cE)) || ge,
+      cs,
+      ce,
       note: cl(row[2]),
       loc: [cl(g(row, cT)), cl(g(row, cG))].filter(x => /LEDMETRO/i.test(x)).join(' '),
       off,
     });
   }
+  if (I && !Object.keys(LEG).length && rows.some(r => r.ad !== 'Version'))
+    I.push({
+      lv: 'info',
+      t:
+        'Metro LED: ไม่พบคำอธิบายสี (ต่อสัญญา / ไฟล์ใหม่ / ไฟล์เก่ากลับมาออกอากาศใหม่) ในหัวชีต ' +
+        sn +
+        ' ระบบจึงไม่ได้อ่านสถานะจากสีแถว',
+    });
   return [fixMetro({ m: 'MetroLED', c: 'METRO', n: '7-Eleven Metro LED', f: 'LED', ed: 0, rows })];
 }
 /* ด่านตรวจ Playlist (3.0): สรุปรายการหนังแยกจอ อ่านคอลัมน์ตามชื่อหัวตาราง ถ้าทีม Playlist แทรก/สลับคอลัมน์ก็ยังอ่านถูก หาไม่เจอ → ใช้ตำแหน่งเดิมและเตือน */
@@ -2117,7 +2181,7 @@ function parsePlaylist(f) {
       return null;
     };
   if (/Metro.*LED/i.test(f.name))
-    return ret(parseMetro(XLSX.read(f.buf, { type: 'array', cellDates: true })));
+    return ret(parseMetro(XLSX.read(f.buf, { type: 'array', cellDates: true, cellStyles: true }), I));
   if (!/แยกจอ/.test(f.name)) {
     const wb = XLSX.read(f.buf, { type: 'array' });
     if (wb.SheetNames.some(n => bkjCode(n))) return ret(parseSig(wb, 'Bangkok Jams', bkjCode));
@@ -2245,7 +2309,7 @@ function noteQ(scr, kind, nums) {
       !r.ad ||
       r.ad === scr.c ||
       JUNK.test(String(r.ad).trim()) ||
-      /FastAds?/i.test(r.ad) ||
+      FASTN.test(r.ad) ||
       MTP.test(String(r.ad).trim()) ||
       (kind === 'jam' && (/^BJ\d*_\d+_/i.test(r.ad) || /weather/i.test(r.ad)))
     )
@@ -2400,7 +2464,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.0.3 (16 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.1 (19 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -3056,11 +3120,12 @@ function vPl() {
  ${L.length > 120 ? '<p class="hint">แสดง 120 จอแรก พิมพ์ค้นหาเพื่อกรองให้แคบลง</p>' : ''}</section>`;
 }
 function vEd(s) {
-  const stc = t => (/ถอด/.test(t || '') ? 'bad' : /ใหม่/.test(t || '') ? 'new' : '');
+  const stc = t => (/ถอด/.test(t || '') ? 'bad' : /ใหม่/.test(t || '') ? 'new' : ''),
+    MC = s.rows.some(r => r.cs || r.ce);
   return `${shead('แก้หนังในจอ', 'สวิตช์เปิด = ออนแอร์ ปิด = ปลด (ใส่สถานะ “ถอด” ก็ปลดให้เช่นกัน) แก้ชื่อ สถานะ ความยาว และจำนวนครั้งได้ในตาราง ใช้ลูกศรเลื่อนลำดับ หรือถังขยะลบแถว', `<div class="go" data-tour="edback"><button class="btn secondary" data-a="back">${IC.back}กลับไปรายการจอ</button></div>`)}
- <section class="panel"><div class="edhead" data-tour="edhead"><h2>${esc(s.c)}</h2><span class="enm">${esc(scrName(s))}</span>${badge(s.m)}${s.f ? `<span class="fmt">Format ${esc(s.f)}</span>` : ''}</div>
+ <section class="panel"><div class="edhead" data-tour="edhead"><h2>${esc(s.c)}</h2><span class="enm">${esc(scrName(s))}</span>${badge(s.m)}${s.f ? `<span class="fmt">Format ${esc(s.f)}</span>` : ''}</div>${s.m === 'MetroLED' ? '<p class="hint">สถานะอ่านจากสีแถวใน Playlist: เหลือง (ไฟล์ใหม่) = ขึ้นใหม่ • ส้ม (ไฟล์เก่ากลับมาออกอากาศใหม่) = ขึ้นใหม่ไฟล์เดิม • ฟ้าอ่อน = ต่อสัญญา — ระยะสัญญาอ่านจากคอลัมน์ “ระยะสัญญา” ถ้าสัญญาเริ่มหลังวันออกอากาศ ใช้วันเริ่มสัญญาจัดแถบวันที่</p>' : ''}
  <div class="tools" data-tour="edtools"><button class="btn primary" data-a="add">+ เพิ่มหนัง</button><button class="btn quiet" data-a="paste">วางรายชื่อหลายบรรทัด</button></div>
- <div class="tbl" data-tour="edtbl"><table><thead><tr><th>ออนแอร์</th><th>ชื่อหนัง</th><th>Type</th><th>สถานะ</th><th class="n">วิ</th><th class="n">ครั้ง</th><th>หมดสัญญา</th><th>หมายเหตุ</th><th><span class="sr">จัดการ</span></th></tr></thead><tbody>
+ <div class="tbl" data-tour="edtbl"><table><thead><tr><th>ออนแอร์</th><th>ชื่อหนัง</th><th>Type</th><th>สถานะ</th><th class="n">วิ</th><th class="n">ครั้ง</th><th>หมดสัญญา</th>${MC ? '<th>ระยะสัญญา</th>' : ''}<th>หมายเหตุ</th><th><span class="sr">จัดการ</span></th></tr></thead><tbody>
  ${s.rows
    .map(
      (
@@ -3071,7 +3136,7 @@ function vEd(s) {
  <td><input class="w-ty" data-f="ty" data-i="${i}" value="${esc2(r.ty)}" placeholder="Type" aria-label="Type"></td>
  <td class="cst ${stc(r.st)}"><input class="w-st" data-f="st" data-i="${i}" value="${esc2(r.st)}" placeholder="-" list="sts" aria-label="สถานะ"></td>
  <td class="n"><input data-f="len" data-i="${i}" value="${esc2(r.len)}" inputmode="numeric" aria-label="ความยาว"></td><td class="n"><input data-f="cnt" data-i="${i}" value="${esc2(r.cnt)}" placeholder="-" inputmode="numeric" aria-label="จำนวนครั้ง"></td>
- <td><input class="w-e" data-f="e" data-i="${i}" value="${esc2(r.e)}" placeholder="-" aria-label="หมดสัญญา"></td><td><input class="w-nt" data-f="note" data-i="${i}" value="${esc2(r.note)}" placeholder="-" aria-label="หมายเหตุ"></td>
+ <td><input class="w-e" data-f="e" data-i="${i}" value="${esc2(r.e)}" placeholder="-" aria-label="หมดสัญญา"></td>${MC ? `<td class="cper">${esc(r.cs || '-')} – ${esc(r.ce || '-')}</td>` : ''}<td><input class="w-nt" data-f="note" data-i="${i}" value="${esc2(r.note)}" placeholder="-" aria-label="หมายเหตุ"></td>
  <td class="acts"><button class="ib" data-a="up" data-k="${i}" aria-label="เลื่อนขึ้น">${IC.au}</button><button class="ib" data-a="dn" data-k="${i}" aria-label="เลื่อนลง">${IC.ad}</button><button class="ib del" data-a="del" data-k="${i}" aria-label="ลบแถว">${IC.trash}</button></td></tr>`,
    )
    .join('')}
@@ -3326,7 +3391,9 @@ const vHelp =
 <li>หนังที่ยังอยู่ใน Playlist ถือว่ายังออนอยู่ “ออกวันที่ N” ใส่เมื่อหนังย้ายไปอยู่ในรายการถอด (วันที่ 1 ยังไม่ใส่) ไฟล์เดิม / ต่อสัญญากลางรอบ ใช้แถวเดิม ไม่เพิ่มแถวซ้ำ</li>
 <li>ตัวเลขที่ผู้ตรวจนับไว้ ย้ายตามชื่อหนังให้เอง</li>
 <li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
-<li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ (Signature Max, Show DC), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li></ul>
+<li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ (Signature Max, Show DC), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li>
+<li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
+<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
