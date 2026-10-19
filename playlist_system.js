@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.2.1 • 19 ต.ค. 2569
+ *  เวอร์ชัน 3.3 • 19 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -29,7 +29,7 @@
  *    5. จัดใบเช็คแบบที่ทำด้วยมือ (กฎทั้งหมด) ........ layoutChk
  *    6. เปิดใบเช็ค จับคู่ชีตกับจอ แล้วเติม ............ fillWb
  *    7. อ่าน Playlist 5 รูปแบบ + ด่านตรวจ Playlist .... parseSig, parseMetro, parseSplit, parsePlaylist,
- *                                                     plCheck, noteQ, addFiles
+ *                                                     slimXlsx, plCheck, noteQ, addFiles
  *    8. เช็กลิสต์ Playlist 11 แบบ / ความพร้อมใบเช็ค .... KINDS, kState, sheetNeeds, readyOf
  *    9. หน้าจอ 4 ขั้นตอน ............................. vData, vWall, vPl, vEd, vTl, vFl, vRes
  *   10. วิธีใช้ / ต้อนรับ / ระบบทำงานอย่างไร ............ vHelp, vWelcome, vHow
@@ -56,7 +56,8 @@
  *   แถว #FAST_ADS / FastAd ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม (FASTN)
  *   เวอร์ชัน 3.2 แก้ส่วน 5 และ 9: วันที่ถ่าย (ช่องหลังชื่อหนัง) ของบล็อกที่มีหลายจอ เช่น BKJ / Metro LED
  *   ย้ายตามชื่อหนังครบทุกคอลัมน์ และขึ้นเดือนใหม่ล้างทุกคอลัมน์ (b.pcs ใน layoutChk)
- *   3.2.1 แก้ส่วน 5: ครึ่งเดือนหลัง หนังใหม่ที่หมายเหตุ “ขึ้นระหว่างวัน วันที่ …” ลงวันที่ 1–15 ลงใต้แถบ 16)
+ *   3.2.1 แก้ส่วน 5: ครึ่งเดือนหลัง หนังใหม่ที่หมายเหตุ “ขึ้นระหว่างวัน วันที่ …” ลงวันที่ 1–15 ลงใต้แถบ 16
+ *   เวอร์ชัน 3.3 แก้ส่วน 7: อ่าน Playlist เร็วขึ้น — ตัดช่องว่างที่มีแต่รูปแบบออกก่อนให้ SheetJS อ่าน (slimXlsx))
  * ======================================================================
  */
 
@@ -2241,6 +2242,58 @@ function parseSplit(wb, media, I) {
   }
   return out;
 }
+/* อ่าน Playlist ให้เร็วขึ้น (3.3): ชีตใน Playlist โดยเฉพาะ Signature Max มีช่องว่างที่มีแต่รูปแบบเป็นล้านช่อง (ข้อมูลจริงไม่ถึง 3,000 ช่อง) → ตัดช่องที่ไม่มีค่าออกก่อนให้ SheetJS อ่าน และคลายไฟล์ด้วยตัวคลายของเบราว์เซอร์ (เร็วกว่า) — ค่าที่อ่านได้เหมือนเดิมทุกช่อง ถ้ามีปัญหาใช้ไฟล์เดิม */
+const EMPTYC = /<c r="[A-Z]{1,3}\d+"(?: s="\d+")?\/>/g,
+  WSX = /^xl\/worksheets\/[^/]+\.xml$/;
+async function slimXlsx(buf) {
+  try {
+    const u = new Uint8Array(buf),
+      dv = new DataView(buf),
+      raw = {},
+      td = new TextDecoder();
+    if (typeof DecompressionStream === 'function') {
+      let e = u.length - 22;
+      while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+      if (e >= 0) {
+        const cnt = dv.getUint16(e + 10, true);
+        let p = dv.getUint32(e + 16, true);
+        for (let i = 0; i < cnt && p + 46 <= u.length && dv.getUint32(p, true) === 0x02014b50; i++) {
+          const m = dv.getUint16(p + 10, true),
+            cs = dv.getUint32(p + 20, true),
+            nl = dv.getUint16(p + 28, true),
+            xl = dv.getUint16(p + 30, true),
+            kl = dv.getUint16(p + 32, true),
+            lo = dv.getUint32(p + 42, true),
+            name = td.decode(u.subarray(p + 46, p + 46 + nl));
+          if (WSX.test(name) && (m === 8 || m === 0) && dv.getUint32(lo, true) === 0x04034b50) {
+            const ds = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true);
+            raw[name] = [m, u.subarray(ds, ds + cs)];
+          }
+          p += 46 + nl + xl + kl;
+        }
+      }
+    }
+    const z = await JSZip.loadAsync(buf),
+      inf = async d =>
+        new Uint8Array(
+          await new Response(
+            new Blob([d]).stream().pipeThrough(new DecompressionStream('deflate-raw')),
+          ).arrayBuffer(),
+        );
+    let cut = 0;
+    for (const k of Object.keys(z.files)) {
+      if (!WSX.test(k)) continue;
+      const r = raw[k],
+        x = r ? td.decode(r[0] === 8 ? await inf(r[1]) : r[1]) : await z.file(k).async('string'),
+        y = x.replace(EMPTYC, '');
+      cut += x.length - y.length;
+      z.file(k, y);
+    }
+    return cut > 0 ? await z.generateAsync({ type: 'arraybuffer', compression: 'STORE' }) : buf;
+  } catch (e) {
+    return buf;
+  }
+}
 function parsePlaylist(f) {
   const I = [],
     ret = x => {
@@ -2471,7 +2524,7 @@ async function addFiles(kind, files) {
     if (typeof busyStep === 'function') await busyStep('กำลังอ่าน Playlist', _i, arr.length, f.name);
     let p;
     try {
-      p = parsePlaylist(f);
+      p = parsePlaylist(/Metro.*LED/i.test(f.name) ? f : { name: f.name, buf: await slimXlsx(f.buf) });
     } catch (e) {
       p = null;
     }
@@ -2534,7 +2587,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.2.1 (19 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.3 (19 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
