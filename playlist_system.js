@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.3 • 19 ต.ค. 2569
+ *  เวอร์ชัน 3.4 • 20 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -27,9 +27,9 @@
  *    3. จับคู่จอ Signature Max / Show DC ........... namedScreen, SIGAL, noteSkip
  *    4. วันที่ (ชื่อไฟล์ / ข้อมูล / วันทำงาน) ......... parseD, fullNameDate, nameDate, workDate
  *    5. จัดใบเช็คแบบที่ทำด้วยมือ (กฎทั้งหมด) ........ layoutChk
- *    6. เปิดใบเช็ค จับคู่ชีตกับจอ แล้วเติม ............ fillWb
+ *    6. เปิดใบเช็ค จับคู่ชีตกับจอ แล้วเติม ............ fillWb, avCols, screen10
  *    7. อ่าน Playlist 5 รูปแบบ + ด่านตรวจ Playlist .... parseSig, parseMetro, parseSplit, parsePlaylist,
- *                                                     slimXlsx, plCheck, noteQ, addFiles
+ *                                                     parseSect, parseMco, slimXlsx, plCheck, noteQ, addFiles
  *    8. เช็กลิสต์ Playlist 11 แบบ / ความพร้อมใบเช็ค .... KINDS, kState, sheetNeeds, readyOf
  *    9. หน้าจอ 4 ขั้นตอน ............................. vData, vWall, vPl, vEd, vTl, vFl, vRes
  *   10. วิธีใช้ / ต้อนรับ / ระบบทำงานอย่างไร ............ vHelp, vWelcome, vHow
@@ -57,7 +57,10 @@
  *   เวอร์ชัน 3.2 แก้ส่วน 5 และ 9: วันที่ถ่าย (ช่องหลังชื่อหนัง) ของบล็อกที่มีหลายจอ เช่น BKJ / Metro LED
  *   ย้ายตามชื่อหนังครบทุกคอลัมน์ และขึ้นเดือนใหม่ล้างทุกคอลัมน์ (b.pcs ใน layoutChk)
  *   3.2.1 แก้ส่วน 5: ครึ่งเดือนหลัง หนังใหม่ที่หมายเหตุ “ขึ้นระหว่างวัน วันที่ …” ลงวันที่ 1–15 ลงใต้แถบ 16
- *   เวอร์ชัน 3.3 แก้ส่วน 7: อ่าน Playlist เร็วขึ้น — ตัดช่องว่างที่มีแต่รูปแบบออกก่อนให้ SheetJS อ่าน (slimXlsx))
+ *   เวอร์ชัน 3.3 แก้ส่วน 7: อ่าน Playlist เร็วขึ้น — ตัดช่องว่างที่มีแต่รูปแบบออกก่อนให้ SheetJS อ่าน (slimXlsx)
+ *   เวอร์ชัน 3.4 แก้ส่วน 4, 5, 6, 7, 8 และ 9: Playlist เพิ่มเติม 5 แบบ (Rama9 Connect / Digital MRT / Gateway X: parseSect,
+ *   Air Traveller / The 20: parseMco) และใบเช็คแบบใหม่ที่แถวสูตรวิเคราะห์อยู่แถว 10 (CCTV / MRT / Gateway X / Rama9 Connect /
+ *   Air Traveller / THE 20: avCols, screen10))
  * ======================================================================
  */
 
@@ -99,7 +102,7 @@ const notChk = sn => {
   const u = String(sn)
     .toUpperCase()
     .replace(/[^A-Z]/g, '');
-  return /^X+$/.test(u) || /ANALYS|SUMMARY|DASHBOARD/.test(u) || /^\s*(สรุป|วิเคราะห์)/.test(sn);
+  return /^X+$/.test(u) || /ANALYS|SUMMARY|DASHBOARD/.test(u) || /^\s*(สรุป|วิเคราะห์|ผลวิเคราะห์)/.test(sn);
 };
 /* ---------- check sheet xml ---------- */
 class Sheet {
@@ -357,6 +360,14 @@ const yy = y => {
 };
 /* วันที่ที่เขียนไว้ชัดในชื่อไฟล์ เช่น 2-10-26, 02.10.2026, 2 ต.ค. 69, 2Oct26 */
 function fullNameDate(n) {
+  const d0 = fullNameDate0(n);
+  if (d0) return d0;
+  const q = String(n).match(/(?:^|[^\d])(20\d{2})(\d{2})(\d{2})(?!\d)/);
+  return q && +q[2] >= 1 && +q[2] <= 12 && +q[3] >= 1 && +q[3] <= 31
+    ? new Date(Date.UTC(+q[1], +q[2] - 1, +q[3]))
+    : null;
+}
+function fullNameDate0(n) {
   n = String(n).replace(/\.xls[xm]?$/i, '');
   const now = new Date().getFullYear();
   let m = n.match(/(?:^|[^\d])(\d{4})[-_. ](\d{1,2})[-_. ](\d{1,2})(?!\d)/);
@@ -698,21 +709,28 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     return f ? f.textContent : null;
   }; /* SheetJS ไม่อ่านช่องสูตรที่ไม่มีค่าที่คำนวณไว้ → ดูสูตรจาก XML ของชีต */
   /* ช่องหลังชื่อหนัง (วันที่ถ่าย) ของจอที่มีหลายจอในบล็อกเดียว เช่น BKJ / Metro LED: คอลัมน์ติดกันที่แถว 9 เป็นสูตร AVERAGE เป็นของบล็อกเดียวกัน → ย้ายตามชื่อหนังทุกช่อง */
+  let AR10 = false;
   {
-    const f9 = c => {
-        const x = wsv && wsv[c + 9];
+    const fr = (c, rw) => {
+        const x = wsv && wsv[c + rw];
         if (x && typeof x.f === 'string') return x.f;
-        const R = sh.row(9, false);
+        const R = sh.row(rw, false);
         if (R)
           for (const e of R.children)
-            if (e.getAttribute('r') === c + 9) {
+            if (e.getAttribute('r') === c + rw) {
               const f = e.getElementsByTagNameNS(NS, 'f')[0];
               return f ? f.textContent : null;
             }
         return null;
       },
-      avg = c => /^=?\s*AVERAGE/i.test(f9(c) || ''),
+      AR = B.some(b => /^=?\s*AVERAGE/i.test(fr(b.pc, 9) || ''))
+        ? 9
+        : B.some(b => BLKAVG(fr(b.pc, 10)))
+          ? 10
+          : 9,
+      avg = c => (AR === 9 ? /^=?\s*AVERAGE/i.test(fr(c, 9) || '') : BLKAVG(fr(c, 10))),
       ownC = new Set(B.flatMap(b => [b.nc, b.lc]));
+    AR10 = AR === 10;
     for (const b of B) {
       b.pcs = [b.pc];
       if (avg(b.pc))
@@ -721,7 +739,19 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
           if (!avg(L) || ownC.has(L)) break;
           b.pcs.push(L);
         }
-      b.bps = b.pcs.map((L, i) => (i ? modeF(sh, L, hr + 1, hr + 400, null, ST) : b.bp));
+      if (AR10) {
+        const L = n2col(col2n(b.pcs[b.pcs.length - 1]) + 1);
+        if (!ownC.has(L) && !fr(L, 10)) {
+          let t = false;
+          for (let r = hr + 1; r <= hr + 400 && !t; r++) {
+            const x = wsv && wsv[L + r];
+            if (x && typeof x.v === 'string' && cl(x.v) && !/^Folder/i.test(x.v)) t = true;
+          }
+          if (t) b.pcs.push(L);
+        }
+      }
+      /* ใบเช็คแบบใหม่: ช่องหมายเหตุที่ทีมพิมพ์ต่อท้าย (เช่น “กลับมาออนใหม่วันที่ 12”) ย้ายตามชื่อหนังด้วย */ b.bps =
+        b.pcs.map((L, i) => (i ? modeF(sh, L, hr + 1, hr + 400, null, ST) : b.bp));
       b.hss = b.pcs.map((L, i) => (i ? sh.getS(L, hr) : b.hs[2]));
     }
   }
@@ -936,7 +966,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   }
   if (!hist && !frozen)
     for (const b of B)
-      for (let r = FIRST; r <= last; r++)
+      for (let r = Math.min(FIRST, S + 1); r <= last; r++)
         if (r > S || vOf(b.lc, r))
           for (const L of b.pcs)
             if (sh.take(L, r))
@@ -1146,11 +1176,38 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     b.main = srt(b.ent.filter(e => e.g === +P));
     b.grp = new Map(dates.map(k => [k, srt(b.ent.filter(e => e.g === k))]));
   }
+  const OSH = { s: false, p: false };
+  if (AR10) {
+    let s = 0,
+      l = 0,
+      n1 = 0,
+      p = 0;
+    for (const b of B)
+      for (let r = hr + 1; r <= last; r++) {
+        const t = vOf(b.nc, r),
+          m = t.match(/^ออก(วันที่)?\s*(\d{1,2})/);
+        if (!m) continue;
+        m[1] ? l++ : s++;
+        if (+m[2] < 10) {
+          n1++;
+          if (/^0/.test(m[2])) p++;
+        }
+      }
+    OSH.s = s > l;
+    OSH.p = p * 2 > n1;
+  }
   const note = (b, r, row) => {
     if (noNotes || !r.ed || !isFinite(r.ed)) return;
     const nd = +addD(new Date(r.ed), 1);
     if (nd > +P && nd <= H) {
-      sh.setText(b.nc, row, 'ออกวันที่ ' + new Date(nd).getUTCDate());
+      {
+        const dn = new Date(nd).getUTCDate();
+        sh.setText(
+          b.nc,
+          row,
+          AR10 ? (OSH.s ? 'ออก ' : 'ออกวันที่ ') + (OSH.p && dn < 10 ? '0' + dn : dn) : 'ออกวันที่ ' + dn,
+        );
+      }
       sh.setS(b.nc, row, ST.derive(b.bn, 'red', { color: 'FFFF0000', right: true }));
     }
   };
@@ -1370,6 +1427,73 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   };
 }
 
+/* ใบเช็คแบบใหม่ (3.4): แถวสูตรวิเคราะห์ (AVERAGE) แบบเดิมอยู่แถว 9 • แบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20) อยู่แถว 10 และตารางเริ่มแถว 17 หรือ 23
+   ช่องสรุปรวมของสถานี MRT (=AVERAGE(E10:F10)) ไม่ใช่คอลัมน์ของจอ */
+const BLKAVG = f => /^=?\s*AVERAGE/i.test(f || '') && !/AVERAGE\(\s*\$?[A-Z]+\$?10\s*:/i.test(f);
+const avRowOf = ws => {
+  let r10 = false;
+  for (const k of Object.keys(ws)) {
+    const m = k.match(/^[A-Z]+(9|10)$/);
+    if (!m || !ws[k].f || !/^AVERAGE/.test(ws[k].f)) continue;
+    if (m[1] === '9') return 9;
+    if (BLKAVG(ws[k].f)) r10 = true;
+  }
+  return r10 ? 10 : 9;
+};
+const avCols = ws => {
+  const R = avRowOf(ws),
+    re = new RegExp('^([A-Z]+)' + R + '$'),
+    av = [];
+  for (const k of Object.keys(ws)) {
+    const m = k.match(re);
+    if (m && ws[k].f && (R === 9 ? /^AVERAGE/.test(ws[k].f) : BLKAVG(ws[k].f))) av.push(col2n(m[1]));
+  }
+  return av;
+};
+/* จับคู่ชีตแบบใหม่กับจอ: สถานี MRT ส่วนต่อขยาย 20 สถานี (สายสีน้ำเงินฝั่งท่าพระ–หลักสอง / เตาปูน–ท่าพระ) ใช้รายการ “ส่วนต่อขยาย” สถานีอื่นใช้ “18 สถานีเดิม” */
+const MRTX = new Set(
+  'ท่าพระ จรัญ13 จรัญฯ13 จรัญสนิทวงศ์13 ไฟฉาย บางขุนนนท์ บางยี่ขัน สิรินธร บางพลัด บางอ้อ บางโพ เตาปูน วัดมังกร สามยอด สนามไชย อิสรภาพ บางไผ่ บางหว้า เพชรเกษม48 ภาษีเจริญ บางแค หลักสอง'
+    .split(' ')
+    .map(s => nrm(s)),
+);
+const txt10 = (ws, cn) => {
+    const g = a => cl((ws[a] || {}).v),
+      T = [];
+    for (const c of [cn - 1, cn]) for (let r = 11; r <= 14; r++) T.push(g(n2col(c) + r));
+    return T;
+  },
+  ttl10 = (ws, sn) => nrm(sn + ' ' + ['A1', 'B1', 'C1', 'D1'].map(a => cl((ws[a] || {}).v)).join(' ')),
+  lab10 = (ws, sn, cn) => txt10(ws, cn).filter(t => t && !/^CCTV$/i.test(t))[0] || sn,
+  kind10 = (ws, sn, cn) => {
+    const t = ttl10(ws, sn),
+      b = nrm(txt10(ws, cn).join(' '));
+    return /MRT/.test(t)
+      ? 'Digital MRT'
+      : /AIRTRAVELLERSERIES/.test(t + b)
+        ? 'Air Traveller'
+        : /THE20/.test(t)
+          ? 'The 20'
+          : /RAMA9CONNECT/.test(t)
+            ? 'Rama9 Connect'
+            : /GATEWAYX/.test(t)
+              ? 'Gateway X'
+              : /AIRTRAVELL/.test(b)
+                ? 'Signature Max'
+                : '';
+  };
+function screen10(ws, sn, cn) {
+  const b = nrm(txt10(ws, cn).join(' ')),
+    k = kind10(ws, sn, cn),
+    one = (m, re) => {
+      const L = DB.filter(s => s.m === m && (!re || re.test(s.c)));
+      return L.length === 1 || (!re && L.length) ? L[0] : null;
+    };
+  if (k === 'Digital MRT') return one(k, MRTX.has(nrm(sn)) ? /ต่อขยาย|ใหม่/ : /เดิม/);
+  if (k === 'Air Traveller')
+    return one(k, /AIRPORTIN|TOAIRPORT/.test(b) ? /IN$/ : /CITYOUT|TOCITY/.test(b) ? /OUT$/ : /^$/);
+  if (k === 'The 20' || k === 'Rama9 Connect' || k === 'Gateway X') return one(k);
+  return null;
+}
 async function fillWb(f, on, metro, o) {
   const rep = [];
   const buf = f.buf.slice(0);
@@ -1407,24 +1531,16 @@ async function fillWb(f, on, metro, o) {
       }
       if (blocks.length) brow = rw;
     }
-    if (
-      blocks.length &&
-      !media &&
-      !Object.keys(ws).some(k => /^[A-Z]+9$/.test(k) && ws[k].f && /^AVERAGE/.test(ws[k].f))
-    ) {
+    if (blocks.length && !media && !avCols(ws).length) {
       const zx = path[sn] && zip.file(path[sn]),
         xs = zx ? await zx.async('string') : '';
-      if (!/<c r="[A-Z]+9"[^>]*>\s*<f[^>]*>\s*AVERAGE/.test(xs)) {
+      if (!/<c r="[A-Z]+(?:9|10)"[^>]*>\s*<f[^>]*>\s*AVERAGE/.test(xs)) {
         rep.push([sn, '-', 'ข้าม (มีรหัสจอแต่ไม่มีคอลัมน์ผลวิเคราะห์ในแถว 9 — ไม่ใช่ชีตจอ)', 0]);
         continue;
       }
     }
     if (media && brow === 11) {
-      const av = [];
-      for (const k of Object.keys(ws)) {
-        const m = k.match(/^([A-Z]+)9$/);
-        if (m && ws[k].f && /^AVERAGE/.test(ws[k].f)) av.push(col2n(m[1]));
-      }
+      const av = avCols(ws);
       for (const cn of av) {
         if (blocks.some(x => x[0] === cn)) continue;
         const raw = cl((ws[n2col(cn) + '11'] || {}).v);
@@ -1447,7 +1563,10 @@ async function fillWb(f, on, metro, o) {
       }
       blocks.sort((x, y) => x[0] - y[0]);
     }
+    const mediaB = cn =>
+      media || (avRowOf(ws) === 10 ? mediaOf(cl((ws[n2col(cn - 1) + '11'] || {}).v)) : null) || media;
     for (const [cn, code] of blocks) {
+      const media = mediaB(cn);
       let key = media + '|' + code,
         ads = on.get(key);
       let fb = '';
@@ -1487,15 +1606,25 @@ async function fillWb(f, on, metro, o) {
       jobs.push([sn, n2col(cn - 1), ads, DB.find(s => s.m + '|' + s.c === key), '']);
       rep.push([sn, code, 'เติมแล้ว' + fb, ads.length]);
     }
+    if (blocks.length && avRowOf(ws) === 10) {
+      const av = avCols(ws);
+      for (const cn of av.filter(c => !av.includes(c - 1))) {
+        if (blocks.some(x => x[0] === cn)) continue;
+        const lc = n2col(cn - 1),
+          label = lab10(ws, sn, cn),
+          scr = screen10(ws, sn, cn) || namedScreen(txt10(ws, cn).join(' '), '', sn);
+        if (!scr) {
+          rep.push([sn, label, 'ไม่พบจอนี้ใน Playlist', 0]);
+          continue;
+        }
+        const ads = listOf(scr, o);
+        jobs.push([sn, lc, ads, scr, '']);
+        rep.push([sn, label + ' → ' + scr.c, 'เติมแล้ว', ads.length]);
+      }
+    } /* ใบเช็คแบบใหม่ที่มีทั้งจอ DGT และจอที่ไม่มีรหัส (เช่น CCTV: Signature Max – Air Traveller Gateway) */
     if (!blocks.length && /METRO/i.test(sn.replace(/[^A-Za-z]/g, '')) && metro.length) {
       let first = 0;
-      for (const k of Object.keys(ws)) {
-        const m = k.match(/^([A-Z]+)9$/);
-        if (m && ws[k].f && /^AVERAGE/.test(ws[k].f)) {
-          const n = col2n(m[1]);
-          if (!first || n < first) first = n;
-        }
-      }
+      for (const n of avCols(ws)) if (!first || n < first) first = n;
       if (first) {
         jobs.push([sn, n2col(first - 1), metro, DB.find(s => s.m === 'MetroLED'), 'metro']);
         rep.push([sn, 'ทั้งแพค', 'เติมแล้ว', metro.length]);
@@ -1511,11 +1640,7 @@ async function fillWb(f, on, metro, o) {
           .match(/(?:JAMS?|BKJ)([12])([AB])?/),
         key = jm[1] === '1' ? 'BKJ1 ALL' : 'BKJ2-' + (jm[2] || 'A'),
         scr = DB.find(x => x.m === 'Bangkok Jams' && x.c === key);
-      const av = [];
-      for (const k of Object.keys(ws)) {
-        const m = k.match(/^([A-Z]+)9$/);
-        if (m && ws[k].f && /^AVERAGE/.test(ws[k].f)) av.push(col2n(m[1]));
-      }
+      const av = avCols(ws);
       av.sort((x, y) => x - y);
       if (!scr) rep.push([sn, key, 'ไม่พบจอนี้ใน Playlist', 0]);
       else if (!av.length) rep.push([sn, key, 'ข้าม (ไม่พบคอลัมน์ผลวิเคราะห์ในแถว 9)', 0]);
@@ -1534,18 +1659,15 @@ async function fillWb(f, on, metro, o) {
         }
       }
     } else if (!blocks.length && !media && !/^(ANALYSIS|X+)$/.test(sn.toUpperCase().replace(/[^A-Z]/g, ''))) {
-      const av = [];
-      for (const k of Object.keys(ws)) {
-        const m = k.match(/^([A-Z]+)9$/);
-        if (m && ws[k].f && /^AVERAGE/.test(ws[k].f)) av.push(col2n(m[1]));
-      }
+      const av = avCols(ws);
       av.sort((x, y) => x - y);
       if (!av.length) rep.push([sn, '-', 'ข้าม (ไม่พบรหัสจอ และไม่พบคอลัมน์ผลวิเคราะห์ในแถว 9)', 0]);
+      const r10 = avRowOf(ws) === 10;
       for (const cn of av.filter(c => !av.includes(c - 1))) {
         const lc = n2col(cn - 1),
-          label = cl((ws[lc + '10'] || {}).v),
+          label = r10 ? lab10(ws, sn, cn) : cl((ws[lc + '10'] || {}).v),
           code = cl((ws[n2col(cn) + '11'] || {}).v) + cl((ws[n2col(cn) + '12'] || {}).v),
-          scr = namedScreen(label, code, sn);
+          scr = (r10 && screen10(ws, sn, cn)) || namedScreen(label, code, sn);
         if (!scr) {
           rep.push([
             sn,
@@ -1579,11 +1701,7 @@ async function fillWb(f, on, metro, o) {
   const KEEP = {};
   for (const sn in by) {
     const ws = wb.Sheets[sn],
-      av = [];
-    for (const k of Object.keys(ws)) {
-      const m = k.match(/^([A-Z]+)9$/);
-      if (m && ws[k].f && /^AVERAGE/.test(ws[k].f)) av.push(col2n(m[1]));
-    }
+      av = avCols(ws);
     av.sort((x, y) => x - y);
     const own = by[sn].map(j => col2n(j[1]));
     for (const cs of av.filter(c => !av.includes(c - 1))) {
@@ -2294,6 +2412,211 @@ async function slimXlsx(buf) {
     return buf;
   }
 }
+/* Playlist แบบแบ่งกลุ่ม (3.4): Rama9 Connect / Digital MRT / Gateway X — ชีต “รายการหนัง…” มีหลายกลุ่ม (Plan B, BMN, Content …) แต่ละกลุ่มมีหัวตาราง “รายชื่อหนังโฆษณา”
+   กลุ่ม “AD.ออก / Ads ถอด” = หนังที่ถอด • ไม่มีช่องสถานะ: ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม (ตามคำอธิบายสีท้ายตาราง) และรายชื่อใต้ “รายการขึ้นใหม่” (ชีต Playlist ของ Rama9)
+   Content อาคาร / Content Plan B ไม่ลงใบเช็ค (ใบเช็ค MRT ไม่มี) • Content อื่น เช่น Content กทพ. ลงเป็นหนัง # (ใบเช็ค Gateway X มี) • แถวที่ยังไม่มีชื่อไฟล์ เช่น “Onair 19/10/2026” ไม่ใส่ */
+const SECT_SKIP = /^Content\s*(อาคาร|Plan\s*B)/i,
+  SECT_OFF = /^(AD\.?\s*ออก|Ads?\.?\s*ถอด|รายการ\s*(ปลด|ถอด))/i,
+  SECT_JUNK = /^(on\s*-?\s*air|วันที่)\s*\d|\d{1,2}\/\d{1,2}\/\d{2,4}/i,
+  SECT_NEW = /^(FFFF00)$/,
+  SECT_BACK = /^(FF66CC|FF99CC|FF66FF|FF99FF)$/;
+const sectHead = ws => {
+  for (let r = 0; r < 8; r++)
+    for (let c = 0; c < 14; c++) {
+      const x = ws[XLSX.utils.encode_cell({ r, c })];
+      if (x && cl(x.v) === 'รายชื่อหนังโฆษณา') return true;
+    }
+  return false;
+};
+const isSectWb = wb =>
+  wb.SheetNames.some(n => {
+    const ws = wb.Sheets[n];
+    return !!ws && /^รายการหนังโฆษณา/.test(cl((ws.A1 || {}).v)) && sectHead(ws);
+  });
+const sectMedia = (wb, fn) => {
+  const t = nrm(
+    fn +
+      ' ' +
+      wb.SheetNames.map(
+        n => cl(((wb.Sheets[n] || {}).A1 || {}).v) + ' ' + cl(((wb.Sheets[n] || {}).F1 || {}).v),
+      ).join(' '),
+  );
+  return /RAMA9/.test(t)
+    ? 'Rama9 Connect'
+    : /MRT/.test(t)
+      ? 'Digital MRT'
+      : /GATEWAY/.test(t)
+        ? 'Gateway X'
+        : '';
+};
+function parseSect(wb, fn, I) {
+  const media = sectMedia(wb, fn),
+    out = [],
+    NEWS = new Set(),
+    E = XLSX.utils.encode_cell;
+  if (!media)
+    I.push({
+      lv: 'stop',
+      t: 'อ่านไฟล์แบบแบ่งกลุ่มได้ แต่ไม่รู้ว่าเป็นสื่อไหน (Rama9 Connect / Digital MRT / Gateway X) — หนังในไฟล์นี้ยังไม่ได้ใช้เติม ส่งไฟล์ให้ผู้ดูแลระบบ',
+    });
+  for (const sn of wb.SheetNames) {
+    const ws = wb.Sheets[sn];
+    if (!ws || !ws['!ref']) continue;
+    const R = XLSX.utils.decode_range(ws['!ref']);
+    for (let r = R.s.r; r <= Math.min(R.e.r, 12); r++)
+      for (let c = R.s.c; c <= Math.min(R.e.c, 40); c++) {
+        const x = ws[E({ r, c })];
+        if (x && /^รายการขึ้นใหม่$/.test(cl(x.v)))
+          for (let q = r + 1; q <= Math.min(R.e.r, r + 300); q++) {
+            const y = ws[E({ r: q, c })];
+            if (y && cl(y.v)) NEWS.add(cl(y.v));
+          }
+      }
+  }
+  const W = (wb.Workbook || {}).Sheets || [],
+    hid = n => {
+      const S = W[wb.SheetNames.indexOf(n)];
+      return !!(S && S.Hidden);
+    },
+    lists = wb.SheetNames.filter(n => {
+      const ws = wb.Sheets[n];
+      return ws && !hid(n) && /^รายการหนังโฆษณา/.test(cl((ws.A1 || {}).v)) && sectHead(ws);
+    });
+  for (const sn of lists) {
+    const ws = wb.Sheets[sn],
+      R = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    R.e.c = Math.min(R.e.c, 30);
+    R.e.r = Math.min(R.e.r, 800);
+    const A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true, range: R }),
+      at = (r, c) => ws[E({ r: r + R.s.r, c: c + R.s.c })];
+    let lab = '';
+    for (let r = 1; r < 4 && r < A.length && !lab; r++) {
+      const t = A[r].map(cl).find(x => /สถานี|ส่วนต่อ/.test(x));
+      if (t) lab = t.replace(/\s+/g, ' ').trim();
+    }
+    const code = lists.length > 1 && lab ? lab : media || sn;
+    let H = null,
+      sec = '',
+      off = false,
+      skip = false;
+    const rows = [];
+    for (let r = 0; r < A.length; r++) {
+      const T = A[r].map(cl),
+        hc = T.indexOf('รายชื่อหนังโฆษณา');
+      if (hc >= 0) {
+        let t = '';
+        for (let q = r - 1; q >= Math.max(0, r - 2) && !t; q--) t = cl(A[q][0]) || cl(A[q][hc]);
+        sec = t;
+        off = SECT_OFF.test(t);
+        skip = SECT_SKIP.test(t);
+        const sub = (A[r + 1] || []).map(cl),
+          hd = T.map((x, i) => (x + (sub[i] || '')).replace(/\s+/g, '')),
+          ix = re => hd.findIndex(x => re.test(x));
+        H = {
+          ad: hc,
+          ty: ix(/^Type$/i),
+          len: ix(/^Spot/i),
+          cnt: ix(/^จำนวนครั้ง/),
+          os: ix(/^เริ่มการออนแอร์/),
+          oe: ix(/^สิ้นสุดการออนแอร์/),
+          s: ix(/^วันเริ่มสัญญา/),
+          e: ix(/^วันหมดสัญญา/),
+          note: ix(/^หมายเหตุ/),
+        };
+        r++;
+        continue;
+      }
+      if (!H) continue;
+      if (!/^\d+$/.test(T[0])) {
+        if (T.some(x => /^Total$/i.test(x))) H = null;
+        continue;
+      }
+      if (skip) continue;
+      const ad = T[H.ad];
+      if (!ad || SECT_JUNK.test(ad) || JUNK.test(ad)) continue;
+      const g = k => (H[k] < 0 ? '' : A[r][H[k]]),
+        fk = fillKey(at(r, H.ad)),
+        cn = g('cnt');
+      const st = off
+        ? 'ถอด'
+        : NEWS.has(ad) || SECT_NEW.test(fk)
+          ? 'ขึ้นใหม่'
+          : SECT_BACK.test(fk)
+            ? 'ขึ้นใหม่ไฟล์เดิม'
+            : '';
+      rows.push({
+        ad,
+        ty: /^Content/i.test(sec) ? 'Content' : cl(g('ty')),
+        len: +g('len') || 0,
+        cnt: cn === '' || cn == null ? null : +cn || 0,
+        st,
+        s: fd(g('os')) || fd(g('s')),
+        e: fd(g('oe')) || fd(g('e')),
+        note: '',
+        off,
+      });
+    }
+    if (rows.length)
+      out.push({
+        m: media || 'อื่นๆ',
+        c: code,
+        n: media === 'Digital MRT' ? 'MRT ' + code : code,
+        f: '',
+        ed: 0,
+        rows: stable(rows),
+      });
+  }
+  return out;
+}
+/* Air Traveller / The 20 (3.4): หน้าตาแบบ Signature Max แต่ไฟล์ละสื่อเดียว — ใช้ชื่อสื่อของตัวเอง ไม่ปนกับ Signature Max • ข้ามชีตสรุป (ต้นฉบับรายการหนังแยกจอ, รายการหนังประจำวัน) และชีตที่ไม่มีหนังจริง */
+const MCO_SKIP = /^(ต้นฉบับ|รายการหนังประจำวัน|รายการหนังรายจอ)/,
+  mcoOf = t =>
+    /AIRTRAVELLERSERIES|AIRTRAVELLER(?!GATEWAY)/.test(nrm(t))
+      ? 'Air Traveller'
+      : /^THE20|THE20/.test(nrm(t))
+        ? 'The 20'
+        : '';
+const isMcoWb = wb => wb.SheetNames.includes('รายการหนังประจำวัน');
+function parseMco(wb, fn) {
+  const own = mcoOf(fn) || '',
+    L = parseSig(wb, 'Media Co').filter(
+      s => !MCO_SKIP.test(s.c) && s.rows.some(r => !r.off && r.ad && !JUNK.test(r.ad.trim())),
+    );
+  const by = new Map();
+  for (const s of L) {
+    const m = mcoOf(s.c);
+    if (m) (by.get(m) || by.set(m, []).get(m)).push(s);
+  }
+  const m = own && by.has(own) ? own : [...by.keys()].sort((a, b) => by.get(b).length - by.get(a).length)[0];
+  const prog = sn => {
+    const ws = wb.Sheets[sn],
+      A = ws
+        ? XLSX.utils.sheet_to_json(ws, {
+            header: 1,
+            defval: '',
+            range: { s: { r: 0, c: 0 }, e: { r: 400, c: 20 } },
+          })
+        : [],
+      h = A.slice(0, 12).findIndex(r => r.some(x => cl(x) === 'หนังโฆษณา'));
+    if (h < 0) return new Set();
+    const H = A[h].map(cl),
+      pa = H.indexOf('สินค้า'),
+      aa = H.indexOf('หนังโฆษณา');
+    return new Set(
+      pa < 0
+        ? []
+        : A.slice(h + 1)
+            .filter(r => /^Programm?atic/i.test(cl(r[pa])))
+            .map(r => cl(r[aa])),
+    );
+  }; /* โฆษณาแบบ Programmatic (เช่น Vistar) ไม่ลงใบเช็ค (ใบเช็ค Air Traveller ของทีมไม่มี) */
+  return m
+    ? by.get(m).map(s => {
+        const P = prog(s.c);
+        return { ...s, m, n: s.c, rep: undefined, rows: s.rows.filter(r => !P.has(r.ad)) };
+      })
+    : [];
+}
 function parsePlaylist(f) {
   const I = [],
     ret = x => {
@@ -2308,6 +2631,11 @@ function parsePlaylist(f) {
   if (!/แยกจอ/.test(f.name)) {
     const wb = XLSX.read(f.buf, { type: 'array' });
     if (wb.SheetNames.some(n => bkjCode(n))) return ret(parseSig(wb, 'Bangkok Jams', bkjCode));
+    if (isSectWb(wb)) return ret(parseSect(XLSX.read(f.buf, { type: 'array', cellStyles: true }), f.name, I));
+    if (isMcoWb(wb)) {
+      const p = parseMco(wb, f.name);
+      if (p.length) return ret(p);
+    }
     if (isSplitWb(wb)) {
       const m = splitMedia(wb);
       if (!m) return null;
@@ -2587,7 +2915,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.3 (19 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.4 (20 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -2805,6 +3133,11 @@ const KINDS = [
   { k: 'BKJ1', c: 'j', has: s => s.m === 'Bangkok Jams' && s.c === 'BKJ1 ALL' },
   { k: 'BKJ2', c: 'j', has: s => s.m === 'Bangkok Jams' && /^BKJ2/.test(s.c) },
   { k: 'Metro LED', c: 'm', tip: 'มาทาง LINE', has: s => s.m === 'MetroLED' },
+  { k: 'Rama9 Connect', c: 'g', x: 1, has: s => s.m === 'Rama9 Connect' },
+  { k: 'Digital MRT', c: 'b', x: 1, has: s => s.m === 'Digital MRT' },
+  { k: 'Gateway X', c: 'p', x: 1, has: s => s.m === 'Gateway X' },
+  { k: 'Air Traveller', c: 'c', x: 1, has: s => s.m === 'Air Traveller' },
+  { k: 'The 20', c: 'r', x: 1, has: s => s.m === 'The 20' },
 ];
 const kindOn = k => {
   const K = KINDS.find(x => x.k === k);
@@ -2829,7 +3162,7 @@ function sheetNeeds(buf, name) {
   if (!(u[0] === 0x50 && u[1] === 0x4b)) return { bad: 'ไม่ใช่ไฟล์ Excel (.xlsm / .xlsx) หรือไฟล์เสีย' };
   let wb;
   try {
-    wb = XLSX.read(buf.slice(0), { type: 'array', sheetRows: 13 });
+    wb = XLSX.read(buf.slice(0), { type: 'array', sheetRows: 15 });
   } catch (e) {
     return { bad: 'ไฟล์เสียหรือเปิดไม่ได้' };
   }
@@ -2842,14 +3175,7 @@ function sheetNeeds(buf, name) {
     return { bad: 'ไฟล์นี้เป็นไฟล์ Playlist ไม่ใช่ใบเช็ครูป (ใส่ไว้ในขั้นที่ 1)' };
   const S = [],
     named = [],
-    avOf = ws => {
-      const av = [];
-      for (const key of Object.keys(ws)) {
-        const m = key.match(/^([A-Z]+)9$/);
-        if (m && ws[key].f && /^AVERAGE/.test(ws[key].f)) av.push(col2n(m[1]));
-      }
-      return av.sort((x, y) => x - y);
-    };
+    avOf = ws => avCols(ws).sort((x, y) => x - y);
   for (const sn of wb.SheetNames) {
     const ws = wb.Sheets[sn];
     if (!ws || notChk(sn)) continue;
@@ -2873,6 +3199,21 @@ function sheetNeeds(buf, name) {
         const raw = cl((ws[n2col(cn) + '11'] || {}).v);
         if (raw && nrm(raw).length >= 3) names.push(raw);
       }
+    if (blocks.length && avRowOf(ws) === 10) {
+      const av = avOf(ws);
+      for (const cn of av.filter(c => !av.includes(c - 1)))
+        if (!blocks.some(x => x[0] === cn))
+          named.push({ sn, label: lab10(ws, sn, cn), code: txt10(ws, cn).join(' '), k: kind10(ws, sn, cn) });
+    }
+    if (blocks.length && !media && avRowOf(ws) === 10) {
+      const G = new Map();
+      for (const [cn, c] of blocks) {
+        const m = mediaOf(cl((ws[n2col(cn - 1) + '11'] || {}).v));
+        (G.get(m) || G.set(m, []).get(m)).push(c);
+      }
+      for (const [m, cs] of G) S.push({ sn, media: m, codes: cs, names: [] });
+      continue;
+    }
     if (blocks.length || names.length) {
       S.push({ sn, media, codes: blocks.map(b => b[1]), names });
       continue;
@@ -2894,12 +3235,16 @@ function sheetNeeds(buf, name) {
       S.push({ sn, kind: 'Metro LED' });
       continue;
     }
+    const r10 = avRowOf(ws) === 10;
     for (const cn of av.filter(c => !av.includes(c - 1))) {
       const lc = n2col(cn - 1);
       named.push({
         sn,
-        label: cl((ws[lc + '10'] || {}).v),
-        code: cl((ws[n2col(cn) + '11'] || {}).v) + cl((ws[n2col(cn) + '12'] || {}).v),
+        label: r10 ? lab10(ws, sn, cn) : cl((ws[lc + '10'] || {}).v),
+        code: r10
+          ? txt10(ws, cn).join(' ')
+          : cl((ws[n2col(cn) + '11'] || {}).v) + cl((ws[n2col(cn) + '12'] || {}).v),
+        k: r10 ? kind10(ws, sn, cn) : '',
       });
     }
   }
@@ -2967,6 +3312,10 @@ function readyOf(f) {
     }
   }
   for (const b of nd.named) {
+    if (b.k && b.k !== 'Signature Max') {
+      add(b.k, b.sn, kindOn(b.k));
+      continue;
+    }
     const s = namedScreen(b.label, b.code, b.sn);
     if (s) {
       add(kindOfS(s), b.sn, true);
@@ -3024,7 +3373,7 @@ const tourKey = () => (tab === 'tl' ? 'pl' : tab === 'pl' && cs != null && DB[cs
 const stepIx = () => STEPS.findIndex(s => s[0] === stepKey());
 function stepSub(k) {
   if (k === 'dat') {
-    const n = KINDS.filter(K => DB.some(K.has)).length;
+    const n = KINDS.filter(K => !K.x && DB.some(K.has)).length;
     return DB.length ? `${n} จาก 11 แบบ` : 'ยังไม่ได้ใส่';
   }
   if (k === 'pl') {
@@ -3100,7 +3449,8 @@ function vDateCard(wd, has) {
   return `<aside class="panel datecard" data-tour="date"><span class="lbl">Playlist วันที่</span><b class="big">${wd ? thd(wd) : 'ไม่พบวันที่'}</b><span class="src">${OP.base ? 'ตามที่พิมพ์ไว้ในขั้นที่ 3' : PLD ? 'จากไฟล์ Playlist ถ้าไม่ตรง แก้ได้ในขั้นที่ 3' : wd ? 'คาดจากวันเริ่มของหนังในไฟล์ ตรวจให้แน่ใจ หรือแก้ในขั้นที่ 3' : 'ใส่วันที่เองได้ในขั้นที่ 3'}</span>${BASEERR ? `<span class="src" style="color:var(--er);font-weight:600">วันที่ที่พิมพ์ในขั้นที่ 3 อ่านไม่ได้ ตอนนี้ใช้วันที่จาก Playlist</span>` : ''}${wd ? rndHTML(wd) : ''}</aside>`;
 }
 function vWall(wd) {
-  const S = KINDS.map(K => ({ K, s: kState(K, wd) })),
+  const SX = KINDS.filter(K => K.x).map(K => ({ K, s: kState(K, wd) })),
+    S = KINDS.filter(K => !K.x).map(K => ({ K, s: kState(K, wd) })),
     n = S.filter(x => x.s.on).length,
     miss = S.filter(x => !x.s.on).map(x => x.K.k),
     mis = S.filter(x => x.s.on && x.s.st === 'mis').map(x => x.K.k);
@@ -3134,7 +3484,9 @@ function vWall(wd) {
    .join('')}</div></div>
  <div class="wg o"><p>Playlist อื่น 5 ไฟล์</p><div class="wgrid" role="list">${S.filter(x => !x.K.g)
    .map(tile)
-   .join('')}</div></div>
+   .join(
+     '',
+   )}</div></div>${SX.some(x => x.s.on) ? `<div class="wg o"><p>Playlist เพิ่มเติม (ใบเช็ค CCTV / MRT — ไม่นับใน 11 แบบ)</p><div class="wgrid" role="list">${SX.map(tile).join('')}</div></div>` : ''}
  ${sum}
  ${n && n < 11 ? `<p class="wnote">ถ้าเติมเฉพาะใบเช็คของตัวเอง ใส่เฉพาะแบบที่ใบเช็คนั้นใช้ก็ได้ ขั้นที่ 3 จะบอกว่าใบเช็คแต่ละไฟล์ต้องใช้แบบไหน</p>` : ''}
  ${mis.length ? `<p class="wnote">ไฟล์ที่ใส่ทีหลังจะแทนที่ไฟล์เดิมของจอเดียวกัน ใส่ไฟล์ของวันที่ถูกต้องอีกครั้งเพื่อแทนที่</p>` : ''}
@@ -3191,7 +3543,7 @@ function vData() {
     ),
   ].sort((a, b) => a - b);
   return `${shead('ใส่ Playlist ของวันนี้', 'ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว')}
- <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม', '.xlsx,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
+ <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม', '.xlsx,.xls,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
  ${vWall(wd)}
  <div class="stack">${PLX.length ? alertHTML('er', `อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`, `<ul>${PLX.map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`) : ''}
  ${vPLI()}
@@ -3502,7 +3854,7 @@ function vRes() {
 const vHelp =
   () => `<div class="ov"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="hlt"><div class="dlgh"><h2 id="hlt">วิธีใช้ประจำวัน</h2><button class="ib" data-a="help" aria-label="ปิด" data-focus>${IC.x}</button></div>
 <ol class="hs">
-<li><b>เตรียมไฟล์</b><span>Playlist ของวันนี้ 11 แบบ (สรุปรายการหนังแยกจอ 40Blue, 40Red, 80Blue, 80Red, CITY, Spare และ Signature Max, Show DC, BKJ1, BKJ2, Metro LED) กับใบเช็ครูปที่เติมแล้วของวันก่อนหน้า</span></li>
+<li><b>เตรียมไฟล์</b><span>Playlist ของวันนี้ 11 แบบ (สรุปรายการหนังแยกจอ 40Blue, 40Red, 80Blue, 80Red, CITY, Spare และ Signature Max, Show DC, BKJ1, BKJ2, Metro LED) กับใบเช็ครูปที่เติมแล้วของวันก่อนหน้า • ถ้ามีใบเช็ค CCTV / MRT ใส่ Playlist เพิ่มเติม Rama9 Connect, Digital MRT, Gateway X, Air Traveller, The 20 ด้วย (ไม่นับใน 11 แบบ)</span></li>
 <li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
 <li><b>ขั้นที่ 2 ตรวจ / แก้ไข (ไม่บังคับ)</b><span>ใช้เมื่อต้องปลด เพิ่ม หรือเปลี่ยนชื่อหนังก่อนเติม</span></li>
 <li><b>ขั้นที่ 3 เติมใบเช็ครูป</b><span>ลากใบเช็ครูปลงกล่อง ดูว่าแต่ละไฟล์ขึ้น “พร้อมเติม” วันที่ทำงานและรอบถูกต้อง แล้วกด “เติมใบเช็ครูป”</span></li>
@@ -3516,7 +3868,7 @@ const vHelp =
 <li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
 <li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ (Signature Max, Show DC), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li>
 <li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
-<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li></ul>
+<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
