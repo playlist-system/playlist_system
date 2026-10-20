@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.4.1 • 20 ต.ค. 2569
+ *  เวอร์ชัน 3.5 • 20 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -61,7 +61,10 @@
  *   เวอร์ชัน 3.4 แก้ส่วน 4, 5, 6, 7, 8 และ 9: Playlist เพิ่มเติม 5 แบบ (Rama9 Connect / Digital MRT / Gateway X: parseSect,
  *   Air Traveller / The 20: parseMco) และใบเช็คแบบใหม่ที่แถวสูตรวิเคราะห์อยู่แถว 10 (CCTV / MRT / Gateway X / Rama9 Connect /
  *   Air Traveller / THE 20: avCols, screen10)
- *   3.4.1 แก้ส่วน 3: หมายเหตุ “ทุกจอยกเว้น <ชื่อย่อจอ>” ของ Signature Max / Show DC (noteSkip))
+ *   3.4.1 แก้ส่วน 3: หมายเหตุ “ทุกจอยกเว้น <ชื่อย่อจอ>” ของ Signature Max / Show DC (noteSkip)
+ *   เวอร์ชัน 3.5 แก้ส่วน 5, 6, 7 และ 8: Playlist LA PlanB (parseSig, laDate — ไม่ได้ส่งทุกวัน ใช้ฉบับล่าสุด) และชีต LA PLANB
+ *   (kind10, screen10) • คำในช่องออกตามแบบที่ใบเช็คใช้ทั้งไฟล์ (OSW, OSH) • รหัสจอที่ขีดต่างกัน (DGT-174 = DGT174)
+ *   • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม)
  * ======================================================================
  */
 
@@ -432,11 +435,11 @@ const plDate = () => {
     a = 0;
   for (const s of DB) {
     if (s.pd > a) a = s.pd;
-    if (s.m !== 'Show DC / Prudential' && s.pd > b) b = s.pd;
+    if (s.m !== 'Show DC / Prudential' && s.m !== 'LA PlanB' && s.pd > b) b = s.pd;
   }
   b = b || a;
   return b ? new Date(b) : null;
-}; /* Show DC อาจเป็นไฟล์ของรอบถัดไป จึงไม่ใช้กำหนดวันทำงาน */
+}; /* Show DC / LA PlanB ไม่ได้ส่งทุกวัน (อาจเป็นฉบับเก่าหรือของรอบถัดไป) จึงไม่ใช้กำหนดวันทำงาน */
 const workDate = () => parseD(OP.base) || PLD || autoBase();
 function autoBase() {
   const c = new Map();
@@ -1047,7 +1050,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     }
     pl.sort((x, y) => x.g - y.g);
     for (const h of b.hist) {
-      let x = h.ned || offEd.get(h.nm) || 0;
+      let x =
+        h.ned || offEd.get(h.nm) || (!h.nm.startsWith('#') && !offEd.has(h.nm) && offEd.get('#' + h.nm)) || 0;
       if (!h.ned && x && h.g >= +P2 && x < h.g)
         x = Math.max(
           h.g,
@@ -1064,6 +1068,10 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
           r => r.st,
         ); /* ตั้งแต่วันที่ 2 ของรอบ: หนังที่ยังไม่มีในใบเช็ค เพิ่มเฉพาะสถานะ “ขึ้นใหม่…” (หรือเริ่มวันนี้/ล่วงหน้า) */
     for (const p of pl) {
+      if (p.hash && !ent.some(e => e.nm === p.nm) && ent.some(e => e.h && e.nm === p.nm.slice(1))) {
+        p.nm = p.nm.slice(1);
+        p.hash = false;
+      } /* หนัง Content ที่ใบเช็คเขียนไว้แล้วแบบไม่มี # (เช่น MD_…) → แถวเดิม ไม่เพิ่ม #MD_… ซ้ำ */
       const c = ent.filter(e => e.nm === p.nm),
         tg = p.g > +P ? p.g : hb ? dd : +P;
       {
@@ -1178,7 +1186,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     b.grp = new Map(dates.map(k => [k, srt(b.ent.filter(e => e.g === k))]));
   }
   const OSH = { s: false, p: false };
-  if (AR10) {
+  {
     let s = 0,
       l = 0,
       n1 = 0,
@@ -1194,9 +1202,13 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
           if (/^0/.test(m[2])) p++;
         }
       }
-    const lg = B.some(b => /^(Air Traveller|The 20|Rama9 Connect)$/.test((b.scr || {}).m || ''));
-    OSH.s = s + l ? s > l : !lg;
-    OSH.p = n1 ? p * 2 > n1 : lg && !OSH.s;
+    const lg = B.some(b => /^(Air Traveller|The 20|Rama9 Connect)$/.test((b.scr || {}).m || '')),
+      la = B.every(b => ((b.scr || {}).m || '') === 'LA PlanB'),
+      w = o.osw || { s: 0, l: 0 };
+    if (AR10) {
+      OSH.s = s + l ? s > l : la ? w.s > w.l : !lg;
+      OSH.p = n1 ? p * 2 > n1 : lg && !OSH.s;
+    } else OSH.s = s + l ? s > l : w.s > w.l;
   } /* ยังไม่มีหมายเหตุให้ดูแบบ (เช่นต้นเดือน): ใบ Air Traveller / THE 20 / Rama9 ทีมเขียน “ออกวันที่ 04” ใบ MRT / Gateway X / CCTV เขียน “ออก 4” */
   const note = (b, r, row) => {
     if (noNotes || !r.ed || !isFinite(r.ed)) return;
@@ -1207,7 +1219,9 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         sh.setText(
           b.nc,
           row,
-          AR10 ? (OSH.s ? 'ออก ' : 'ออกวันที่ ') + (OSH.p && dn < 10 ? '0' + dn : dn) : 'ออกวันที่ ' + dn,
+          AR10
+            ? (OSH.s ? 'ออก ' : 'ออกวันที่ ') + (OSH.p && dn < 10 ? '0' + dn : dn)
+            : (OSH.s ? 'ออก ' : 'ออกวันที่ ') + dn,
         );
       }
       sh.setS(b.nc, row, ST.derive(b.bn, 'red', { color: 'FFFF0000', right: true }));
@@ -1479,9 +1493,11 @@ const txt10 = (ws, cn) => {
             ? 'Rama9 Connect'
             : /GATEWAYX/.test(t)
               ? 'Gateway X'
-              : /AIRTRAVELL/.test(b)
-                ? 'Signature Max'
-                : '';
+              : /LAPLANB/.test(t)
+                ? 'LA PlanB'
+                : /AIRTRAVELL/.test(b)
+                  ? 'Signature Max'
+                  : '';
   };
 function screen10(ws, sn, cn) {
   const b = nrm(txt10(ws, cn).join(' ')),
@@ -1493,7 +1509,7 @@ function screen10(ws, sn, cn) {
   if (k === 'Digital MRT') return one(k, MRTX.has(nrm(sn)) ? /ต่อขยาย|ใหม่/ : /เดิม/);
   if (k === 'Air Traveller')
     return one(k, /AIRPORTIN|TOAIRPORT/.test(b) ? /IN$/ : /CITYOUT|TOCITY/.test(b) ? /OUT$/ : /^$/);
-  if (k === 'The 20' || k === 'Rama9 Connect' || k === 'Gateway X') return one(k);
+  if (k === 'The 20' || k === 'Rama9 Connect' || k === 'Gateway X' || k === 'LA PlanB') return one(k);
   return null;
 }
 async function fillWb(f, on, metro, o) {
@@ -1572,6 +1588,17 @@ async function fillWb(f, on, metro, o) {
       let key = media + '|' + code,
         ads = on.get(key);
       let fb = '';
+      if (!ads) {
+        const nk = c => c.replace(/-/g, ''),
+          h = media
+            ? [...on.keys()].filter(k => k.startsWith(media + '|') && nk(k.split('|')[1]) === nk(code))
+            : [];
+        if (h.length === 1) {
+          key = h[0];
+          ads = on.get(key);
+          fb = ' (ใบเช็คเขียน ' + code + ' = ' + key.split('|')[1] + ' ใน Playlist)';
+        }
+      } /* รหัสที่ขีดต่างกัน เช่น ใบเช็ค DGT-174 / Playlist DGT174 */
       if (!ads && media === 'CITY' && on.has('CITY|THE CITY')) {
         key = 'CITY|THE CITY';
         ads = on.get(key);
@@ -1721,6 +1748,17 @@ async function fillWb(f, on, metro, o) {
       (KEEP[sn] = KEEP[sn] || []).push([sn, lc, [], { c: label, rows: [], pd: 0 }, 'keep', ce - cs + 1]);
     }
   } /* จอที่ไม่มีใน Playlist วันนี้ แต่อยู่ในชีตเดียวกับจอที่เติม */
+  const OSW = { s: 0, l: 0 };
+  for (const sn of wb.SheetNames) {
+    if (notChk(sn)) continue;
+    const ws = wb.Sheets[sn];
+    for (const k in ws) {
+      if (k[0] === '!') continue;
+      const v = ws[k].v,
+        m = typeof v === 'string' && v.trim().match(/^ออก(วันที่)?\s*\d{1,2}$/);
+      if (m) m[1] ? OSW.l++ : OSW.s++;
+    }
+  } /* แบบหมายเหตุของทั้งไฟล์ (“ออก 5” หรือ “ออกวันที่ 5”) ใช้กับชีตที่ยังไม่มีหมายเหตุ */
   const ST = o.hand
       ? mkStyles(
           new DOMParser().parseFromString(await zip.file('xl/styles.xml').async('string'), 'application/xml'),
@@ -1730,7 +1768,7 @@ async function fillWb(f, on, metro, o) {
   for (const sn in by) {
     const sh = new Sheet(await zip.file(path[sn]).async('string'));
     if (ST && W && by[sn].every(j => j[3])) {
-      const L = layoutChk(sh, [...by[sn], ...(KEEP[sn] || [])], o, ST, W, wb.Sheets[sn]);
+      const L = layoutChk(sh, [...by[sn], ...(KEEP[sn] || [])], { ...o, osw: OSW }, ST, W, wb.Sheets[sn]);
       if (L.skip) rep.push([sn, 'รูปแบบ', 'ตรวจ: ' + L.skip, 0]);
       else {
         if (L.dropped)
@@ -2071,7 +2109,7 @@ function parseSig(wb, media, map) {
   const out = [];
   for (const sn of wb.SheetNames) {
     const ws = wb.Sheets[sn];
-    if (!ws || !/^รายการหนังโฆษณา/.test(cl((ws.A1 || {}).v))) continue;
+    if (!ws || !(media === 'LA PlanB' ? LAT : /^รายการหนังโฆษณา/).test(cl((ws.A1 || {}).v))) continue;
     const code = map ? map(sn) : media === 'Signature Max' ? SIGCODE[sn] || sn : sn;
     if (!code) continue;
     const R = XLSX.utils.decode_range(ws['!ref'] || 'A1');
@@ -2625,6 +2663,36 @@ function parseMco(wb, fn) {
       })
     : [];
 }
+/* LA PlanB: ชีตเดียว “รายการโฆษณาประจำวันสื่อ LA PlanB เริ่มตั้งแต่ 20 ตุลาคม 2569” มีรายการที่ออน + “รายการปลด” ส่งเฉพาะวันที่รายการเปลี่ยน (ไม่ได้ส่งทุกวัน → ใช้ฉบับล่าสุด) วันของไฟล์ = วันที่แถว 2 / “เริ่มตั้งแต่” ไม่ใช่วันเริ่มของหนัง • ใบเช็ค: ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน */
+const LAT = /^รายการ(?:หนัง)?โฆษณา.*LA\s*Plan\s*B/i,
+  THMF = [
+    'มกราคม',
+    'กุมภาพันธ์',
+    'มีนาคม',
+    'เมษายน',
+    'พฤษภาคม',
+    'มิถุนายน',
+    'กรกฎาคม',
+    'สิงหาคม',
+    'กันยายน',
+    'ตุลาคม',
+    'พฤศจิกายน',
+    'ธันวาคม',
+  ];
+const isLaWb = wb => wb.SheetNames.some(n => LAT.test(cl(((wb.Sheets[n] || {}).A1 || {}).v)));
+function laDate(wb) {
+  for (const n of wb.SheetNames) {
+    const ws = wb.Sheets[n];
+    if (!ws || !LAT.test(cl((ws.A1 || {}).v))) continue;
+    const v = (ws.A2 || {}).v;
+    if (v instanceof Date) return new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()));
+    if (typeof v === 'number' && v > 40000 && v < 80000) return s2d(v);
+    const m = cl(ws.A1.v).match(/(\d{1,2})\s*([\u0E01-\u0E4E]+)\s*(\d{4})/),
+      i = m ? THMF.indexOf(m[2]) : -1;
+    if (i >= 0) return new Date(Date.UTC(yy(m[3]), i, +m[1]));
+  }
+  return null;
+}
 function parsePlaylist(f) {
   const I = [],
     ret = x => {
@@ -2639,6 +2707,13 @@ function parsePlaylist(f) {
   if (!/แยกจอ/.test(f.name)) {
     const wb = XLSX.read(f.buf, { type: 'array' });
     if (wb.SheetNames.some(n => bkjCode(n))) return ret(parseSig(wb, 'Bangkok Jams', bkjCode));
+    if (isLaWb(wb)) {
+      const p = parseSig(wb, 'LA PlanB', () => 'LA PlanB');
+      if (p.length) {
+        p.dt = laDate(wb);
+        return ret(p);
+      }
+    }
     if (isSectWb(wb)) return ret(parseSect(XLSX.read(f.buf, { type: 'array', cellStyles: true }), f.name, I));
     if (isMcoWb(wb)) {
       const p = parseMco(wb, f.name);
@@ -2880,7 +2955,7 @@ async function addFiles(kind, files) {
       PLX.push({ f: f.name, why: 'อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) — ใช้ข้อมูลเดิมไว้ก่อน' });
       continue;
     } /* อ่านได้แต่ไม่มีรายการหนังเลย → ไม่ลบข้อมูลเดิม */
-    const fd0 = fullNameDate(f.name) || dataDate(p) || nameDate(f.name, autoBase());
+    const fd0 = p.dt || fullNameDate(f.name) || dataDate(p) || nameDate(f.name, autoBase());
     for (const x of p) {
       x.pf = f.name;
       x.pd = fd0 ? +fd0 : 0;
@@ -2924,7 +2999,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.4.1 (20 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.5 (20 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -3147,6 +3222,7 @@ const KINDS = [
   { k: 'Gateway X', c: 'p', x: 1, has: s => s.m === 'Gateway X' },
   { k: 'Air Traveller', c: 'c', x: 1, has: s => s.m === 'Air Traveller' },
   { k: 'The 20', c: 'r', x: 1, has: s => s.m === 'The 20' },
+  { k: 'LA PlanB', c: 'm', x: 1, latest: true, tip: 'ไม่ได้ส่งทุกวัน', has: s => s.m === 'LA PlanB' },
 ];
 const kindOn = k => {
   const K = KINDS.find(x => x.k === k);
@@ -3179,6 +3255,7 @@ function sheetNeeds(buf, name) {
   if (
     wb.SheetNames.includes('Index') ||
     wb.SheetNames.some(n => /^รายการหนังโฆษณา/.test(cl(((wb.Sheets[n] || {}).A1 || {}).v))) ||
+    isLaWb(wb) ||
     /สรุปรายการหนัง|รายการหนัง/.test(String(name || ''))
   )
     return { bad: 'ไฟล์นี้เป็นไฟล์ Playlist ไม่ใช่ใบเช็ครูป (ใส่ไว้ในขั้นที่ 1)' };
@@ -3292,6 +3369,16 @@ function readyOf(f) {
       if (on.has(e.media + '|' + code)) {
         add(e.media, e.sn, true);
         continue;
+      }
+      {
+        const nk = c => c.replace(/-/g, ''),
+          h = e.media
+            ? keys.filter(k => k.startsWith(e.media + '|') && nk(k.split('|')[1]) === nk(code))
+            : [];
+        if (h.length === 1) {
+          add(h[0].split('|')[0], e.sn, true);
+          continue;
+        }
       }
       if (e.media === 'CITY' && on.has('CITY|THE CITY')) {
         add('CITY', e.sn, true);
@@ -3495,7 +3582,7 @@ function vWall(wd) {
    .map(tile)
    .join(
      '',
-   )}</div></div>${SX.some(x => x.s.on) ? `<div class="wg o"><p>Playlist เพิ่มเติม (ใบเช็ค CCTV / MRT — ไม่นับใน 11 แบบ)</p><div class="wgrid" role="list">${SX.map(tile).join('')}</div></div>` : ''}
+   )}</div></div>${SX.some(x => x.s.on) ? `<div class="wg o"><p>Playlist เพิ่มเติม (ใบเช็ค CCTV / MRT / LA PlanB — ไม่นับใน 11 แบบ)</p><div class="wgrid" role="list">${SX.map(tile).join('')}</div></div>` : ''}
  ${sum}
  ${n && n < 11 ? `<p class="wnote">ถ้าเติมเฉพาะใบเช็คของตัวเอง ใส่เฉพาะแบบที่ใบเช็คนั้นใช้ก็ได้ ขั้นที่ 3 จะบอกว่าใบเช็คแต่ละไฟล์ต้องใช้แบบไหน</p>` : ''}
  ${mis.length ? `<p class="wnote">ไฟล์ที่ใส่ทีหลังจะแทนที่ไฟล์เดิมของจอเดียวกัน ใส่ไฟล์ของวันที่ถูกต้องอีกครั้งเพื่อแทนที่</p>` : ''}
@@ -3535,14 +3622,16 @@ const vPLI = () => {
 function vData() {
   const has = DB.length > 0,
     wd = has ? workDate() : null,
-    sdc = KINDS.find(K => K.latest);
+    sdc = KINDS.filter(K => K.latest);
   const fl = (() => {
     const M = new Map();
     for (const x of DB) if (x.pf && (!M.has(x.pf) || x.pd > M.get(x.pf))) M.set(x.pf, x.pd || 0);
     return [...M];
   })();
   const isSdc = ([f]) =>
-    DB.some(s => s.pf === f && sdc.has(s)); /* Show DC มีช่องบอกสถานะของตัวเอง ไม่นับเป็น “หลายวันปนกัน” */
+    DB.some(
+      s => s.pf === f && sdc.some(K => K.has(s)),
+    ); /* Show DC / LA PlanB มีช่องบอกสถานะของตัวเอง ไม่นับเป็น “หลายวันปนกัน” */
   const ds = [
     ...new Set(
       fl
@@ -3877,7 +3966,7 @@ const vHelp =
 <li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
 <li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ / ทุกจอยกเว้น (Signature Max, Show DC — เทียบชื่อย่อจอ เช่น SO TWT สาทร AOT BIGY), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li>
 <li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
-<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li></ul>
+<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
