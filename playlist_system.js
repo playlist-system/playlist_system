@@ -1193,9 +1193,10 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
           if (/^0/.test(m[2])) p++;
         }
       }
-    OSH.s = s > l;
-    OSH.p = p * 2 > n1;
-  }
+    const lg = B.some(b => /^(Air Traveller|The 20|Rama9 Connect)$/.test((b.scr || {}).m || ''));
+    OSH.s = s + l ? s > l : !lg;
+    OSH.p = n1 ? p * 2 > n1 : lg && !OSH.s;
+  } /* ยังไม่มีหมายเหตุให้ดูแบบ (เช่นต้นเดือน): ใบ Air Traveller / THE 20 / Rama9 ทีมเขียน “ออกวันที่ 04” ใบ MRT / Gateway X / CCTV เขียน “ออก 4” */
   const note = (b, r, row) => {
     if (noNotes || !r.ed || !isFinite(r.ed)) return;
     const nd = +addD(new Date(r.ed), 1);
