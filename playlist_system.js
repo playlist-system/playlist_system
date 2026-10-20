@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.8 • 20 ต.ค. 2569
+ *  เวอร์ชัน 3.8.1 • 20 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -1954,117 +1954,161 @@ async function cmpCheck(root, W, res) {
       : [...IX.entries()]
           .filter(([id]) => id.startsWith('N:') && e.lab.some(t => cLab(t, id.slice(2))))
           .flatMap(([, v]) => v);
+  const kOf = id =>
+      K.find(x => (x.key ? x.key === id : id.startsWith('N:') && x.lab.some(t => cLab(t, id.slice(2))))),
+    plOf = id => (id.startsWith('N:') ? cPl('', [id.slice(2)]) : cPl(id, []));
+  /* แต่ละเรื่อง: g = ck (แก้ในใบเช็ค) / fd (แก้ในโฟลเดอร์) / chk (ให้ตรวจเอง) • act = สิ่งที่ต้องทำ • now = ตอนนี้เป็นอย่างไร */
+  const dn = n =>
+      String(n)
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    tg = k => k.slice(0, 2) + k.charAt(2),
+    who = L => [...new Set(L.map(s => '“' + s.f + '”'))].join(', '),
+    shs = L => [...new Set(L.map(s => s.sn))].join(', '),
+    fq = L => '“' + [...new Set(L)].join('” / “') + '”',
+    plS = S => (S.size ? ' • Playlist วันนี้อยู่ ' + cpl(S) : '');
   const iss = [],
+    inv = new Set(),
     rows = new Map(PK.map(p => [p.n, { n: p.n, k: p.k, nf: p.S.length, nk: 0, ok: 0, bad: 0 }])),
-    add = (t, p, nm, msg) => {
-      iss.push({ t, p, nm, msg });
+    add = (g, p, nm, act, now, id) => {
+      iss.push({ g, p, nm: dn(nm), act, now: now || '' });
+      if (id) inv.add(id);
       const r = rows.get(p);
       if (r) r.bad++;
     };
-  const srcT = e => e.src.map(s => s.f + ' ชีต “' + s.sn + '”').join(', '),
-    plT = (S, side) => (S.size ? ' • Playlist วันนี้: ' + cpl(S) + side(S) : '');
+  let okK = 0;
+  const nopk = new Map();
   /* 1) จอในใบเช็ค → โฟลเดอร์ */
-  const seenF = new Set(),
-    nopk = new Map();
   for (const e of K) {
     const H = fFind(e),
-      pl = cPl(e.key, e.lab);
-    if (e.pk.size > 1)
-      add(
-        'conf',
-        '',
-        e.nm,
-        'ใบเช็คใส่จอนี้ไว้คนละแพค: ' +
-          e.src.map(s => s.f + ' ชีต “' + s.sn + '” = ' + CPN[s.m]).join(', ') +
-          plT(pl, () => ''),
-      );
+      pl = cPl(e.key, e.lab),
+      eid = e.key || 'N:' + (e.lab[0] || ''),
+      nm = H.length ? H[0].sc.nm : e.nm;
     for (const m of e.pk) {
       const cf = pkF(m);
       for (const f of cf) rows.get(f).nk++;
-      if (!cf.length) {
-        nopk.set(m, (nopk.get(m) || 0) + 1);
-        continue;
-      }
-      const ok = H.filter(x => x.p.k === m),
-        bad = H.filter(x => x.p.k !== m && x.p.k !== 'ALL');
-      for (const x of ok) {
-        rows.get(x.p.n).ok++;
-        seenF.add(x.sc);
-      }
-      if (e.pk.size > 1) continue;
-      if (!H.length) {
+      if (!cf.length) nopk.set(m, (nopk.get(m) || 0) + 1);
+      for (const x of H) if (x.p.k === m) rows.get(x.p.n).ok++;
+    }
+    if (e.pk.size > 1) {
+      const P1 = pl.size === 1 ? [...pl][0] : '',
+        Wr = P1 && e.pk.has(P1) ? e.src.filter(s => s.m !== P1) : [],
+        now =
+          'ใบเช็คแต่ละไฟล์ใส่จอนี้ไว้คนละแพค: ' + e.src.map(s => s.f + ' = ' + CPN[s.m]).join(', ') + plS(pl);
+      if (Wr.length)
         add(
-          'miss',
-          cf[0],
-          e.nm,
-          'ใบเช็ค ' + srcT(e) + ' อยู่แพค ' + CPN[m] + ' แต่ไม่มีโฟลเดอร์จอ' + plT(pl, () => ''),
+          'ck',
+          '',
+          nm,
+          'ใบเช็ค ' + who(Wr) + ' ใส่จอนี้ไว้ชีต ' + shs(Wr) + ' แต่ควรอยู่แพค ' + CPN[P1],
+          now,
+          eid,
         );
-        continue;
-      }
-      if (!ok.length)
-        for (const x of bad) {
-          seenF.add(x.sc);
-          const pS = plT(pl, S =>
-            S.has(m) && !S.has(x.p.k)
-              ? ' (ตรงกับใบเช็ค → ย้ายโฟลเดอร์ไป “' + cf.join('” / “') + '”)'
-              : S.has(x.p.k) && !S.has(m)
-                ? ' (ตรงกับโฟลเดอร์ → แก้ที่ใบเช็ค)'
-                : '',
-          );
-          add(
-            'wrong',
-            x.p.n,
-            x.sc.nm,
-            'ใบเช็ค ' + srcT(e) + ' อยู่แพค ' + CPN[m] + ' แต่โฟลเดอร์อยู่ใน “' + x.p.n + '”' + pS,
-          );
-        }
+      else add('chk', '', nm, 'ใบเช็คใส่จอนี้ไว้คนละแพค ดูว่าจอนี้อยู่แพคไหน แล้วแก้ใบเช็คที่ผิด', now, eid);
+      continue;
     }
+    const m = [...e.pk][0],
+      cf = pkF(m);
+    if (!cf.length) continue;
+    const ok = H.filter(x => x.p.k === m),
+      bad = H.filter(x => x.p.k !== m && x.p.k !== 'ALL'),
+      src = 'ใบเช็ค ' + who(e.src) + ' ชีต ' + shs(e.src);
+    if (!H.length) {
+      if (pl.size && !pl.has(m))
+        add(
+          'chk',
+          cf[0],
+          nm,
+          'ไม่มีโฟลเดอร์จอนี้ และ Playlist วันนี้ไม่ได้อยู่แพค ' + CPN[m] + ' ดูว่าจอนี้อยู่แพคไหน',
+          src + ' (แพค ' + CPN[m] + ')' + plS(pl),
+          eid,
+        );
+      else
+        add(
+          'fd',
+          cf[0],
+          nm,
+          'สร้างโฟลเดอร์จอนี้ใน “' + cf[0] + '”',
+          src + ' มีจอนี้ แต่ในเครื่องยังไม่มีโฟลเดอร์' + plS(pl),
+          eid,
+        );
+      continue;
+    }
+    if (!ok.length) {
+      const ks = [...new Set(bad.map(x => x.p.k))],
+        fn = fq(bad.map(x => x.p.n)),
+        hit = ks.filter(k => pl.has(k)),
+        now = 'ใบเช็คอยู่ ' + CPN[m] + ' • โฟลเดอร์อยู่ ' + fn + plS(pl);
+      for (const x of bad) inv.add(cId(x.sc));
+      if (hit.length && !pl.has(m))
+        add(
+          'ck',
+          bad[0].p.n,
+          nm,
+          'ใบเช็ค ' + who(e.src) + ' ใส่จอนี้ไว้ชีต ' + shs(e.src) + ' แต่ควรอยู่แพค ' + cpl(hit),
+          now,
+          eid,
+        );
+      else if (pl.has(m) && !hit.length)
+        add('fd', bad[0].p.n, nm, 'ย้ายโฟลเดอร์จาก ' + fn + ' ไป “' + cf[0] + '”', now, eid);
+      else
+        add(
+          'chk',
+          bad[0].p.n,
+          nm,
+          'ใบเช็คกับโฟลเดอร์อยู่คนละแพค ดูว่าจอนี้อยู่แพคไหน แล้วแก้ฝั่งที่ผิด',
+          now,
+          eid,
+        );
+      continue;
+    }
+    if (bad.length) {
+      for (const x of bad)
+        add(
+          'fd',
+          x.p.n,
+          x.sc.nm,
+          'เอาโฟลเดอร์ใน “' + x.p.n + '” ออก',
+          'จอนี้อยู่แพค ' + CPN[m] + ' ตามใบเช็ค และมีโฟลเดอร์ใน “' + ok[0].p.n + '” แล้ว' + plS(pl),
+          cId(x.sc),
+        );
+      continue;
+    }
+    okK++;
   }
-  /* 2) จอเดียวกันมีโฟลเดอร์ในหลายแพค (ไม่นับ 240) */
-  for (const [id, L] of IX) {
-    const ks = [...new Set(L.map(x => x.p.k))];
-    if (ks.length < 2) continue;
-    const e = K.find(x =>
-        x.key ? x.key === id : id.startsWith('N:') && x.lab.some(t => cLab(t, id.slice(2))),
-      ),
-      pl = cPl(id.startsWith('N:') ? '' : id, id.startsWith('N:') ? [id.slice(2)] : []);
-    if (e && e.pk.size === 1)
-      continue; /* จอที่อยู่ในใบเช็ค บอกไว้แล้วในข้อ 1 (คนละแพค) หรือรายการโฟลเดอร์เกิน */
+  for (const [k, n] of nopk)
     add(
-      'dup2',
-      L[0].p.n,
-      L[0].sc.nm,
-      'มีโฟลเดอร์ใน “' +
-        L.map(x => x.p.n).join('” และ “') +
-        '”' +
-        (e ? ' • ใบเช็ค ' + srcT(e) + ' อยู่แพค ' + cpl(e.pk) : '') +
-        plT(pl, () => ''),
+      'fd',
+      '',
+      'แพค ' + CPN[k],
+      'สร้างโฟลเดอร์แพค ' + CPN[k] + ' ในโฟลเดอร์รอบ “' + rd.path[rd.path.length - 1] + '”',
+      'ใบเช็คมีจอของแพคนี้ ' + n + ' จอ แต่รอบนี้ยังไม่มีโฟลเดอร์แพค',
+      '',
     );
+  /* 2) จอเดียวกันมีโฟลเดอร์หลายแพค (ไม่นับ 240) ที่ไม่ได้บอกไว้ในข้อ 1 */
+  for (const [id, L] of IX) {
+    if (new Set(L.map(x => x.p.k)).size < 2 || inv.has(id)) continue;
+    const e = kOf(id);
+    if (e && e.pk.size === 1) continue;
+    const pl = plOf(id),
+      nm = L[0].sc.nm,
+      now = 'มีโฟลเดอร์ทั้งใน ' + fq(L.map(x => x.p.n)).replace(/” \/ “/g, '” และ “') + plS(pl),
+      bad = L.filter(x => !pl.has(x.p.k)),
+      to = [...pl].flatMap(pkF);
+    if (pl.size && bad.length && bad.length < L.length)
+      for (const x of bad) add('fd', x.p.n, nm, 'เอาโฟลเดอร์ใน “' + x.p.n + '” ออก', now, id);
+    else if (pl.size && bad.length === L.length && to.length)
+      add(
+        'fd',
+        L[0].p.n,
+        nm,
+        'ย้ายโฟลเดอร์จาก ' + fq(L.map(x => x.p.n)) + ' ไปไว้ที่ “' + to[0] + '” ที่เดียว',
+        now,
+        id,
+      );
+    else add('chk', L[0].p.n, nm, 'จอนี้มีโฟลเดอร์หลายแพค ดูว่าควรอยู่แพคไหน', now, id);
   }
-  for (const r of rows.values())
-    if (r.k !== 'ALL') {
-      const p = PK.find(
-        q => q.n === r.n,
-      ); /* จอที่อยู่หลายแพคและใบเช็คชี้แพคหนึ่ง: โฟลเดอร์เกินอยู่ในแพคอื่น */
-      for (const e of K) {
-        if (e.pk.size !== 1 || e.pk.has(p.k)) continue;
-        const H = fFind(e);
-        if (H.some(x => x.p.k === [...e.pk][0]) && H.some(x => x.p === p)) {
-          const x = H.find(x => x.p === p);
-          add(
-            'extra',
-            p.n,
-            x.sc.nm,
-            'ใบเช็ค ' +
-              srcT(e) +
-              ' อยู่แพค ' +
-              cpl(e.pk) +
-              ' และมีโฟลเดอร์ในแพคนั้นแล้ว โฟลเดอร์นี้เกิน' +
-              plT(cPl(e.key, e.lab), () => ''),
-          );
-        }
-      }
-    }
   /* 3) Plan B TV 240 เทียบกับโฟลเดอร์แพค 40 / 80 */
   for (const A of ALL) {
     const got = new Set();
@@ -2072,89 +2116,115 @@ async function cmpCheck(root, W, res) {
     for (const sc of A.S) {
       const id = cId(sc),
         L = (IX.get(id) || []).filter(x => CPB.includes(x.p.k)),
-        ks = new Set(L.map(x => x.p.k));
+        ks = [...new Set(L.map(x => x.p.k))],
+        e = kOf(id);
       got.add(id);
-      const e = K.find(x => (x.key ? x.key === sc.key : !sc.key && x.lab.some(t => cLab(t, sc.base))));
+      if (inv.has(id)) continue;
       if (!L.length) {
-        const o = IX.get(id);
-        add(
-          'f240',
-          A.n,
-          sc.nm,
-          o
-            ? 'อยู่ใน 240 แต่โฟลเดอร์แพคอยู่ “' + o.map(x => x.p.n).join('” / “') + '” ไม่ใช่ 40 / 80'
-            : 'อยู่ใน 240 แต่ไม่มีในโฟลเดอร์แพค 40 / 80',
-        );
+        const o = IX.get(id),
+          pl = plOf(id),
+          pb = CPB.filter(k => pl.has(k)),
+          on = o ? ' • โฟลเดอร์แพคอยู่ ' + fq(o.map(x => x.p.n)) : '';
+        if (pb.length === 1 && pkF(pb[0]).length)
+          add(
+            'fd',
+            A.n,
+            sc.nm,
+            'สร้างโฟลเดอร์จอนี้ใน “' + pkF(pb[0])[0] + '”',
+            'มีใน “' + A.n + '” แต่ในโฟลเดอร์แพคยังไม่มี' + on + plS(pl),
+            id,
+          );
+        else if (pl.size && !pb.length)
+          add(
+            'fd',
+            A.n,
+            sc.nm,
+            'เอาโฟลเดอร์ใน “' + A.n + '” ออก',
+            'จอนี้ไม่ได้อยู่ใน 4 แพค Plan B TV' + on + plS(pl),
+            id,
+          );
+        else
+          add(
+            'chk',
+            A.n,
+            sc.nm,
+            'จอนี้มีใน “' + A.n + '” แต่ไม่มีในโฟลเดอร์แพค 40 / 80',
+            on.replace(/^ • /, ''),
+            id,
+          );
         continue;
       }
+      if (ks.length > 1) continue;
+      const k = ks[0],
+        pn = 'โฟลเดอร์แพคอยู่ “' + L[0].p.n + '”';
       if (!sc.tag) {
-        add('f240', A.n, sc.nm, 'ชื่อโฟลเดอร์ไม่มีป้ายแพค • โฟลเดอร์แพคอยู่ ' + cpl(ks));
+        add('fd', A.n, sc.nm, 'เติม (' + tg(k) + ') ในชื่อโฟลเดอร์ใน “' + A.n + '”', pn, id);
         continue;
       }
-      if (!ks.has(sc.tag)) {
+      if (sc.tag !== k) {
         add(
-          'f240',
+          'fd',
           A.n,
           sc.nm,
-          'ป้ายในชื่อเป็น ' + CPN[sc.tag] + ' แต่โฟลเดอร์แพคอยู่ “' + L.map(x => x.p.n).join('” / “') + '”',
+          'แก้ชื่อโฟลเดอร์ใน “' + A.n + '”: เปลี่ยน (' + tg(sc.tag) + ') เป็น (' + tg(k) + ')',
+          pn,
+          id,
         );
         continue;
       }
-      if (e && [...e.pk].some(k => CPB.includes(k))) rows.get(A.n).ok++;
+      if (e && [...e.pk].some(q => CPB.includes(q))) rows.get(A.n).ok++;
     }
     for (const [id, L] of IX)
       for (const x of L)
         if (CPB.includes(x.p.k) && !got.has(id)) {
           got.add(id);
-          add('f240', A.n, x.sc.nm, 'มีในโฟลเดอร์ “' + x.p.n + '” แต่ไม่มีใน 240');
+          if (inv.has(id)) continue;
+          add(
+            'fd',
+            A.n,
+            x.sc.nm,
+            'เพิ่มโฟลเดอร์จอนี้ใน “' + A.n + '”',
+            'มีในโฟลเดอร์ “' + x.p.n + '” แต่ใน “' + A.n + '” ยังไม่มี',
+            id,
+          );
         }
   }
-  const nIn = PK.reduce((n, p) => n + p.S.filter(sc => p.k !== 'ALL' && !seenF.has(sc)).length, 0);
   const G = [
-    ['wrong', 'ใบเช็คกับโฟลเดอร์อยู่คนละแพค'],
-    ['miss', 'จอในใบเช็คที่ไม่มีโฟลเดอร์จอ'],
-    ['conf', 'ใบเช็คใส่จอเดียวกันไว้คนละแพค'],
-    ['extra', 'มีโฟลเดอร์เกินในแพคอื่น'],
-    ['dup2', 'จอเดียวกันมีโฟลเดอร์หลายแพค'],
-    ['f240', 'Plan B TV 240 ไม่ตรงกับโฟลเดอร์แพค'],
+    ['ck', 'ต้องแก้ในใบเช็ค', 'แก้ในไฟล์ใบเช็คของคนที่ระบุ'],
+    ['fd', 'ต้องแก้ในโฟลเดอร์', 'แก้ในโฟลเดอร์เทียบจอในเครื่อง'],
+    ['chk', 'ให้ตรวจเอง', 'ระบบบอกไม่ได้ว่าฝั่งไหนถูก ดูแล้วแก้ฝั่งที่ผิด'],
   ];
   const RW = [...rows.values()],
-    NP = [...nopk].map(([k, n]) => ({ k, n }));
+    rdn = rd.path[rd.path.length - 1];
   const T = [
-    'ตรวจโฟลเดอร์เทียบจอ รอบ “' +
-      rd.path[rd.path.length - 1] +
-      '” เทียบกับใบเช็ครูป ' +
-      [
-        ...new Set((res || []).filter(r => (r.fold || []).some(b => CPN[b.media])).map(r => cFn(r.name))),
-      ].join(', '),
+    'ตรวจโฟลเดอร์เทียบจอ รอบ “' + rdn + '”' + (prev ? ' (ยังไม่มีรอบ ' + want + ' จึงใช้รอบล่าสุด)' : ''),
+    'ตรวจจอในใบเช็ค ' +
+      K.length +
+      ' จอ • ' +
+      (iss.length ? 'ถูกต้อง ' + okK + ' จอ • ต้องแก้ ' + iss.length + ' เรื่อง' : 'ถูกต้องทั้งหมด'),
   ];
-  if (prev) T.push('(ยังไม่มีโฟลเดอร์รอบ ' + want + ' จึงตรวจโฟลเดอร์รอบล่าสุดแทน)');
-  for (const r of RW)
-    T.push(
-      r.n + ': โฟลเดอร์จอ ' + r.nf + ' • จอในใบเช็ค ' + r.nk + ' • ถูกต้อง ' + r.ok + ' • ต้องตรวจ ' + r.bad,
-    );
-  for (const x of NP) T.push('ไม่มีโฟลเดอร์แพค ' + CPN[x.k] + ' (ใบเช็คมี ' + x.n + ' จอ)');
-  for (const [t, lb] of G) {
-    const I = iss.filter(x => x.t === t);
+  for (const [g, lb] of G) {
+    const I = iss.filter(x => x.g === g);
     if (!I.length) continue;
-    T.push('', lb + ' ' + I.length + ' รายการ');
-    for (const x of I) T.push('- ' + (x.p ? x.p + ' / ' : '') + x.nm + (x.msg ? ' : ' + x.msg : ''));
+    T.push('', lb + ' (' + I.length + ')');
+    I.forEach((x, i) => {
+      T.push(i + 1 + '. ' + x.nm + ' — ' + x.act);
+      if (x.now) T.push('   ' + x.now);
+    });
   }
-  if (!iss.length && !NP.length) T.push('', 'ทุกจอในใบเช็คอยู่ถูกแพค และโฟลเดอร์ 240 ตรงกับโฟลเดอร์แพค');
   return {
     dir: root.name,
     rd: rd.path.join(' / '),
-    rdn: rd.path[rd.path.length - 1],
+    rdn,
     prev,
     want,
     rows: RW,
     iss,
     other,
-    nopk: NP,
     nk: K.length,
-    nIn,
+    okK,
     G,
-    n: iss.length + NP.length,
+    n: iss.length,
     txt: T.join('\n'),
   };
 }
@@ -3651,7 +3721,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.8 (20 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.8.1 (20 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -4588,7 +4658,7 @@ const vCmp = () => {
   const btn = `<div class="picb"><button class="btn secondary" data-a="cmpscan" data-k="again">ตรวจอีกครั้ง</button>${R && !R.err ? '<button class="btn quiet" data-a="cmpcopy">คัดลอกผลตรวจ</button>' : ''}<button class="linkb" data-a="cmpscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
   if (!FSA) b = '<p class="hint">ปุ่มนี้ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์</p>';
   else if (!R)
-    b = `<p class="hint">เทียบใบเช็ครูปที่เติมแล้วกับโฟลเดอร์ในเครื่อง (โฟลเดอร์รอบ เช่น 10 Oct 16-31 → แพค → จอ) ว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare อยู่ในโฟลเดอร์แพคเดียวกันไหม และโฟลเดอร์ Plan B TV 240 ตรงกับโฟลเดอร์แพคไหม • ระบบอ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อโฟลเดอร์ • ใส่ใบเช็คของทุกคนจะตรวจได้ครบทุกจอที่มีในใบเช็ค</p><div><button class="btn secondary" data-a="cmpscan">${IC.folder}เลือกโฟลเดอร์เทียบจอแล้วตรวจ</button></div>`;
+    b = `<p class="hint">ตรวจว่าจอในใบเช็คอยู่ในโฟลเดอร์แพคที่ถูกต้องไหม เช่น จอในชีต 80 RED ต้องมีโฟลเดอร์อยู่ใน Plan B TV 80 RED • ระบบดูอย่างเดียว ไม่ย้ายหรือแก้อะไรในเครื่อง</p><div><button class="btn secondary" data-a="cmpscan">${IC.folder}เลือกโฟลเดอร์เทียบจอแล้วตรวจ</button></div><p class="hint">ครั้งแรกให้เลือกโฟลเดอร์ “เทียบจอ Plan B TV BKK” (ที่มีโฟลเดอร์รอบ เช่น 10 Oct 16-31 อยู่ข้างใน) ครั้งต่อไประบบจำไว้</p>`;
   else if (R.err)
     b =
       alertHTML(
@@ -4597,18 +4667,17 @@ const vCmp = () => {
         `<p>เลือกโฟลเดอร์ที่มีโฟลเดอร์รอบ เช่น “${esc(R.want)}” อยู่ข้างใน (หรือเลือกโฟลเดอร์รอบนั้นเลย)</p>`,
       ) + btn;
   else {
-    const it = x => `<li><b>${esc(x.nm)}</b><small>${x.p ? esc(x.p) + ' • ' : ''}${esc(x.msg)}</small></li>`;
+    const grp = ([g, lb, ds]) => {
+      const I = R.iss.filter(x => x.g === g);
+      return I.length
+        ? `<div class="cmpg g-${g}"><h4>${lb}<span>${I.length}</span></h4><p class="hint">${ds}</p><ol class="cmpl">${I.map(x => `<li><b>${esc(x.nm)}</b><span class="do">${esc(x.act)}</span>${x.now ? `<small>${esc(x.now)}</small>` : ''}</li>`).join('')}</ol></div>`
+        : '';
+    };
     b = `${R.prev ? alertHTML('wr', `ยังไม่มีโฟลเดอร์รอบ ${esc(R.want)}`, `<p>ระบบตรวจโฟลเดอร์รอบล่าสุด “${esc(R.rdn)}” แทน รายการด้านล่างคือสิ่งที่ต้องแก้ตอนทำโฟลเดอร์รอบใหม่</p>`) : ''}
- ${R.n ? alertHTML('wr', `ต้องตรวจ ${R.n.toLocaleString()} รายการ`, `<p>โฟลเดอร์ “${esc(R.rd)}” เทียบกับจอในใบเช็ค ${R.nk} จอ</p>`) : alertHTML('ok', 'ทุกจอในใบเช็คอยู่ถูกแพค', `<p>โฟลเดอร์ “${esc(R.rd)}” ตรงกับจอในใบเช็ค ${R.nk} จอ และโฟลเดอร์ 240 ตรงกับโฟลเดอร์แพค</p>`)}
- <div class="cmpw"><table class="cmpt"><thead><tr><th>โฟลเดอร์แพค</th><th>โฟลเดอร์จอ</th><th>จอในใบเช็ค</th><th>ถูกต้อง</th><th>ต้องตรวจ</th></tr></thead><tbody>${R.rows.map(r => `<tr><td>${esc(r.n)}</td><td>${r.nf}</td><td>${r.nk}</td><td>${r.ok}</td><td class="${r.bad ? 'bad' : ''}">${r.bad}</td></tr>`).join('')}${R.nopk.map(x => `<tr><td class="bad">ไม่มีโฟลเดอร์แพค ${esc(CPN[x.k])}</td><td>-</td><td>${x.n}</td><td colspan="2"></td></tr>`).join('')}</tbody></table></div>
- ${R.G.map(([t, lb]) => {
-   const I = R.iss.filter(x => x.t === t);
-   return I.length
-     ? `<details class="picd" open><summary>${lb} ${I.length} รายการ</summary><ul>${I.map(it).join('')}</ul></details>`
-     : '';
- }).join('')}
- ${R.nIn ? `<p class="hint">โฟลเดอร์จออีก ${R.nIn.toLocaleString()} จอไม่มีในใบเช็คที่เติม จึงไม่ได้เทียบกับใบเช็ค (โฟลเดอร์ 240 ยังตรวจกับโฟลเดอร์แพคครบทุกจอ)</p>` : ''}
- ${R.other.length ? `<p class="hint">โฟลเดอร์อื่นในโฟลเดอร์รอบ (ไม่ใช่แพค ข้าม): ${esc(R.other.join(', '))}</p>` : ''}${btn}`;
+ ${R.n ? alertHTML('wr', `ต้องแก้ ${R.n.toLocaleString()} เรื่อง`, `<p>รอบ “${esc(R.rdn)}” • ตรวจจอในใบเช็ค ${R.nk} จอ ถูกต้อง ${R.okK} จอ</p>`) : alertHTML('ok', 'ถูกต้องทั้งหมด', `<p>รอบ “${esc(R.rdn)}” • จอในใบเช็ค ${R.nk} จออยู่ในโฟลเดอร์แพคที่ถูกต้อง และโฟลเดอร์ Plan B TV 240 ตรงกับโฟลเดอร์แพค</p>`)}
+ ${R.G.map(grp).join('')}
+ <details class="picd"><summary>ดูจำนวนแต่ละแพค</summary><div class="cmpw"><table class="cmpt"><thead><tr><th>โฟลเดอร์แพค</th><th>โฟลเดอร์ในเครื่อง</th><th>จอในใบเช็ค</th><th>ถูกต้อง</th><th>ต้องแก้</th></tr></thead><tbody>${R.rows.map(r => `<tr><td>${esc(r.n)}</td><td>${r.nf}</td><td>${r.nk}</td><td>${r.ok}</td><td class="${r.bad ? 'bad' : ''}">${r.bad}</td></tr>`).join('')}</tbody></table></div></details>
+ <p class="hint">ระบบดูอย่างเดียว ไม่ได้ย้ายหรือแก้อะไรในเครื่อง • ตรวจเฉพาะจอที่มีในใบเช็คที่เติม • แก้แล้วกด “ตรวจอีกครั้ง”${R.other.length ? ` • โฟลเดอร์อื่นในโฟลเดอร์รอบ (ข้าม): ${esc(R.other.join(', '))}` : ''}</p>${btn}`;
   }
   return `<section class="pic cmp"><h3>${IC.folder}ตรวจโฟลเดอร์เทียบจอ Plan B TV BKK</h3>${b}</section>`;
 };
@@ -4686,7 +4755,7 @@ const vHelp =
 <li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
 <li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ / ทุกจอยกเว้น (Signature Max, Show DC — เทียบชื่อย่อจอ เช่น SO TWT สาทร AOT BIGY), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li>
 <li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
-<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>แถบวันที่ทำตามแบบของแต่ละใบ: ใบที่ใส่แถบวันถัดไปรอไว้ท้ายตาราง ระบบใส่ให้ ใบที่ไม่ใส่ ระบบก็ไม่ใส่ • วันที่ในแถบของจอที่ 2 เป็นต้นไปเป็นสูตร (=C25) หรือตัวเลขตามที่ใบนั้นใช้ • หนังต่อสัญญาวันที่ 16 ปกติแถวเดิมใส่ “ออก 16” ถ้าใบไหนไม่ใส่ ติ๊กตัวเลือกใต้ชื่อไฟล์ในขั้นที่ 3 (ระบบจำไว้ตามชื่อไฟล์)</li><li>ตรวจโฟลเดอร์เทียบจอ (ขั้นที่ 4, Chrome / Edge): หลังเติมใบเช็ค กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และป้าย (40B) (80R) ในโฟลเดอร์ Plan B TV 240 ตรงกับโฟลเดอร์แพคไหม • บอก Playlist วันนี้ประกอบ ว่าฝั่งไหนตรงกับรอบนี้ • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>โฟลเดอร์แยกรูป (ขั้นที่ 4, Chrome / Edge): เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
+<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>แถบวันที่ทำตามแบบของแต่ละใบ: ใบที่ใส่แถบวันถัดไปรอไว้ท้ายตาราง ระบบใส่ให้ ใบที่ไม่ใส่ ระบบก็ไม่ใส่ • วันที่ในแถบของจอที่ 2 เป็นต้นไปเป็นสูตร (=C25) หรือตัวเลขตามที่ใบนั้นใช้ • หนังต่อสัญญาวันที่ 16 ปกติแถวเดิมใส่ “ออก 16” ถ้าใบไหนไม่ใส่ ติ๊กตัวเลือกใต้ชื่อไฟล์ในขั้นที่ 3 (ระบบจำไว้ตามชื่อไฟล์)</li><li>ตรวจโฟลเดอร์เทียบจอ (ขั้นที่ 4, Chrome / Edge): หลังเติมใบเช็ค กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และป้าย (40B) (80R) ในโฟลเดอร์ Plan B TV 240 ตรงกับโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>โฟลเดอร์แยกรูป (ขั้นที่ 4, Chrome / Edge): เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
@@ -5571,8 +5640,8 @@ const ACT = {
     note = R.err
       ? `ไม่พบโฟลเดอร์รอบในโฟลเดอร์ “${d.name}”`
       : R.n
-        ? `ตรวจแล้ว ต้องตรวจ ${R.n.toLocaleString()} รายการ`
-        : 'ตรวจแล้ว ทุกจอในใบเช็คอยู่ถูกแพค';
+        ? `ตรวจแล้ว ต้องแก้ ${R.n.toLocaleString()} เรื่อง`
+        : 'ตรวจแล้ว ถูกต้องทั้งหมด';
   },
   cmpcopy: async () => {
     const R = last && last.cmp && last.cmp.R;
