@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.8.2 • 20 ต.ค. 2569
+ *  เวอร์ชัน 3.8.3 • 20 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -1970,8 +1970,8 @@ async function cmpCheck(root, W, res) {
   const iss = [],
     inv = new Set(),
     rows = new Map(PK.map(p => [p.n, { n: p.n, k: p.k, nf: p.S.length, nk: 0, ok: 0, bad: 0 }])),
-    add = (g, p, nm, act, now, id) => {
-      iss.push({ g, p, nm: dn(nm), act, now: now || '' });
+    add = (g, p, nm, act, now, id, pair) => {
+      iss.push({ g, p, nm: dn(nm), act, now: now || '', pair });
       if (id) inv.add(id);
       const r = rows.get(p);
       if (r) r.bad++;
@@ -2132,6 +2132,10 @@ async function cmpCheck(root, W, res) {
         'ชื่อใน “' + A.n + '” ไม่ตรงกับโฟลเดอร์ “' + x.p.n + '”',
         'ใน “' + A.n + '”: ' + sc.nm + '\nใน “' + x.p.n + '”: ' + x.sc.nm,
         id,
+        [
+          [A.n, sc.nm],
+          [x.p.n, x.sc.nm],
+        ],
       );
     }
     for (const [id, L] of IX)
@@ -2146,7 +2150,11 @@ async function cmpCheck(root, W, res) {
     ['ck', 'ต้องแก้ในใบเช็ค', 'แก้ในไฟล์ใบเช็คของคนที่ระบุ'],
     ['fd', 'ต้องแก้ในโฟลเดอร์', 'แก้ในโฟลเดอร์เทียบจอในเครื่อง'],
     ['chk', 'ให้ตรวจเอง', 'ระบบบอกไม่ได้ว่าฝั่งไหนถูก ดูแล้วแก้ฝั่งที่ผิด'],
-    ['nm', 'ชื่อจอใน Plan B TV 240', 'โฟลเดอร์รวมไว้ดูรายชื่อจอ • ชื่อที่ไม่ตรงกับชื่อในโฟลเดอร์แพค'],
+    [
+      'nm',
+      'ชื่อจอใน Plan B TV 240',
+      'โฟลเดอร์รวมไว้ดูรายชื่อจอ • ชื่อที่ไม่ตรงกับชื่อในโฟลเดอร์แพค (ส่วนที่ต่างมีแถบสี)',
+    ],
   ];
   const RW = [...rows.values()],
     rdn = rd.path[rd.path.length - 1];
@@ -3675,7 +3683,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.8.2 (20 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.8.3 (20 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -4604,6 +4612,13 @@ const vPic = () => {
   }
   return `<section class="pic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูป รอบ ${rn}</h3>${b}</section>`;
 };
+const cHl = (a, b) => {
+  const B = new Set(String(b).split(/\s+/));
+  return String(a)
+    .split(/(\s+)/)
+    .map(t => (!t.trim() || B.has(t) ? esc(t) : `<mark>${esc(t)}</mark>`))
+    .join('');
+}; /* คำที่ไม่มีในอีกชื่อ = ส่วนที่ต่าง */
 const vCmp = () => {
   if (!last || !last.res.some(r => (r.fold || []).some(b => CPN[b.media]))) return '';
   const c = last.cmp,
@@ -4624,7 +4639,7 @@ const vCmp = () => {
     const grp = ([g, lb, ds]) => {
       const I = R.iss.filter(x => x.g === g);
       return I.length
-        ? `<div class="cmpg g-${g}"><h4>${lb}<span>${I.length}</span></h4><p class="hint">${ds}</p><ol class="cmpl">${I.map(x => `<li><b>${esc(x.nm)}</b><span class="do">${esc(x.act)}</span>${x.now ? `<small>${esc(x.now).replace(/\n/g, '<br>')}</small>` : ''}</li>`).join('')}</ol></div>`
+        ? `<div class="cmpg g-${g}"><h4>${lb}<span>${I.length}</span></h4><p class="hint">${ds}</p><ol class="cmpl">${I.map(x => `<li><b>${esc(x.nm)}</b><span class="do">${esc(x.act)}</span>${x.pair ? `<small>${x.pair.map(([f, n], i) => 'ใน “' + esc(f) + '”: ' + cHl(n, x.pair[1 - i][1])).join('<br>')}</small>` : x.now ? `<small>${esc(x.now).replace(/\n/g, '<br>')}</small>` : ''}</li>`).join('')}</ol></div>`
         : '';
     };
     b = `${R.prev ? alertHTML('wr', `ยังไม่มีโฟลเดอร์รอบ ${esc(R.want)}`, `<p>ระบบตรวจโฟลเดอร์รอบล่าสุด “${esc(R.rdn)}” แทน รายการด้านล่างคือสิ่งที่ต้องแก้ตอนทำโฟลเดอร์รอบใหม่</p>`) : ''}
