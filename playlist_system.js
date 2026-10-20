@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.5 • 20 ต.ค. 2569
+ *  เวอร์ชัน 3.6 • 20 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -64,7 +64,9 @@
  *   3.4.1 แก้ส่วน 3: หมายเหตุ “ทุกจอยกเว้น <ชื่อย่อจอ>” ของ Signature Max / Show DC (noteSkip)
  *   เวอร์ชัน 3.5 แก้ส่วน 5, 6, 7 และ 8: Playlist LA PlanB (parseSig, laDate — ไม่ได้ส่งทุกวัน ใช้ฉบับล่าสุด) และชีต LA PLANB
  *   (kind10, screen10) • คำในช่องออกตามแบบที่ใบเช็คใช้ทั้งไฟล์ (OSW, OSH) • รหัสจอที่ขีดต่างกัน (DGT-174 = DGT174)
- *   • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม)
+ *   • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม
+ *   เวอร์ชัน 3.6 แก้ส่วน 5 และ 9: แถบวันที่ตามแบบของแต่ละใบ — แถบวันถัดไปท้ายตาราง (TRAIL) และวันที่ในแถบของจอที่ 2
+ *   เป็นตัวเลขหรือสูตร (BVAL) • ตัวเลือกรายไฟล์ “ต่อสัญญาวันที่ 16 แถวเดิมไม่ใส่ออก” (k16 ใน fcol))
  * ======================================================================
  */
 
@@ -809,6 +811,22 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     }
     if (B.some(b => vOf(b.lc, r) || /^ออก(วันที่)?\s*\d/.test(vOf(b.nc, r)))) last = r;
   }
+  const TRAIL =
+    !bars.length ||
+    bars[bars.length - 1][0] >=
+      last; /* แถบสุดท้ายของชีตไม่มีหนังข้างใต้ (ใส่แถบวันถัดไปรอไว้) หรือยังไม่มีแถบเลย → ใส่แถบรอแบบเดิม; แถบสุดท้ายมีหนังแล้ว → คนทำใบนี้ไม่ใส่แถบรอ */
+  let BV = 0,
+    BF = 0;
+  for (const [r] of bars)
+    for (const b of B.slice(1)) {
+      const x = wsv && wsv[b.nc + r];
+      if (!x) continue;
+      if (typeof x.f === 'string') BF++;
+      else if (typeof x.v === 'number') BV++;
+    }
+  const BVAL =
+    BV >
+    BF; /* วันที่ในแถบของจอที่ 2 เป็นต้นไป: ชีตพิมพ์เป็นตัวเลข → ใส่ตัวเลข ถ้าไม่ใช่ใช้สูตร =C25 แบบเดิม */
   const F = bars.length && bars[0][0] === hr ? bars[0][1] : null;
   let S = hr,
     hist = false,
@@ -1102,7 +1120,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         for (const e of c)
           if (e.g < +P2) {
             e.m = true;
-            if (!(e.ed && e.ed < +P2)) e.ed = +P2 - 864e5;
+            if (!o.k16 && !(e.ed && e.ed < +P2)) e.ed = +P2 - 864e5;
           }
         const t = c.find(e => e.g === +P2);
         if (t) {
@@ -1360,7 +1378,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     }
     B.forEach((b, i) => {
       sh.clear(b.lc, row);
-      if (i === 0) sh.setNum(b.nc, row, serial(d));
+      if (i === 0 || BVAL) sh.setNum(b.nc, row, serial(d));
       else sh.setF(b.nc, row, B[i - 1].nc + row, serial(d));
       if (b.hs[0] != null) sh.setS(b.nc, row, hsx(b.hs[0], b.nc, r2));
       if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1], b.lc, r2));
@@ -1397,10 +1415,11 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     }
     cur += 1 + n;
   }
-  hdr(
-    cur,
-    addD(new Date(Math.max(dates.length ? dates[dates.length - 1] : +P, dd)), 1),
-  ); /* แถบว่างท้ายตาราง = วันถัดจากวันที่เติม (เติมวันที่ 2 → แถบ 3) */ /* ปิดท้ายด้วยแถบวันถัดไปเสมอ ไว้ใส่หนังของวันพรุ่งนี้ */
+  if (TRAIL)
+    hdr(
+      cur,
+      addD(new Date(Math.max(dates.length ? dates[dates.length - 1] : +P, dd)), 1),
+    ); /* แถบว่างท้ายตาราง = วันถัดจากวันที่เติม (เติมวันที่ 2 → แถบ 3) */ /* ปิดท้ายด้วยแถบวันถัดไปเสมอ ไว้ใส่หนังของวันพรุ่งนี้ */
   if (o.off) {
     let row = cur + 2;
     for (const b of B) {
@@ -1417,6 +1436,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     E,
     two,
     contm: CONTM,
+    trail: TRAIL,
+    bval: BVAL,
     fdrop,
     keep: KB.map(b => b.scr.c).join(', '),
     renew,
@@ -1790,7 +1811,8 @@ async function fillWb(f, on, metro, o) {
               (L.renew
                 ? ' • ต่อสัญญา/ขึ้นใหม่วันที่ 16 ' +
                   L.renew +
-                  ' เรื่อง ลงใหม่ใต้แถบ 16 (แถวเดิมใส่ออกวันที่ 16)'
+                  ' เรื่อง ลงใหม่ใต้แถบ 16 ' +
+                  (o.k16 ? '(แถวเดิมไม่ใส่ออก ตามที่ตั้งไว้ของไฟล์นี้)' : '(แถวเดิมใส่ออกวันที่ 16)')
                 : '')
             : L.two
               ? 'รอบ 16–' +
@@ -1804,6 +1826,8 @@ async function fillWb(f, on, metro, o) {
             (L.today ? ' • หนังใหม่ของวันนี้ ' + L.today + ' เรื่อง ลงใต้แถบวันที่ ' + rd(L.W) : '') +
             (L.nost ? ' • ไม่เพิ่ม ' + L.nost + ' เรื่องที่ยังไม่มีในใบเช็คแต่สถานะไม่ใช่ “ขึ้นใหม่”' : '') +
             (L.dates ? ' • แยกวันเริ่ม ' + L.dates + ' กลุ่ม' : '') +
+            (L.trail ? '' : ' • ไม่ใส่แถบวันถัดไปท้ายตาราง (ตามแบบของชีตนี้)') +
+            (L.bval ? ' • วันที่ในแถบของจอที่ 2 เป็นต้นไปใส่เป็นตัวเลข (ตามแบบของชีตนี้)' : '') +
             (L.merged ? ' • ไฟล์เดิม/ต่อสัญญา ' + L.merged + ' แถว ใช้แถวเดิม ไม่ใส่ออกวันที่' : '') +
             (L.kept ? ' • เก็บหนังที่ลงไว้แล้วแต่ไม่มีใน Playlist วันนี้ ' + L.kept + ' แถว' : '') +
             (L.cleared ? ' • ขึ้นรอบใหม่ ล้างวันที่ถ่ายของรอบก่อน ' + L.cleared + ' ช่อง (ทุกจอ)' : '') +
@@ -2999,7 +3023,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.5 (20 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.6 (20 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -3151,11 +3175,11 @@ const fkey = n => 'ps_fcol:' + String(n).replace(/\.(xlsm|xlsx)$/i, '');
 const fcol = n => {
   try {
     const o = JSON.parse(store.get(fkey(n)) || '{}');
-    return { 1: o[1] || '', 2: o[2] || '' };
+    return { ...o, 1: o[1] || '', 2: o[2] || '' };
   } catch (_) {
     return { 1: '', 2: '' };
   }
-};
+}; /* k16 = ต่อสัญญาวันที่ 16 แถวเดิมไม่ใส่ออก */
 const effCol = (r, f) => (f && fcol(f.name)[r]) || OP['col' + r] || '';
 const shownCol = (r, f) => effCol(r, f) || (r === 2 ? 'FF4472C4' : 'FF002060');
 function vColPick(k) {
@@ -3780,7 +3804,7 @@ function vCk(f, r, i, rk) {
         '',
       )}${r.nf.length > 12 ? `<span class="need miss">และอีก ${r.nf.length - 12} จอ</span>` : ''}</div>${r.warn.length ? `<p class="nfline">ใช้รายการแทน (จะขึ้นใน “ควรตรวจ”): ${esc(r.warn.join(', '))}</p>` : ''}${r.skip.length ? `<p class="hint" style="margin-top:6px">ข้าม ${r.skip.length} จอตามตัวเลือก “สื่อ” (จะขึ้นใน “ควรตรวจ” ว่าไม่พบจอ)</p>` : ''}`;
   }
-  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}${r && !r.bad && !r.empty ? sel : ''}</div>`;
+  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}${r && !r.bad && !r.empty ? sel + (rk === 2 && OP.r2 !== 'new' ? `<label class="fcol"><input type="checkbox" data-f16="${esc(f.name)}" ${fcol(f.name).k16 ? 'checked' : ''}><span>หนังต่อสัญญาวันที่ 16: แถวเดิมไม่ใส่ “ออก 16” (ใส่ออกที่แถวใต้แถบ 16) — ระบบจำไว้สำหรับไฟล์นี้</span></label>` : '') : ''}</div>`;
 }
 function vFl() {
   const ms = ['ทั้งหมด', ...new Set(DB.filter(s => /^(40|80|CITY|Spare)/.test(s.m)).map(s => s.m))];
@@ -3966,7 +3990,7 @@ const vHelp =
 <li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
 <li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ / ทุกจอยกเว้น (Signature Max, Show DC — เทียบชื่อย่อจอ เช่น SO TWT สาทร AOT BIGY), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li>
 <li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
-<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
+<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>แถบวันที่ทำตามแบบของแต่ละใบ: ใบที่ใส่แถบวันถัดไปรอไว้ท้ายตาราง ระบบใส่ให้ ใบที่ไม่ใส่ ระบบก็ไม่ใส่ • วันที่ในแถบของจอที่ 2 เป็นต้นไปเป็นสูตร (=C25) หรือตัวเลขตามที่ใบนั้นใช้ • หนังต่อสัญญาวันที่ 16 ปกติแถวเดิมใส่ “ออก 16” ถ้าใบไหนไม่ใส่ ติ๊กตัวเลือกใต้ชื่อไฟล์ในขั้นที่ 3 (ระบบจำไว้ตามชื่อไฟล์)</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
@@ -5051,7 +5075,12 @@ const ACT = {
           };
         else
           try {
-            r = await fillWb(f, on, metro, { ...o, col1: effCol(1, f), col2: effCol(2, f) });
+            r = await fillWb(f, on, metro, {
+              ...o,
+              col1: effCol(1, f),
+              col2: effCol(2, f),
+              k16: !!fcol(f.name).k16,
+            });
           } catch (e) {
             r = {
               rep: [
@@ -5162,6 +5191,13 @@ document.addEventListener('change', e => {
     OP['col' + t.dataset.k] = 'FF' + t.value.slice(1).toUpperCase();
     store.set('ps_col' + t.dataset.k, OP['col' + t.dataset.k]);
     view();
+    return;
+  }
+  if (t.dataset.f16 != null) {
+    const m = fcol(t.dataset.f16);
+    m.k16 = t.checked ? 1 : 0;
+    store.set(fkey(t.dataset.f16), JSON.stringify(m));
+    softView();
     return;
   }
   if (t.dataset.fcol != null) {
