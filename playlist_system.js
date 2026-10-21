@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.12.1 • 21 ต.ค. 2569
+ *  เวอร์ชัน 3.12.2 • 21 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -1974,7 +1974,14 @@ async function chkRead(f) {
       for (const b of L) {
         const nm = vOf(b.lc, r);
         if (!nm || /^ออก(วันที่)?\s*\d/.test(nm) || FASTN.test(nm)) continue;
-        b.items.push([nm, g, r]);
+        const ox = vOf(b.nc, r).match(/^ออก(?:วันที่)?\s*(\d{1,2})/);
+        let ed = 0;
+        if (ox) {
+          const G = new Date(g),
+            dd = +ox[1];
+          ed = Date.UTC(G.getUTCFullYear(), G.getUTCMonth() + (dd < G.getUTCDate() ? 1 : 0), dd);
+        }
+        b.items.push([nm, g, r, ed]);
         if (g > mx) mx = g;
       }
     }
@@ -1983,7 +1990,8 @@ async function chkRead(f) {
   return { sheets, mx };
 }
 /* ----- ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป (3.12) อ่านรูปอย่างเดียว เขียนเฉพาะช่องวันที่ถ่ายที่ยังว่างในใบเช็ค
-   แถวหนังใต้แถบวันที่ 1–15 → โฟลเดอร์รอบ 1-15, ใต้แถบ 16 ขึ้นไป → 16-30 / 16-31 • ชื่อโฟลเดอร์หนัง = ชื่อหนังในใบเช็ค (แบบที่ระบบสร้าง)
+   แถวหนังใต้แถบวันที่ 1–15 → โฟลเดอร์รอบ 1-15 (ไม่มีรูปที่ใช้ได้ ดู 16-30 / 16-31 ด้วย ยกเว้นหนังที่ต่อสัญญามีแถวใหม่ใต้แถบ 16), ใต้แถบ 16 ขึ้นไป → 16-30 / 16-31
+   วันที่ที่ใช้ได้ = เดือนเดียวกัน ไม่ก่อนวันที่หนังขึ้น และไม่หลังวันที่ออก (3.12.2) • ชื่อโฟลเดอร์หนัง = ชื่อหนังในใบเช็ค (แบบที่ระบบสร้าง)
    วันที่ถ่าย = วันที่ล่าสุดในรูป (EXIF — รูปที่ไม่มีวันที่ถ่ายในไฟล์ไม่เดา บอกไว้ให้ตรวจ) ที่อยู่ในรอบนั้น และไม่ก่อนวันที่หนังขึ้น • อ่านรูปไม่เกิน 6 รูปต่อโฟลเดอร์ ----- */
 async function exifDay(file) {
   try {
@@ -2197,25 +2205,46 @@ async function shotScan(root, files, prog) {
           );
           if (C.st == null) C.st = sheetSt();
         } /* สีช่องที่มีวันที่ถ่ายแล้วในคอลัมน์นี้ (ส่วนใหญ่) */
-        for (const [nm, g, r] of b.items) {
+        const ren = new Set(
+          b.items.filter(q => q[1] >= cut && q[1] < m1).map(q => String(q[0]).trim().toLowerCase()),
+        ); /* หนังที่มีแถวใต้แถบ 16 (ต่อสัญญา / ขึ้นใหม่) */
+        for (const [nm, g, r, ed] of b.items) {
           if (g < m0 || g >= m1) continue;
           const two = g >= cut,
-            r0 = two ? cut : m0,
-            r1 = two ? m1 : cut,
-            rn = two ? '16-' + ld : '1-15';
+            rn = two ? '16-' + ld : '1-15',
+            fk = fsafe(nm).toLowerCase(),
+            late = !two && !ren.has(String(nm).trim().toLowerCase());
           for (const C of cols) {
             R.cells++;
             const xv = x.ws[C.c + r],
               e = x.sh && x.sh.cell(C.c, r, false),
               hasF = !!(e && e.getElementsByTagNameNS(NS, 'f').length),
               val = xv && xv.v != null && String(xv.v).trim() !== '' ? xv.v : null;
-            const rd = await rdir(C.s, y, m, two),
-              fh = rd && rd.get(fsafe(nm).toLowerCase()),
-              P = fh
-                ? await pics(fh, C.s.path.join('/') + '|' + rn + '|' + fsafe(nm).toLowerCase())
-                : { n: 0, days: [], fdays: [] };
-            const ok = P.days.filter(d => d >= r0 && d < r1 && d >= g),
+            if (hasF) continue;
+            const look = async t => {
+              const rd = await rdir(C.s, y, m, t),
+                fh = rd && rd.get(fk);
+              return {
+                rd,
+                fh,
+                P: fh
+                  ? await pics(fh, C.s.path.join('/') + '|' + t + '|' + fk)
+                  : { n: 0, days: [], fdays: [] },
+              };
+            };
+            const okD = P => P.days.filter(d => d >= g && d < m1 && (!ed || d <= ed));
+            const A = await look(two);
+            let B = null;
+            if (late && !okD(A.P).length)
+              B = await look(true); /* หนังรอบ 1–15 ที่ถ่ายตอนรอบ 16 → รูปอยู่โฟลเดอร์ 16-30 / 16-31 */
+            const okA = okD(A.P),
+              okB = B ? okD(B.P) : [],
+              src = okA.length ? '' : okB.length ? '16-' + ld : '',
+              ok = okA.length ? okA : okB,
               day = ok.length ? new Date(Math.max(...ok)).getUTCDate() : 0;
+            const n = A.P.n + (B ? B.P.n : 0),
+              days = [...A.P.days, ...(B ? B.P.days : [])],
+              fdays = [...A.P.fdays, ...(B ? B.P.fdays : [])];
             const row = {
               f: f.name,
               sn: x.sn,
@@ -2226,32 +2255,38 @@ async function shotScan(root, files, prog) {
               rnd: rn,
               v: val,
               day,
-              n: P.n,
-              fd: P.fdays.length,
-              nofold: !fh,
-              nornd: !rd,
+              n,
+              fd: fdays.length,
+              nofold: !A.fh && !(B && B.fh),
+              nornd: !A.rd && !(B && B.rd),
               st: C.st,
+              src,
             };
-            if (val != null || hasF) {
-              if (hasF) continue;
-              if (!P.n) R.has.push(row);
+            if (val != null) {
+              if (!n) R.has.push(row);
               else if (day && /^\d{1,2}$/.test(String(val).trim()) && +val !== day) R.diff.push(row);
-            } else if (!P.n) R.none.push(row);
+            } else if (!n) R.none.push(row);
             else if (day) {
               R.fill.push(row);
               R.n++;
             } else {
-              const inR = P.days.filter(d => d >= r0 && d < r1);
-              row.why = !P.days.length
+              const inM = days.filter(d => d >= m0 && d < m1);
+              row.why = !days.length
                 ? 'ไม่มีวันที่ถ่ายในไฟล์รูป' +
-                  (P.fdays.length ? ' (วันที่ของไฟล์ ' + thdS(new Date(Math.max(...P.fdays))) + ')' : '')
-                : inR.length
-                  ? 'รูปถ่ายก่อนวันที่หนังขึ้น (' +
-                    new Date(Math.max(...inR)).getUTCDate() +
-                    ' ' +
-                    TH[m] +
-                    ')'
-                  : 'วันที่ในรูปไม่อยู่ในรอบ ' + rn + ' (' + thdS(new Date(Math.max(...P.days))) + ')';
+                  (fdays.length ? ' (วันที่ของไฟล์ ' + thdS(new Date(Math.max(...fdays))) + ')' : '')
+                : !inM.length
+                  ? 'วันที่ในรูปไม่อยู่ในเดือนนี้ (' + thdS(new Date(Math.max(...days))) + ')'
+                  : inM.some(d => d < g) && !inM.some(d => d >= g)
+                    ? 'รูปถ่ายก่อนวันที่หนังขึ้น (' +
+                      new Date(Math.max(...inM)).getUTCDate() +
+                      ' ' +
+                      TH[m] +
+                      ')'
+                    : 'รูปถ่ายหลังวันที่หนังออก (' +
+                      new Date(Math.max(...inM)).getUTCDate() +
+                      ' ' +
+                      TH[m] +
+                      ')';
               R.bad.push(row);
             }
           }
@@ -2355,7 +2390,16 @@ const shotTxt = R => {
       for (const x of A) L.push(`  ${x.f} | ${x.sn} | ${x.scr} | ${x.nm} | ${fx(x)}`);
       L.push('');
     };
-  ln('ใส่วันที่ถ่ายแล้ว', R.fill, x => 'รอบ ' + x.rnd + ' = ' + x.day + (x.man ? ' (เลือกวันที่เอง)' : ''));
+  ln(
+    'ใส่วันที่ถ่ายแล้ว',
+    R.fill,
+    x =>
+      'รอบ ' +
+      x.rnd +
+      ' = ' +
+      x.day +
+      (x.man ? ' (เลือกวันที่เอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''),
+  );
   ln(
     'มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์',
     R.has,
@@ -4295,7 +4339,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.12.1 (21 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.12.2 (21 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -5455,7 +5499,7 @@ const vShot = () => {
       : '';
     b = `${D ? (D.bad ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`) : alertHTML('ok', `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง ใน ${D.files.length} ไฟล์`, `<p>ใบเช็คในรายการด้านบนเป็นฉบับที่ใส่แล้ว (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้) ${D.saved && D.sv ? `<b>บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว</b> (ทับ ${D.sv.ok - D.sv.neu} ไฟล์${D.sv.neu ? ` • ไฟล์ใหม่ ${D.sv.neu} ไฟล์ เพราะโฟลเดอร์นี้ไม่มีไฟล์ชื่อเดียวกัน` : ''}) — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย/${esc(D.sv.day)}` : 'ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็คด้านล่าง'}</p>`)) : ''}
  <p class="hint">โฟลเดอร์ “${esc(R.dir)}” • ตรวจ ${R.cells.toLocaleString()} ช่อง${R.read.length ? ` • เปิดไม่ได้: ${esc(R.read.join(', '))}` : ''}</p>
- ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man ? ' (เลือกเอง)' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}
+ ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man ? ' (เลือกเอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}
  <div class="shg">${grp('มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์', R.has, 'อาจลืมคัดลอกรูป หรือชื่อโฟลเดอร์ไม่ตรงกับชื่อหนัง', x => x.nm + ' (' + x.v + ')')}
  ${grp('เลขในใบเช็คไม่ตรงกับวันที่ในรูป', R.diff, 'ระบบไม่ได้แก้ ตรวจว่าเลขไหนถูก', x => x.nm + ': ใบเช็ค ' + x.v + ' / รูป ' + x.day)}
  ${badH}
