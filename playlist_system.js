@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.13 • 21 ต.ค. 2569
+ *  เวอร์ชัน 3.14 • 21 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -4248,6 +4248,7 @@ async function addFiles(kind, files) {
   for (const f of files) arr.push({ name: f.name, buf: await f.arrayBuffer() });
   if (kind === 'ck') {
     C.push(...arr);
+    MQN = 'catch';
     note = `เพิ่มใบเช็ครูป ${arr.length} ไฟล์`;
     return view();
   }
@@ -4335,6 +4336,7 @@ async function addFiles(kind, files) {
     const live = new Set(DB.map(s => s.pf));
     PLI = PLI.filter(x => live.has(x.f));
   }
+  MQN = skip.length || emp.length ? 'warn' : 'done';
   note =
     `นำเข้า ${new Set(got.flatMap(x => x.p.map(s => s.m + '|' + s.c))).size} จอ` +
     (skip.length ? ` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก` : '') +
@@ -4346,7 +4348,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.13 (21 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.14 (21 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -4398,14 +4400,7 @@ const setTheme = t => {
   THEME = t;
   document.documentElement.dataset.theme = t;
 };
-try {
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (!store.get('ps_theme')) {
-      setTheme(e.matches ? 'dark' : 'light');
-      view();
-    }
-  });
-} catch (_) {}
+/* 3.14: ค่าเริ่มต้น = โหมดมืดโทนน้ำเงินกรม (ไม่ตามธีมของเครื่อง) เลือกเองแล้วระบบจำไว้ใน ps_theme */
 
 OP.col1 = store.get('ps_col1') || '';
 OP.col2 = store.get('ps_col2') || '';
@@ -4881,7 +4876,7 @@ const vSteps = () => {
 };
 const vNav = () => {
   const tl = THEME === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด';
-  return `<button class="btn ghost" data-a="how" aria-label="ระบบทำงานอย่างไร" title="ระบบทำงานอย่างไร">${IC.how}<span class="lbl">ระบบทำงานอย่างไร</span></button><button class="btn ghost" data-a="tour" aria-label="แนะนำการใช้" title="แนะนำการใช้หน้านี้">${IC.tour}<span class="lbl">แนะนำการใช้</span></button><button class="btn ghost" data-a="help" aria-haspopup="dialog" aria-label="วิธีใช้" title="วิธีใช้">${IC.book}<span class="lbl">วิธีใช้</span></button><button class="btn secondary tg" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button>`;
+  return `<button class="btn ghost" data-a="how" aria-label="ระบบทำงานอย่างไร" title="ระบบทำงานอย่างไร">${IC.how}<span class="lbl">ระบบทำงานอย่างไร</span></button><button class="btn ghost" data-a="tour" aria-label="แนะนำการใช้" title="แนะนำการใช้หน้านี้">${IC.tour}<span class="lbl">แนะนำการใช้</span></button><button class="btn ghost" data-a="help" aria-haspopup="dialog" aria-label="วิธีใช้" title="วิธีใช้">${IC.book}<span class="lbl">วิธีใช้</span></button><button class="btn ghost tg${mqOn() ? '' : ' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${mqOn() ? 'ปิดผู้ช่วยน้องเช็ค' : 'เปิดผู้ช่วยน้องเช็ค'}" title="${mqOn() ? 'ปิดผู้ช่วยน้องเช็ค' : 'เปิดผู้ช่วยน้องเช็ค'}">${IC.bot}</button><button class="btn secondary tg" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button>`;
 };
 const shead = (t, p, extra = '') =>
   `<div class="shead"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ''}</div>${extra}</div>`;
@@ -4901,7 +4896,7 @@ function openPicker(k) {
   p.click();
 }
 const drop = (k, t, s, acc, tour, sm) =>
-  `<div class="drop${sm ? ' sm' : ''}" data-dz="${k}" data-a="pick" data-k="${k}" data-tour="${tour}" tabindex="0" role="button" aria-label="${esc(t)} (กด Enter เพื่อเลือกไฟล์)"><span class="dic">${k === 'ck' ? IC.sheet : IC.up}</span><span class="dt"><b>${t}</b><span class="ds">${s}</span></span></div>`;
+  `<div class="drop${sm ? ' sm' : ''}" data-dz="${k}" data-a="pick" data-k="${k}" data-tour="${tour}" tabindex="0" role="button" aria-label="${esc(t)} (กด Enter เพื่อเลือกไฟล์)"><span class="dic">${k === 'ck' ? IC.sheet : IC.up}</span><span class="dt"><b>${t}</b><span class="ds">${s}</span></span>${!sm && mqOn() ? `<span class="dmq" aria-hidden="true"><span class="mq mq-i">${mqSVG('idle')}</span><span class="mq mq-c">${mqSVG('catch')}</span></span>` : ''}</div>`;
 const alertHTML = (k, t, body) =>
   `<div class="alert ${k}" role="${k === 'er' ? 'alert' : 'status'}">${k === 'ok' ? IC.okc : k === 'info' ? IC.info : IC.warn}<b>${t}</b><div>${body}</div></div>`;
 const rndHTML = wd => {
@@ -4911,7 +4906,7 @@ const rndHTML = wd => {
 };
 const vBusy = () =>
   BUSY
-    ? `<div class="busy" role="status" aria-live="polite"><div class="bbox"><b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small><small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small></div></div>`
+    ? `<div class="busy" role="status" aria-live="polite"><div class="bbox${mqOn() ? ' mqb' : ''}">${mqOn() ? `<span class="mq" aria-hidden="true">${mqSVG('scan')}</span>` : ''}<div class="bin">${vBusyIn()}</div></div></div>`
     : '';
 function busyDone() {
   if (BUSY && !FILLING) {
@@ -4921,8 +4916,7 @@ function busyDone() {
 }
 async function busyStep(t, i, n, f) {
   BUSY = { t, i, n, f };
-  const b = $('#busy');
-  if (b) b.innerHTML = vBusy();
+  busyPaint();
   $('.wrap').inert = true;
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 }
@@ -5685,6 +5679,7 @@ async function tcAdd(files) {
   tcMark('own');
   SHOT = null;
   await tcRead();
+  MQN = PICX && PICX.res.length ? 'catch' : 'warn';
   view();
 }
 const rndOf = W => {
@@ -5731,11 +5726,159 @@ function vTools() {
  }
  <div class="tsb">${FSA ? `<button class="btn secondary" data-a="tcdir">${IC.folder}เปิดใบเช็คทั้งโฟลเดอร์${CKDIR ? ` (ล่าสุด: ${esc(CKDIR.name)})` : ''}</button>` : ''}${n ? `<button class="btn quiet" data-a="pick" data-k="tc">${IC.up}เพิ่มไฟล์</button>` : ''}${qb}${n ? '<button class="linkb" data-a="tcclear">ล้างรายการ</button>' : ''}</div></section>`;
   const tools = n
-    ? vPicCk() + vShot() + vCmp()
+    ? vTCards() +
+      `<div id="tdetail">${TOOLV === 'shot' ? vShot() : TOOLV === 'cmp' ? vCmp() : vPicCk()}</div>`
     : `<h3 class="sec-t" style="margin-top:22px">เครื่องมือในหน้านี้<small>ใช้ได้เมื่อเลือกใบเช็คแล้ว</small></h3><div class="tlist"><div><b>${IC.folder}สร้างโฟลเดอร์แยกรูป</b><p class="hint">สร้างโฟลเดอร์หนังที่ยังไม่มี ตามรายชื่อในใบเช็ค เลือกรอบและวันที่ได้</p></div><div><b>${IC.folder}ใส่วันที่ถ่าย</b><p class="hint">อ่านวันที่ถ่ายจากไฟล์รูป ใส่ลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ</p></div><div><b>${IC.folder}ตรวจโฟลเดอร์เทียบจอ</b><p class="hint">เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ Plan B TV BKK ว่าอยู่ถูกแพคไหม อ่านอย่างเดียว</p></div></div>`;
   return `${shead('งานโฟลเดอร์และรูป', 'สร้างโฟลเดอร์แยกรูป • ใส่วันที่ถ่าย • ตรวจโฟลเดอร์เทียบจอ — ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
  ${FSA ? '' : alertHTML('wr', 'ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์', '<p>เครื่องมือในหน้านี้ต้องเปิดโฟลเดอร์ในเครื่อง ซึ่งเบราว์เซอร์นี้ทำไม่ได้</p>')}${box}${tools}
  <p class="hint tsafe">ไม่ลบ ไม่ย้ายรูปหรือโฟลเดอร์ที่มีอยู่ • บันทึกทับใบเช็คเมื่อไหร่ เก็บไฟล์เดิมไว้ในโฟลเดอร์สำรองเสมอ • กลับไปเติมใบเช็ค กด “เติมใบเช็ครูป” ด้านบน งานที่ค้างไว้ไม่หาย</p>`;
+}
+/* ===== น้องเช็ค (3.14): ผู้ช่วยตัวการ์ตูน (ออกแบบใหม่สำหรับระบบนี้) — โผล่มุมขวาล่างตอนรับไฟล์ ตอนเสร็จ และตอนมีเรื่องต้องดู แล้วหายเอง
+   อยู่ในกล่องรอระหว่างทำงาน และในกล่องลากไฟล์ตอนยังว่าง • ปิด / เปิดได้ที่ปุ่มหน้ายิ้มมุมขวาบน (ps_mascot) • เครื่องที่ตั้งค่าลดการเคลื่อนไหว ตัวการ์ตูนไม่ขยับ ===== */
+const mqOn = () => store.get('ps_mascot') !== 'off';
+let MQN = null,
+  MQT = 0; /* MQN = ท่าของน้องเช็คสำหรับข้อความ (note) ถัดไป: catch / scan / done / warn / idle */
+const MQA = d =>
+  `<path d="${d}" stroke="#C9D3F2" stroke-width="13" stroke-linecap="round"/><path d="${d}" stroke="#F4F7FF" stroke-width="10" stroke-linecap="round"/>`;
+const MQ0 = `<path d="M48 88 C44 50 70 28 100 28 C130 28 156 50 152 88 L155 124 C148 132 137 128 133 119 L67 119 C63 128 52 132 45 124 Z" fill="#1C2A6E" stroke="#7189E6" stroke-width="2"/><rect x="85" y="178" width="12" height="22" rx="6" fill="#26357A"/><rect x="103" y="178" width="12" height="22" rx="6" fill="#26357A"/><ellipse cx="90" cy="202" rx="9.5" ry="5" fill="#FF8A3D"/><ellipse cx="110" cy="202" rx="9.5" ry="5" fill="#FF8A3D"/>`;
+const MQL = MQA('M76 138 L67 166') + `<circle cx="66" cy="169" r="5.5" fill="#FFE1CF"/>`;
+const MQ1 = `<path d="M70 142 Q70 128 83 126 L117 126 Q130 128 130 142 L133 184 Q100 193 67 184 Z" fill="#F4F7FF" stroke="#C9D3F2" stroke-width="1.5"/><path d="M83 126 Q100 141 117 126" stroke="#1C2A6E" stroke-width="3" stroke-linecap="round"/><circle cx="100" cy="161" r="9" fill="#FF8A3D"/><path d="M95.5 161 L99 164.5 L105 157.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="94" y="116" width="12" height="12" rx="4" fill="#F7D3C0"/><ellipse cx="100" cy="84" rx="46" ry="42" fill="#FFE7D9"/><path d="M55 82 L50 114 Q56 119 61 110 L62 86 Z" fill="#1C2A6E" stroke="#7189E6" stroke-width="1.2"/><path d="M145 82 L150 114 Q144 119 139 110 L138 86 Z" fill="#1C2A6E" stroke="#7189E6" stroke-width="1.2"/><path d="M54 86 C51 56 72 38 100 38 C128 38 149 56 146 86 C141 74 133 66 125 63 C123 69 117 73 108 74 C110 68 108 63 104 60 C98 68 88 72 76 74 C80 69 80 65 78 62 C68 66 60 74 54 86 Z" fill="#1C2A6E" stroke="#7189E6" stroke-width="1.5"/><path d="M68 52 Q82 42 98 44" stroke="#4B66C9" stroke-width="3" stroke-linecap="round" opacity="0.85"/><path d="M49 80 C49 30 151 30 151 80" stroke="#9FB2FF" stroke-width="5" stroke-linecap="round"/><rect x="41" y="72" width="15" height="24" rx="7.5" fill="#FF8A3D"/><rect x="144" y="72" width="15" height="24" rx="7.5" fill="#FF8A3D"/><circle cx="48.5" cy="84" r="3" fill="#FFF3E8"/><circle cx="151.5" cy="84" r="3" fill="#FFF3E8"/><path d="M47 95 Q50 112 72 110" stroke="#9FB2FF" stroke-width="2.6" stroke-linecap="round"/><circle cx="74" cy="110" r="3.2" fill="#FF8A3D"/><path d="M120 55 L125.5 60.5 L136 49" stroke="#FF8A3D" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+const MQEO = `<g class="mq-blink"><ellipse cx="82" cy="91" rx="8.5" ry="11" fill="url(#mqEye)"/><ellipse cx="118" cy="91" rx="8.5" ry="11" fill="url(#mqEye)"/><circle cx="85" cy="86" r="3.2" fill="#FFFFFF"/><circle cx="121" cy="86" r="3.2" fill="#FFFFFF"/><circle cx="79.5" cy="96" r="1.6" fill="#FFFFFF"/><circle cx="115.5" cy="96" r="1.6" fill="#FFFFFF"/></g><path d="M72 84 Q82 78 92 83" stroke="#18215A" stroke-width="2.6" stroke-linecap="round"/><path d="M108 83 Q118 78 128 84" stroke="#18215A" stroke-width="2.6" stroke-linecap="round"/>`;
+const MQEH = `<path d="M73 93 Q82 83 91 93" stroke="#18215A" stroke-width="3" stroke-linecap="round"/><path d="M109 93 Q118 83 127 93" stroke="#18215A" stroke-width="3" stroke-linecap="round"/>`;
+const MQBR = {
+  scan: `<path d="M75 74 L88 75.5" stroke="#1C2A6E" stroke-width="2.4" stroke-linecap="round"/><path d="M112 75.5 L125 74" stroke="#1C2A6E" stroke-width="2.4" stroke-linecap="round"/>`,
+  warn: `<path d="M73 77 L88 72" stroke="#1C2A6E" stroke-width="2.4" stroke-linecap="round"/><path d="M112 72 L127 77" stroke="#1C2A6E" stroke-width="2.4" stroke-linecap="round"/>`,
+};
+const MQBL = `<ellipse cx="71" cy="104" rx="7" ry="4" fill="#FF9FB0" opacity="0.6"/><ellipse cx="129" cy="104" rx="7" ry="4" fill="#FF9FB0" opacity="0.6"/>`;
+const MQX = {
+  idle: `<path d="M94 106 Q100 112 106 106" stroke="#8A3B2E" stroke-width="2.3" stroke-linecap="round"/><g class="mq-wave">${MQA('M124 138 L150 116')}<circle cx="153" cy="113" r="6" fill="#FFE1CF"/></g>`,
+  catch: `<ellipse cx="100" cy="108" rx="4.5" ry="5.5" fill="#8A3B2E"/><path d="M92 4 L92 18 M100 0 L100 16 M108 4 L108 18" stroke="#FF8A3D" stroke-width="2.5" stroke-linecap="round" opacity="0.75"/><g class="mq-drop"><rect x="83" y="138" width="34" height="40" rx="5" fill="#1F8A57"/><path d="M106 138 L117 149 L106 149 Z" fill="#7FD3A6"/><path d="M90 153 H103 M90 160 H110 M90 167 H110" stroke="#E9FFF3" stroke-width="2.4" stroke-linecap="round"/></g>${MQA('M76 138 L86 168')}${MQA('M124 138 L114 168')}<circle cx="87" cy="171" r="5.5" fill="#FFE1CF"/><circle cx="113" cy="171" r="5.5" fill="#FFE1CF"/>`,
+  scan: `<path d="M96 108 Q100 110 104 108" stroke="#8A3B2E" stroke-width="2.3" stroke-linecap="round"/><g class="mq-scan">${MQA('M124 138 L143 132')}<path d="M147 128 L153 121" stroke="#9FB2FF" stroke-width="4.5" stroke-linecap="round"/><circle cx="145" cy="131" r="5.5" fill="#FFE1CF"/><circle cx="161" cy="112" r="13" fill="#7AA2FF" fill-opacity="0.22" stroke="#9FB2FF" stroke-width="4"/><path d="M155 107 Q159 103 164 104" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity="0.85"/></g><g class="mq-tw"><path d="M178 88 L180 93 L185 95 L180 97 L178 102 L176 97 L171 95 L176 93 Z" fill="#FFC857"/></g><g class="mq-tw" style="animation-delay:.6s"><path d="M26 58 L27.5 62 L31.5 63.5 L27.5 65 L26 69 L24.5 65 L20.5 63.5 L24.5 62 Z" fill="#9FB2FF"/></g>`,
+  done: `<path d="M91 104 Q100 117 109 104 Z" fill="#8A3B2E"/><path d="M95 110 Q100 114 105 110 Z" fill="#FF8C8C"/>${MQA('M76 138 L50 118')}${MQA('M124 138 L150 118')}<circle cx="47" cy="115" r="6" fill="#FFE1CF"/><circle cx="153" cy="115" r="6" fill="#FFE1CF"/><rect class="mq-tw" x="30" y="30" width="7" height="7" rx="1.5" fill="#FF8A3D"/><rect class="mq-tw" x="166" y="40" width="6" height="6" rx="1.5" fill="#7AA2FF" style="animation-delay:.4s"/><circle class="mq-tw" cx="22" cy="80" r="3.5" fill="#FFC857" style="animation-delay:.8s"/><circle class="mq-tw" cx="180" cy="74" r="3.5" fill="#3DDC97" style="animation-delay:.2s"/><rect class="mq-tw" x="150" y="14" width="6" height="6" rx="1.5" fill="#FFC857" style="animation-delay:1s"/><circle class="mq-tw" cx="46" cy="12" r="3" fill="#7AA2FF" style="animation-delay:.6s"/>`,
+  warn: `<path d="M93 109 Q96.5 105.5 100 109 Q103.5 112.5 107 109" stroke="#8A3B2E" stroke-width="2.3" stroke-linecap="round"/>${MQA('M124 138 L141 147')}<path d="M151 142 L144 148" stroke="#8A5A00" stroke-width="3" stroke-linecap="round"/><rect x="136" y="112" width="30" height="30" rx="8" fill="#FFC857" stroke="#8A5A00" stroke-width="1.5"/><rect x="149.4" y="118" width="3.2" height="12" rx="1.6" fill="#3A2A00"/><circle cx="151" cy="135" r="2" fill="#3A2A00"/><circle cx="143" cy="149" r="5.5" fill="#FFE1CF"/><g class="mq-sweat"><path d="M160 50 Q154 59 160 63 Q166 59 160 50 Z" fill="#9FD0FF"/></g>`,
+};
+function mqSVG(p) {
+  if (!MQX[p]) p = 'idle';
+  return `<svg viewBox="0 0 200 220" aria-hidden="true" focusable="false"><defs><linearGradient id="mqEye" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151D55"/><stop offset="0.55" stop-color="#3A3F9E"/><stop offset="1" stop-color="#FF9447"/></linearGradient><radialGradient id="mqGlow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#FF8A3D" stop-opacity="0.5"/><stop offset="1" stop-color="#FF8A3D" stop-opacity="0"/></radialGradient></defs><ellipse cx="100" cy="208" rx="50" ry="9" fill="url(#mqGlow)"/><g class="mq-float">${MQ0}${p === 'idle' || p === 'scan' || p === 'warn' ? MQL : ''}${MQ1}${p === 'done' ? MQEH : MQEO}${MQBR[p] || ''}${MQBL}${MQX[p]}</g></svg>`;
+}
+function mqShow(pose, text) {
+  const d = $('#mq');
+  if (!d) return;
+  clearTimeout(MQT);
+  const m = $('#msg');
+  if (m) m.classList.remove('show');
+  d.innerHTML = `<div class="mqdock" role="status" aria-live="polite"><div class="mqt"><p>${esc(text)}</p><button type="button" class="mqx" data-a="mqx" aria-label="ปิดข้อความของน้องเช็ค">ปิด</button></div><span class="mq" aria-hidden="true">${mqSVG(pose)}</span></div>`;
+  MQT = setTimeout(
+    () => {
+      d.innerHTML = '';
+    },
+    pose === 'catch' || pose === 'idle' ? 4000 : 8000,
+  );
+}
+IC.bot =
+  '<svg viewBox="0 0 24 24"><rect x="4.5" y="8" width="15" height="11" rx="4.5"/><path d="M12 8V5.5M9.5 13h.01M14.5 13h.01M10 16c1.2.8 2.8.8 4 0"/><circle cx="12" cy="4.5" r="1"/></svg>';
+IC.cam = '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="4"/></svg>';
+IC.cmpi = '<svg viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7zM7 9h1M16 9h1"/></svg>';
+const vBusyIn = () =>
+  `<b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small><small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>`;
+/* วาดกล่องรอ: ถ้ามีกล่องอยู่แล้วเปลี่ยนเฉพาะข้อความ น้องเช็คจะได้ขยับต่อเนื่อง ไม่เริ่มใหม่ทุกไฟล์ */
+function busyPaint() {
+  const b = $('#busy');
+  if (!b) return;
+  if (!BUSY) {
+    if (b.innerHTML) b.innerHTML = '';
+    return;
+  }
+  const bi = b.querySelector('.bin');
+  if (bi && !!b.querySelector('.bbox .mq') === mqOn()) bi.innerHTML = vBusyIn();
+  else b.innerHTML = vBusy();
+}
+
+/* ===== การ์ดเครื่องมือ (3.14): สรุปสถานะ 3 เครื่องมือ เปิดทีละอย่าง (TOOLV) ===== */
+let TOOLV = 'pic';
+function vTCards() {
+  if (PICX && PICX.sig !== ckSig()) PICX = null;
+  if (SHOT && SHOT.sig !== ckSig()) SHOT = null;
+  const L = PICX,
+    p = L && L.pic,
+    P = p && p.P,
+    R = SHOT && SHOT.R,
+    D = SHOT && SHOT.done,
+    NF = shotFill().length,
+    CR = L && L.cmp && L.cmp.R,
+    hasCP = !!L && L.res.some(r => (r.fold || []).some(b => CPN[b.media])),
+    nIss = R ? R.has.length + R.diff.length + R.bad.length : 0;
+  const pic =
+    !L || !L.res.length
+      ? ['mu', '—', '', 'อ่านรายชื่อหนังจากใบเช็คไม่ได้']
+      : !P
+        ? ['mu', '—', '', 'ยังไม่ได้ตรวจโฟลเดอร์แยกรูป']
+        : P.n
+          ? [
+              'wr',
+              P.n.toLocaleString(),
+              'โฟลเดอร์ที่จะสร้าง',
+              `โฟลเดอร์ “${esc(P.dir)}” • พบโฟลเดอร์จอ ${P.scr != null ? P.scr : P.plan.length} จอ`,
+            ]
+          : [
+              'ok',
+              p.made ? p.made.n.toLocaleString() : '0',
+              p.made ? 'โฟลเดอร์ที่สร้างแล้ว' : 'โฟลเดอร์ที่ต้องสร้าง',
+              `ครบแล้ว • โฟลเดอร์ “${esc(P.dir)}”`,
+            ];
+  const shot = !R
+    ? ['mu', '—', '', 'ยังไม่ได้ตรวจวันที่ถ่าย']
+    : D
+      ? [
+          D.saved ? 'ok' : 'wr',
+          D.n.toLocaleString(),
+          'ช่องที่ใส่แล้ว',
+          D.saved && D.sv
+            ? `บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว`
+            : 'ยังไม่ได้บันทึก — ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็ค',
+        ]
+      : [
+          NF ? 'wr' : 'ok',
+          NF.toLocaleString(),
+          'ช่องที่จะใส่',
+          nIss ? `ควรดูอีก ${nIss.toLocaleString()} ช่อง` : 'ไม่มีช่องที่ต้องดูเพิ่ม',
+        ];
+  const cmp = !hasCP
+    ? ['mu', '—', '', 'ไม่มีจอ Plan B TV ในใบเช็คชุดนี้']
+    : !CR
+      ? ['mu', '—', '', 'ยังไม่ได้ตรวจ']
+      : CR.err
+        ? ['er', '!', '', 'ไม่พบโฟลเดอร์รอบในโฟลเดอร์ที่เลือก']
+        : CR.n
+          ? ['er', CR.n.toLocaleString(), 'เรื่องที่ต้องแก้', `รอบ “${esc(CR.rdn)}”`]
+          : ['ok', '0', 'เรื่องที่ต้องแก้', `ถูกต้องทั้งหมด • รอบ “${esc(CR.rdn)}”`];
+  const C3 = [
+    [
+      'pic',
+      'สร้างโฟลเดอร์แยกรูป',
+      'สร้างโฟลเดอร์หนังที่ยังไม่มี ตามรายชื่อในใบเช็ค เลือกรอบและวันที่ได้',
+      IC.folder,
+      pic,
+    ],
+    [
+      'shot',
+      'ใส่วันที่ถ่าย',
+      'อ่านวันที่ถ่ายจากไฟล์รูป ใส่ลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ',
+      IC.cam,
+      shot,
+    ],
+    [
+      'cmp',
+      'ตรวจโฟลเดอร์เทียบจอ',
+      'เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ Plan B TV BKK ว่าอยู่ถูกแพคไหม อ่านอย่างเดียว',
+      IC.cmpi,
+      cmp,
+    ],
+  ];
+  return `<div class="tcards" data-tour="tcards">${C3.map(([k, t, d, ic, [st, big, unit, s]]) => {
+    const on = TOOLV === k;
+    return `<article class="tcard st-${st}${on ? ' sel' : ''}"><div class="tch"><span class="tci">${ic}</span><h3>${t}</h3></div><p class="tcd">${d}</p><div class="tcs"><span class="tcn"><b>${big}</b>${unit ? `<span>${unit}</span>` : ''}</span><small>${s}</small></div><button class="btn ${on ? 'primary' : 'secondary'}" data-a="toolv" data-k="${k}" aria-expanded="${on}" aria-controls="tdetail">${on ? 'เปิดอยู่ด้านล่าง' : 'เปิด'}</button></article>`;
+  }).join('')}</div>`;
 }
 function vRes() {
   if (!last) return vFl();
@@ -5802,7 +5945,8 @@ const vHelp =
 <li><b>ขั้นที่ 2 ตรวจ / แก้ไข (ไม่บังคับ)</b><span>ใช้เมื่อต้องปลด เพิ่ม หรือเปลี่ยนชื่อหนังก่อนเติม</span></li>
 <li><b>ขั้นที่ 3 เติมใบเช็ครูป</b><span>ลากใบเช็ครูปลงกล่อง ดูว่าแต่ละไฟล์ขึ้น “พร้อมเติม” วันที่ทำงานและรอบถูกต้อง แล้วกด “เติมใบเช็ครูป”</span></li>
 <li><b>ขั้นที่ 4 ผลการเติม</b><span>เปิดดูรายการ “ควรตรวจ” ของแต่ละไฟล์ แล้วกด “ดาวน์โหลดทั้งหมด (.zip)” ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันพรุ่งนี้</span></li></ol>
-<h3>งานโฟลเดอร์และรูป (หน้าแยก, Chrome / Edge)</h3><ul class="hr2"><li>กดปุ่ม “งานโฟลเดอร์และรูป” ด้านบน (กลับมาเติมใบเช็ค กด “เติมใบเช็ครูป” งานที่ค้างไว้ไม่หาย) • กล่อง “ใบเช็คที่ใช้” คือชุดที่ทุกเครื่องมือในหน้านี้อ่าน: ถ้าเพิ่งเติม ระบบใช้ใบที่เพิ่งเติมให้เลย ถ้ายังไม่เติม ใช้ใบในขั้นที่ 3 หรือกด “เปิดใบเช็คทั้งโฟลเดอร์” / ลากไฟล์มาวาง ไม่ต้องใส่ Playlist</li><li>สร้างโฟลเดอร์แยกรูป: เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • ตั้งแต่วันที่ 16 เลือกได้ว่าจะสร้างรอบนี้ / รอบ 1–15 (จอที่ยังไม่ได้สร้างรอบแรก) / ทั้ง 2 รอบ • ช่อง “หนังที่ขึ้นจอถึงวันที่” = ทุกเรื่องในรอบ (ค่าปกติ) หรือเลือกวันที่ เพื่อสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่) ไม่เกินวันนั้น • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>ใส่วันที่ถ่าย: ใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ และบอกเรื่องที่น่าจะลืมหรือใส่ผิด ดูรายการก่อนกดใส่ แล้วดาวน์โหลด หรือบันทึกทับในโฟลเดอร์ใบเช็ค (ไฟล์เดิมเก็บไว้ใน สำรองก่อนใส่วันที่ถ่าย) • ง่ายที่สุด: “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์ใบเช็คจริงก่อน ระบบบันทึกกลับโฟลเดอร์เดิม</li><li>ตรวจโฟลเดอร์เทียบจอ: กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ที่ใส่ไว้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>หน้าแบบเดิม (3.12.3) ยังเปิดได้ชั่วคราวจากลิงก์ “เปิดหน้าเดิม (3.12.3)” ท้ายหน้า (เปิดจากลิงก์ระบบ)</li></ul>
+<h3>หน้าตาและผู้ช่วย</h3><ul class="hr2"><li>โหมดมืดโทนน้ำเงินกรมเป็นค่าเริ่มต้น สลับเป็นโหมดสว่างได้ที่ปุ่มมุมขวาบน (ระบบจำไว้ในเครื่อง)</li><li>“น้องเช็ค” ผู้ช่วยตัวการ์ตูน โผล่มุมขวาล่างตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู แล้วหายไปเอง (กด “ปิด” ให้หายทันทีได้) และอยู่ในกล่องรอระหว่างทำงาน • ปิด / เปิดได้ที่ปุ่มหน้ายิ้มมุมขวาบน • เครื่องที่ตั้งค่าลดการเคลื่อนไหวไว้ ตัวการ์ตูนจะไม่ขยับ</li></ul>
+<h3>งานโฟลเดอร์และรูป (หน้าแยก, Chrome / Edge)</h3><ul class="hr2"><li>กดปุ่ม “งานโฟลเดอร์และรูป” ด้านบน (กลับมาเติมใบเช็ค กด “เติมใบเช็ครูป” งานที่ค้างไว้ไม่หาย) • กล่อง “ใบเช็คที่ใช้” คือชุดที่ทุกเครื่องมือในหน้านี้อ่าน: ถ้าเพิ่งเติม ระบบใช้ใบที่เพิ่งเติมให้เลย ถ้ายังไม่เติม ใช้ใบในขั้นที่ 3 หรือกด “เปิดใบเช็คทั้งโฟลเดอร์” / ลากไฟล์มาวาง ไม่ต้องใส่ Playlist • การ์ด 3 ใบบอกสถานะของแต่ละเครื่องมือ (เหลือง = รอทำ เขียว = เรียบร้อย แดง = ต้องแก้) กด “เปิด” เพื่อทำงานนั้นด้านล่าง</li><li>สร้างโฟลเดอร์แยกรูป: เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • ตั้งแต่วันที่ 16 เลือกได้ว่าจะสร้างรอบนี้ / รอบ 1–15 (จอที่ยังไม่ได้สร้างรอบแรก) / ทั้ง 2 รอบ • ช่อง “หนังที่ขึ้นจอถึงวันที่” = ทุกเรื่องในรอบ (ค่าปกติ) หรือเลือกวันที่ เพื่อสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่) ไม่เกินวันนั้น • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>ใส่วันที่ถ่าย: ใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ และบอกเรื่องที่น่าจะลืมหรือใส่ผิด ดูรายการก่อนกดใส่ แล้วดาวน์โหลด หรือบันทึกทับในโฟลเดอร์ใบเช็ค (ไฟล์เดิมเก็บไว้ใน สำรองก่อนใส่วันที่ถ่าย) • ง่ายที่สุด: “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์ใบเช็คจริงก่อน ระบบบันทึกกลับโฟลเดอร์เดิม</li><li>ตรวจโฟลเดอร์เทียบจอ: กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ที่ใส่ไว้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>หน้าแบบเดิม (3.12.3) ยังเปิดได้ชั่วคราวจากลิงก์ “เปิดหน้าเดิม (3.12.3)” ท้ายหน้า (เปิดจากลิงก์ระบบ)</li></ul>
 <h3>ระบบจัดให้อย่างไร</h3><ul class="hr2">
 <li>วันที่ 1 ลงหนังที่ออนอยู่ทั้งหมด หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z</li>
 <li>ด่านตรวจ Playlist: ระบบอ่านคอลัมน์ตามชื่อหัวตาราง ถ้าเจอสิ่งที่ไม่รู้จัก (หาคอลัมน์ไม่เจอ สถานะใหม่ วันที่อ่านไม่ได้ สื่อใหม่) จะเตือนในขั้นที่ 1 และถามยืนยันก่อนเติม หมายเหตุที่พูดถึงจอที่กำลังเติมแต่ระบบอ่านไม่ออกจะขึ้นใน “ควรตรวจ”</li>
@@ -5896,7 +6040,7 @@ const TOURS = {
     {
       t: 'hdr',
       h: 'ตัวช่วยมุมขวาบน',
-      p: '“ระบบทำงานอย่างไร” อธิบายภาพรวมสำหรับคนที่ยังไม่รู้จักระบบ “แนะนำการใช้” เปิดทัวร์ของหน้าที่อยู่ “วิธีใช้” มีขั้นตอนและกฎทั้งหมด ปุ่มสุดท้ายสลับโหมดสว่างและมืด',
+      p: '“ระบบทำงานอย่างไร” อธิบายภาพรวมสำหรับคนที่ยังไม่รู้จักระบบ “แนะนำการใช้” เปิดทัวร์ของหน้าที่อยู่ “วิธีใช้” มีขั้นตอนและกฎทั้งหมด ปุ่มหน้ายิ้มเปิด / ปิดผู้ช่วย “น้องเช็ค” ปุ่มสุดท้ายสลับโหมดสว่างและมืด',
     },
   ],
   pl: [
@@ -5981,6 +6125,11 @@ const TOURS = {
       t: 'drop-tc',
       h: 'หรือลากไฟล์มาวาง',
       p: 'ลากใบเช็คที่เติมแล้วมาวาง หรือคลิกเพื่อเลือกไฟล์ ไม่ต้องใส่ Playlist',
+    },
+    {
+      t: 'tcards',
+      h: 'การ์ดเครื่องมือ 3 อย่าง',
+      p: 'การ์ดบอกสถานะของแต่ละเครื่องมือ ตัวเลขใหญ่คือสิ่งที่ต้องทำ สีเหลือง = รอทำ สีเขียว = เรียบร้อย สีแดง = ต้องแก้ กด “เปิด” เพื่อทำงานนั้นด้านล่าง',
     },
     {
       t: 'tpic',
@@ -6137,7 +6286,7 @@ function view() {
       t2.scrollLeft = tbs[1];
     }
   }
-  $('#busy').innerHTML = vBusy();
+  busyPaint();
   const ok = WELCOME ? 'w' : PASTE ? 'v' : HOW ? 'h' : HELP ? 'p' : '',
     o = $('#ovl'),
     was = OVK;
@@ -6153,9 +6302,11 @@ function view() {
   }
   document.body.classList.toggle('lock', !!ok || !!BUSY);
   if (note) {
-    say(note);
+    if (MQN && mqOn() && !BUSY) mqShow(MQN, note);
+    else say(note);
     note = '';
   }
+  MQN = null;
   scanLater();
   if (pendTour) {
     const k = pendTour;
@@ -6423,6 +6574,7 @@ async function addChecks(ck, msg) {
     .filter(Boolean)
     .join(' ');
   if (msg || extra) {
+    MQN = 'catch';
     note = (msg || `เพิ่มใบเช็ครูป ${uniq.length} ไฟล์`) + (extra ? ` (${extra})` : '');
     view();
   }
@@ -6759,6 +6911,7 @@ const ACT = {
     view();
     const R = await cmpCheck(d, L.W, L.res);
     L.cmp = { d, R };
+    MQN = R.err || R.n ? 'warn' : 'done';
     note = R.err
       ? `ไม่พบโฟลเดอร์รอบในโฟลเดอร์ “${d.name}”`
       : R.n
@@ -6842,6 +6995,7 @@ const ACT = {
       if (typeof busyDone === 'function') busyDone();
     }
     SHOT = { sig: ckSig(), d, R, done: null };
+    MQN = R.cells && !(R.has.length + R.diff.length + R.bad.length) ? 'done' : 'warn';
     note = R.cells
       ? R.n
         ? `ตรวจแล้ว จะใส่วันที่ถ่าย ${R.n.toLocaleString()} ช่อง`
@@ -6893,6 +7047,7 @@ const ACT = {
     if (PICX)
       PICX.sig =
         ckSig(); /* วันที่ถ่ายไม่เปลี่ยนรายชื่อหนังในใบเช็ค → ใช้ผลที่อ่านไว้ต่อ (แผนสร้างโฟลเดอร์ / ผลตรวจเทียบจอยังอยู่) */
+    MQN = 'done';
     note = `ใส่วันที่ถ่ายแล้ว ${SHOT.done.n.toLocaleString()} ช่อง`;
   },
   shotdl: async () => {
@@ -6993,11 +7148,36 @@ const ACT = {
     }
     D.saved = true;
     D.sv = { dir: d.name, ok: D.files.length, neu, day };
+    MQN = 'done';
     note = `บันทึกลงโฟลเดอร์ “${d.name}” แล้ว ${D.files.length} ไฟล์`;
   },
   picck: async () => {
     if (!TC.length) return;
     await tcRead();
+  },
+  toolv: k => {
+    if (!['pic', 'shot', 'cmp'].includes(k)) return;
+    TOOLV = k;
+    setTimeout(() => {
+      const d = $('#tdetail');
+      if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  },
+  mqx: () => {
+    clearTimeout(MQT);
+    const d = $('#mq');
+    if (d) d.innerHTML = '';
+  },
+  mqtoggle: () => {
+    const on = !mqOn();
+    store.set('ps_mascot', on ? 'on' : 'off');
+    clearTimeout(MQT);
+    const d = $('#mq');
+    if (d) d.innerHTML = '';
+    if (on) {
+      MQN = 'idle';
+      note = 'สวัสดี! น้องเช็คจะโผล่มาบอกตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู';
+    } else note = 'ปิดผู้ช่วยแล้ว กดปุ่มหน้ายิ้มมุมขวาบนเพื่อเปิดอีกครั้ง';
   },
   tools: async k => {
     if (BUSY || FILLING) return;
@@ -7057,6 +7237,7 @@ const ACT = {
     tcMark('dir', d.name);
     SHOT = null;
     await tcRead();
+    MQN = PICX && PICX.res.length ? 'catch' : 'warn';
   },
   tcclear: () => {
     if (!tcOk()) return;
@@ -7086,6 +7267,7 @@ const ACT = {
     const r = await picMake(L.pic.P);
     L.pic.P = await picPlan(L.pic.d, L.W, L.res, PICR, picUp());
     L.pic.made = r;
+    MQN = r.bad.length ? 'warn' : 'done';
     note = r.bad.length
       ? `สร้างแล้ว ${r.n} โฟลเดอร์ สร้างไม่ได้ ${r.bad.length} โฟลเดอร์`
       : `สร้างแล้ว ${r.n} โฟลเดอร์`;
@@ -7152,6 +7334,7 @@ const ACT = {
     } catch (_) {}
     last.sv = { dir: d.name, ok, neu, bad, day };
     if (!bad.length) last.saved = true;
+    MQN = bad.length ? 'warn' : 'done';
     note = bad.length
       ? `บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`
       : `บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`;
@@ -7355,7 +7538,12 @@ const ACT = {
         W: o.W ? +o.W : Date.now(),
         txt: L.join('\n'),
       };
-      note = 'เติมเสร็จแล้ว';
+      {
+        const _w = res.reduce((t, r) => t + r.rep.filter(isWarn).length, 0),
+          _f = res.filter(r => r.blob).length;
+        MQN = _w ? 'warn' : 'done';
+        note = `เติมเสร็จแล้ว ${_f} ไฟล์` + (_w ? ` • ควรตรวจ ${_w} รายการ` : '');
+      }
       tab = 'res';
       cs = null;
       RO.clear();
