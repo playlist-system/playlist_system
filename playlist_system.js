@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.9.1 • 21 ต.ค. 2569
+ *  เวอร์ชัน 3.9.2 • 21 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -1990,12 +1990,12 @@ async function cmpCheck(root, W, res) {
   const iss = [],
     inv = new Set(),
     rows = new Map(PK.map(p => [p.n, { n: p.n, k: p.k, nf: p.S.length, nk: 0, ok: 0, bad: 0 }])),
-    add = (g, p, nm, act, now, id, pair) => {
-      iss.push({ g, p, nm: dn(nm), act, now: now || '', pair });
+    add = (g, p, nm, act, now, id, pair, oth) => {
+      iss.push({ g, p, nm: dn(nm), act, now: now || '', pair, oth: !!oth });
       if (id) inv.add(id);
       const r = rows.get(p);
-      if (r) r.bad++;
-    };
+      if (r && !oth) r.bad++;
+    }; /* oth = จอที่ไม่อยู่ในใบเช็คที่เติม (แยกไว้ ไม่นับรวม) */
   let okK = 0;
   const nopk = new Map();
   /* 1) จอในใบเช็ค → โฟลเดอร์ */
@@ -2116,7 +2116,7 @@ async function cmpCheck(root, W, res) {
       bad = L.filter(x => !pl.has(x.p.k)),
       to = [...pl].flatMap(pkF);
     if (pl.size && bad.length && bad.length < L.length)
-      for (const x of bad) add('fd', x.p.n, nm, 'เอาโฟลเดอร์ใน “' + x.p.n + '” ออก', now, id);
+      for (const x of bad) add('fd', x.p.n, nm, 'เอาโฟลเดอร์ใน “' + x.p.n + '” ออก', now, id, 0, 1);
     else if (pl.size && bad.length === L.length && to.length)
       add(
         'fd',
@@ -2125,8 +2125,10 @@ async function cmpCheck(root, W, res) {
         'ย้ายโฟลเดอร์จาก ' + fq(L.map(x => x.p.n)) + ' ไปไว้ที่ “' + to[0] + '” ที่เดียว',
         now,
         id,
+        0,
+        1,
       );
-    else add('chk', L[0].p.n, nm, 'จอนี้มีโฟลเดอร์หลายแพค ดูว่าควรอยู่แพคไหน', now, id);
+    else add('chk', L[0].p.n, nm, 'จอนี้มีโฟลเดอร์หลายแพค ดูว่าควรอยู่แพคไหน', now, id, 0, 1);
   }
   /* 3) Plan B TV 240 = โฟลเดอร์รวมไว้ดูรายชื่อจอ: ชื่อในนั้นต้องตรงกับชื่อในโฟลเดอร์แพค (ไม่ตัดสินแพคจากโฟลเดอร์นี้) */
   const sp = n => String(n).replace(/\s+/g, ' ').trim();
@@ -2140,7 +2142,7 @@ async function cmpCheck(root, W, res) {
       got.add(id);
       if (inv.has(id)) continue;
       if (!L.length) {
-        add('nm', A.n, sc.nm, 'ชื่อนี้ไม่มีในโฟลเดอร์แพค', 'ใน “' + A.n + '”: ' + sc.nm, id);
+        add('nm', A.n, sc.nm, 'ชื่อนี้ไม่มีในโฟลเดอร์แพค', 'ใน “' + A.n + '”: ' + sc.nm, id, 0, !kOf(id));
         continue;
       }
       if (L.some(x => sp(x.sc.nm) === sp(sc.nm))) continue;
@@ -2156,6 +2158,7 @@ async function cmpCheck(root, W, res) {
           [A.n, sc.nm],
           [x.p.n, x.sc.nm],
         ],
+        !kOf(id),
       );
     }
     for (const [id, L] of IX)
@@ -2163,7 +2166,16 @@ async function cmpCheck(root, W, res) {
         if (CPB.includes(x.p.k) && !got.has(id)) {
           got.add(id);
           if (inv.has(id)) continue;
-          add('nm', A.n, x.sc.nm, 'ยังไม่มีชื่อนี้ใน “' + A.n + '”', 'ใน “' + x.p.n + '”: ' + x.sc.nm, id);
+          add(
+            'nm',
+            A.n,
+            x.sc.nm,
+            'ยังไม่มีชื่อนี้ใน “' + A.n + '”',
+            'ใน “' + x.p.n + '”: ' + x.sc.nm,
+            id,
+            0,
+            !kOf(id),
+          );
         }
   }
   const G = [
@@ -2177,16 +2189,18 @@ async function cmpCheck(root, W, res) {
     ],
   ];
   const RW = [...rows.values()],
-    rdn = rd.path[rd.path.length - 1];
+    rdn = rd.path[rd.path.length - 1],
+    OWN = iss.filter(x => !x.oth),
+    OTH = iss.filter(x => x.oth);
   const T = [
     'ตรวจโฟลเดอร์เทียบจอ รอบ “' + rdn + '”' + (prev ? ' (ยังไม่มีรอบ ' + want + ' จึงใช้รอบล่าสุด)' : ''),
     'ตรวจจอในใบเช็ค ' +
       K.length +
       ' จอ • ' +
-      (iss.length ? 'ถูกต้อง ' + okK + ' จอ • ต้องแก้ ' + iss.length + ' เรื่อง' : 'ถูกต้องทั้งหมด'),
+      (OWN.length ? 'ถูกต้อง ' + okK + ' จอ • ต้องแก้ ' + OWN.length + ' เรื่อง' : 'ถูกต้องทั้งหมด'),
   ];
   for (const [g, lb] of G) {
-    const I = iss.filter(x => x.g === g);
+    const I = OWN.filter(x => x.g === g);
     if (!I.length) continue;
     T.push('', lb + ' (' + I.length + ')');
     I.forEach((x, i) => {
@@ -2201,12 +2215,13 @@ async function cmpCheck(root, W, res) {
     prev,
     want,
     rows: RW,
-    iss,
+    iss: OWN,
+    oth: OTH,
     other,
     nk: K.length,
     okK,
     G,
-    n: iss.length,
+    n: OWN.length,
     txt: T.join('\n'),
   };
 }
@@ -3703,7 +3718,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.9.1 (21 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.9.2 (21 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -4703,15 +4718,19 @@ const vCmp = () => {
         `<p>เลือกโฟลเดอร์ที่มีโฟลเดอร์รอบ เช่น “${esc(R.want)}” อยู่ข้างใน (หรือเลือกโฟลเดอร์รอบนั้นเลย)</p>`,
       ) + btn;
   else {
-    const grp = ([g, lb, ds]) => {
-      const I = R.iss.filter(x => x.g === g);
-      return I.length
-        ? `<div class="cmpg g-${g}"><h4>${lb}<span>${I.length}</span></h4><p class="hint">${ds}</p><ol class="cmpl">${I.map(x => `<li><b>${esc(x.nm)}</b><span class="do">${esc(x.act)}</span>${x.pair ? `<small>${x.pair.map(([f, n], i) => 'ใน “' + esc(f) + '”: ' + cHl(n, x.pair[1 - i][1])).join('<br>')}</small>` : x.now ? `<small>${esc(x.now).replace(/\n/g, '<br>')}</small>` : ''}</li>`).join('')}</ol></div>`
-        : '';
-    };
+    const li = x =>
+        `<li><b>${esc(x.nm)}</b><span class="do">${esc(x.act)}</span>${x.pair ? `<small>${x.pair.map(([f, n], i) => 'ใน “' + esc(f) + '”: ' + cHl(n, x.pair[1 - i][1])).join('<br>')}</small>` : x.now ? `<small>${esc(x.now).replace(/\n/g, '<br>')}</small>` : ''}</li>`,
+      grp = ([g, lb, ds]) => {
+        const I = R.iss.filter(x => x.g === g);
+        return I.length
+          ? `<div class="cmpg g-${g}"><h4>${lb}<span>${I.length}</span></h4><p class="hint">${ds}</p><ol class="cmpl">${I.map(li).join('')}</ol></div>`
+          : '';
+      },
+      OT = R.oth || [];
     b = `${R.prev ? alertHTML('wr', `ยังไม่มีโฟลเดอร์รอบ ${esc(R.want)}`, `<p>ระบบตรวจโฟลเดอร์รอบล่าสุด “${esc(R.rdn)}” แทน รายการด้านล่างคือสิ่งที่ต้องแก้ตอนทำโฟลเดอร์รอบใหม่</p>`) : ''}
- ${R.n ? alertHTML('wr', `ต้องแก้ ${R.n.toLocaleString()} เรื่อง`, `<p>รอบ “${esc(R.rdn)}” • ตรวจจอในใบเช็ค ${R.nk} จอ ถูกต้อง ${R.okK} จอ</p>`) : alertHTML('ok', 'ถูกต้องทั้งหมด', `<p>รอบ “${esc(R.rdn)}” • จอในใบเช็ค ${R.nk} จออยู่ในโฟลเดอร์แพคที่ถูกต้อง และชื่อจอใน Plan B TV 240 ตรงกับโฟลเดอร์แพค</p>`)}
+ ${R.n ? alertHTML('wr', `ต้องแก้ ${R.n.toLocaleString()} เรื่อง`, `<p>รอบ “${esc(R.rdn)}” • ตรวจจอในใบเช็ค ${R.nk} จอ ถูกต้อง ${R.okK} จอ</p>`) : alertHTML('ok', 'ถูกต้องทั้งหมด', `<p>รอบ “${esc(R.rdn)}” • จอในใบเช็ค ${R.nk} จออยู่ในโฟลเดอร์แพคที่ถูกต้อง</p>`)}
  ${R.G.map(grp).join('')}
+ ${OT.length ? `<details class="picd cmpo"><summary>จออื่นที่ไม่อยู่ในใบเช็คที่เติม ${OT.length} รายการ (ไม่นับรวม)</summary><p class="hint">ระบบเจอตอนเทียบโฟลเดอร์ในเครื่อง เช่น ชื่อใน Plan B TV 240 ไม่ตรง หรือจอเดียวกันมีโฟลเดอร์ 2 แพค ไม่ใช่จอในใบเช็คที่เติม ดูไว้เผื่อแก้</p><ol class="cmpl g-oth">${OT.map(li).join('')}</ol></details>` : ''}
  <details class="picd"><summary>ดูจำนวนแต่ละแพค</summary><div class="cmpw"><table class="cmpt"><thead><tr><th>โฟลเดอร์แพค</th><th>โฟลเดอร์ในเครื่อง</th><th>จอในใบเช็ค</th><th>ถูกต้อง</th><th>ต้องแก้</th></tr></thead><tbody>${R.rows.map(r => `<tr><td>${esc(r.n)}</td><td>${r.nf}</td><td>${r.nk == null ? '–' : r.nk}</td><td>${r.ok == null ? '–' : r.ok}</td><td class="${r.bad ? 'bad' : ''}">${r.bad}</td></tr>`).join('')}</tbody></table></div></details>
  <p class="hint">ระบบดูอย่างเดียว ไม่ได้ย้ายหรือแก้อะไรในเครื่อง • ตรวจเฉพาะจอที่มีในใบเช็คที่เติม • แก้แล้วกด “ตรวจอีกครั้ง”${R.other.length ? ` • โฟลเดอร์อื่นในโฟลเดอร์รอบ (ข้าม): ${esc(R.other.join(', '))}` : ''}</p>${btn}`;
   }
