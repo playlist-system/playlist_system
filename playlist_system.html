@@ -263,7 +263,7 @@ tr.off td:not(:first-child){opacity:.45}
 .picd small{display:block;color:var(--mu);font-size:12.5px;overflow-wrap:anywhere}.picb{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .cmpw{overflow-x:auto}.cmpt{width:100%;min-width:0;max-width:780px;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}.cmpt th,.cmpt td{padding:6px 8px;border-top:0;border-bottom:1px solid var(--ln);text-align:right;vertical-align:top;white-space:normal}.cmpt th{position:static;font-weight:600;color:var(--tx2);font-size:13px;line-height:1.3}.cmpt th:first-child,.cmpt td:first-child{text-align:left}.cmpt td.bad{color:var(--er);font-weight:600}
 .cmpg{display:grid;gap:6px}.cmpg h4{display:flex;align-items:center;gap:8px;margin:6px 0 0;font-size:15px}.cmpg h4 span{min-width:24px;padding:1px 8px;border-radius:999px;font-size:13px;text-align:center;background:var(--wrsoft);color:var(--wr);border:1px solid var(--wrln)}.cmpg.g-chk h4 span{background:var(--sf3);color:var(--tx2);border-color:var(--ln2)}.cmpg>.hint{margin:0}
-.cmpl{margin:0;padding-left:24px;display:grid;gap:8px}.cmpl li{padding:9px 12px;border:1px solid var(--ln);border-left:3px solid var(--wrln);border-radius:8px;background:var(--sf2)}.cmpg.g-chk .cmpl li,.cmpg.g-nm .cmpl li{border-left-color:var(--ln2)}.cmpg.g-nm h4 span{background:var(--sf3);color:var(--tx2);border-color:var(--ln2)}.cmpl li::marker{color:var(--mu);font-size:13px}.cmpl b{display:block;font-size:14.5px}.cmpl .do{display:block;margin-top:2px;font-size:14px;color:var(--tx);font-weight:500}.cmpl mark{background:var(--wrsoft);color:var(--wr);font-weight:600;border-radius:3px;padding:0 2px}.cmpl small{display:block;margin-top:3px;color:var(--mu);font-size:12.5px;overflow-wrap:anywhere}
+.cmpl{margin:0;padding-left:24px;display:grid;gap:8px}.cmpl li{padding:9px 12px;border:1px solid var(--ln);border-left:3px solid var(--wrln);border-radius:8px;background:var(--sf2)}.cmpg.g-chk .cmpl li,.cmpg.g-nm .cmpl li{border-left-color:var(--ln2)}.cmpg.g-nm h4 span{background:var(--sf3);color:var(--tx2);border-color:var(--ln2)}.cmpl li::marker{color:var(--mu);font-size:13px}.cmpl b{display:block;font-size:14.5px}.cmpl .do{display:block;margin-top:2px;font-size:14px;color:var(--tx);font-weight:500}.cmpl mark{background:var(--wrsoft);color:var(--wr);font-weight:600;border-radius:3px;padding:0 2px}.cmpo>.hint{margin:6px 0}.cmpl.g-oth li{border-left-color:var(--ln2)}.cmpl small{display:block;margin-top:3px;color:var(--mu);font-size:12.5px;overflow-wrap:anywhere}
 .nextday{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;margin-top:16px;padding:14px 18px;border:1px dashed var(--ln2);border-radius:var(--r-m,12px)}
 .nextday p{flex:1 1 320px;margin:0;color:var(--tx2);font-size:14px}
 .linkb{background:none;border:0;padding:0;margin-left:6px;color:inherit;font:inherit;text-decoration:underline;cursor:pointer}
@@ -773,7 +773,7 @@ async function cmpCheck(root,W,res){
   fq=L=>'“'+[...new Set(L)].join('” / “')+'”',
   plS=S=>S.size?' • Playlist วันนี้อยู่ '+cpl(S):'';
  const iss=[],inv=new Set(),rows=new Map(PK.map(p=>[p.n,{n:p.n,k:p.k,nf:p.S.length,nk:0,ok:0,bad:0}])),
-  add=(g,p,nm,act,now,id,pair)=>{iss.push({g,p,nm:dn(nm),act,now:now||'',pair});if(id)inv.add(id);const r=rows.get(p);if(r)r.bad++};
+  add=(g,p,nm,act,now,id,pair,oth)=>{iss.push({g,p,nm:dn(nm),act,now:now||'',pair,oth:!!oth});if(id)inv.add(id);const r=rows.get(p);if(r&&!oth)r.bad++}; /* oth = จอที่ไม่อยู่ในใบเช็คที่เติม (แยกไว้ ไม่นับรวม) */
  let okK=0;const nopk=new Map();
  /* 1) จอในใบเช็ค → โฟลเดอร์ */
  for(const e of K){const H=fFind(e),pl=cPl(e.key,e.lab),eid=e.key||'N:'+(e.lab[0]||''),nm=H.length?H[0].sc.nm:e.nm;
@@ -802,23 +802,23 @@ async function cmpCheck(root,W,res){
  /* 2) จอเดียวกันมีโฟลเดอร์หลายแพค (ไม่นับ 240) ที่ไม่ได้บอกไว้ในข้อ 1 */
  for(const[id,L]of IX){if(new Set(L.map(x=>x.p.k)).size<2||inv.has(id))continue;const e=kOf(id);if(e&&e.pk.size===1)continue;
   const pl=plOf(id),nm=L[0].sc.nm,now='มีโฟลเดอร์ทั้งใน '+fq(L.map(x=>x.p.n)).replace(/” \/ “/g,'” และ “')+plS(pl),bad=L.filter(x=>!pl.has(x.p.k)),to=[...pl].flatMap(pkF);
-  if(pl.size&&bad.length&&bad.length<L.length)for(const x of bad)add('fd',x.p.n,nm,'เอาโฟลเดอร์ใน “'+x.p.n+'” ออก',now,id);
-  else if(pl.size&&bad.length===L.length&&to.length)add('fd',L[0].p.n,nm,'ย้ายโฟลเดอร์จาก '+fq(L.map(x=>x.p.n))+' ไปไว้ที่ “'+to[0]+'” ที่เดียว',now,id);
-  else add('chk',L[0].p.n,nm,'จอนี้มีโฟลเดอร์หลายแพค ดูว่าควรอยู่แพคไหน',now,id)}
+  if(pl.size&&bad.length&&bad.length<L.length)for(const x of bad)add('fd',x.p.n,nm,'เอาโฟลเดอร์ใน “'+x.p.n+'” ออก',now,id,0,1);
+  else if(pl.size&&bad.length===L.length&&to.length)add('fd',L[0].p.n,nm,'ย้ายโฟลเดอร์จาก '+fq(L.map(x=>x.p.n))+' ไปไว้ที่ “'+to[0]+'” ที่เดียว',now,id,0,1);
+  else add('chk',L[0].p.n,nm,'จอนี้มีโฟลเดอร์หลายแพค ดูว่าควรอยู่แพคไหน',now,id,0,1)}
  /* 3) Plan B TV 240 = โฟลเดอร์รวมไว้ดูรายชื่อจอ: ชื่อในนั้นต้องตรงกับชื่อในโฟลเดอร์แพค (ไม่ตัดสินแพคจากโฟลเดอร์นี้) */
  const sp=n=>String(n).replace(/\s+/g,' ').trim();
  for(const A of ALL){const got=new Set(),rw=rows.get(A.n);rw.nk=rw.ok=null;
   for(const sc of A.S){const id=cId(sc),L=IX.get(id)||[];got.add(id);if(inv.has(id))continue;
-   if(!L.length){add('nm',A.n,sc.nm,'ชื่อนี้ไม่มีในโฟลเดอร์แพค','ใน “'+A.n+'”: '+sc.nm,id);continue}
+   if(!L.length){add('nm',A.n,sc.nm,'ชื่อนี้ไม่มีในโฟลเดอร์แพค','ใน “'+A.n+'”: '+sc.nm,id,0,!kOf(id));continue}
    if(L.some(x=>sp(x.sc.nm)===sp(sc.nm)))continue;
    const x=L.find(y=>CPB.includes(y.p.k))||L[0];
-   add('nm',A.n,sc.nm,'ชื่อใน “'+A.n+'” ไม่ตรงกับโฟลเดอร์ “'+x.p.n+'”','ใน “'+A.n+'”: '+sc.nm+'\nใน “'+x.p.n+'”: '+x.sc.nm,id,[[A.n,sc.nm],[x.p.n,x.sc.nm]])}
-  for(const[id,L]of IX)for(const x of L)if(CPB.includes(x.p.k)&&!got.has(id)){got.add(id);if(inv.has(id))continue;add('nm',A.n,x.sc.nm,'ยังไม่มีชื่อนี้ใน “'+A.n+'”','ใน “'+x.p.n+'”: '+x.sc.nm,id)}}
+   add('nm',A.n,sc.nm,'ชื่อใน “'+A.n+'” ไม่ตรงกับโฟลเดอร์ “'+x.p.n+'”','ใน “'+A.n+'”: '+sc.nm+'\nใน “'+x.p.n+'”: '+x.sc.nm,id,[[A.n,sc.nm],[x.p.n,x.sc.nm]],!kOf(id))}
+  for(const[id,L]of IX)for(const x of L)if(CPB.includes(x.p.k)&&!got.has(id)){got.add(id);if(inv.has(id))continue;add('nm',A.n,x.sc.nm,'ยังไม่มีชื่อนี้ใน “'+A.n+'”','ใน “'+x.p.n+'”: '+x.sc.nm,id,0,!kOf(id))}}
  const G=[['ck','ต้องแก้ในใบเช็ค','แก้ในไฟล์ใบเช็คของคนที่ระบุ'],['fd','ต้องแก้ในโฟลเดอร์','แก้ในโฟลเดอร์เทียบจอในเครื่อง'],['chk','ให้ตรวจเอง','ระบบบอกไม่ได้ว่าฝั่งไหนถูก ดูแล้วแก้ฝั่งที่ผิด'],['nm','ชื่อจอใน Plan B TV 240','โฟลเดอร์รวมไว้ดูรายชื่อจอ • ชื่อที่ไม่ตรงกับชื่อในโฟลเดอร์แพค (ส่วนที่ต่างมีแถบสี)']];
- const RW=[...rows.values()],rdn=rd.path[rd.path.length-1];
- const T=['ตรวจโฟลเดอร์เทียบจอ รอบ “'+rdn+'”'+(prev?' (ยังไม่มีรอบ '+want+' จึงใช้รอบล่าสุด)':''),'ตรวจจอในใบเช็ค '+K.length+' จอ • '+(iss.length?'ถูกต้อง '+okK+' จอ • ต้องแก้ '+iss.length+' เรื่อง':'ถูกต้องทั้งหมด')];
- for(const[g,lb]of G){const I=iss.filter(x=>x.g===g);if(!I.length)continue;T.push('',lb+' ('+I.length+')');I.forEach((x,i)=>{T.push((i+1)+'. '+x.nm+' — '+x.act);if(x.now)T.push('   '+x.now.replace(/\n/g,'\n   '))})}
- return{dir:root.name,rd:rd.path.join(' / '),rdn,prev,want,rows:RW,iss,other,nk:K.length,okK,G,n:iss.length,txt:T.join('\n')}}
+ const RW=[...rows.values()],rdn=rd.path[rd.path.length-1],OWN=iss.filter(x=>!x.oth),OTH=iss.filter(x=>x.oth);
+ const T=['ตรวจโฟลเดอร์เทียบจอ รอบ “'+rdn+'”'+(prev?' (ยังไม่มีรอบ '+want+' จึงใช้รอบล่าสุด)':''),'ตรวจจอในใบเช็ค '+K.length+' จอ • '+(OWN.length?'ถูกต้อง '+okK+' จอ • ต้องแก้ '+OWN.length+' เรื่อง':'ถูกต้องทั้งหมด')];
+ for(const[g,lb]of G){const I=OWN.filter(x=>x.g===g);if(!I.length)continue;T.push('',lb+' ('+I.length+')');I.forEach((x,i)=>{T.push((i+1)+'. '+x.nm+' — '+x.act);if(x.now)T.push('   '+x.now.replace(/\n/g,'\n   '))})}
+ return{dir:root.name,rd:rd.path.join(' / '),rdn,prev,want,rows:RW,iss:OWN,oth:OTH,other,nk:K.length,okK,G,n:OWN.length,txt:T.join('\n')}}
 async function fillWb(f,on,metro,o){const rep=[],FOLD=[];const buf=f.buf.slice(0);
  const wb=XLSX.read(f.buf,{type:'array'}),zip=await JSZip.loadAsync(buf);
  const wx=new DOMParser().parseFromString(await zip.file('xl/workbook.xml').async('string'),'application/xml');
@@ -1095,7 +1095,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.9.1 (21 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.9.2 (21 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -1411,10 +1411,11 @@ const vCmp=()=>{if(!last||!last.res.some(r=>(r.fold||[]).some(b=>CPN[b.media])))
  if(!FSA)b='<p class="hint">ปุ่มนี้ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์</p>';
  else if(!R)b=`<p class="hint">ตรวจว่าจอในใบเช็คอยู่ในโฟลเดอร์แพคที่ถูกต้องไหม เช่น จอในชีต 80 RED ต้องมีโฟลเดอร์อยู่ใน Plan B TV 80 RED • ระบบดูอย่างเดียว ไม่ย้ายหรือแก้อะไรในเครื่อง</p><div><button class="btn secondary" data-a="cmpscan">${IC.folder}เลือกโฟลเดอร์เทียบจอแล้วตรวจ</button></div><p class="hint">ครั้งแรกให้เลือกโฟลเดอร์ “เทียบจอ Plan B TV BKK” (ที่มีโฟลเดอร์รอบ เช่น 10 Oct 16-31 อยู่ข้างใน) ครั้งต่อไประบบจำไว้</p>`;
  else if(R.err)b=alertHTML('wr',`ไม่พบโฟลเดอร์รอบในโฟลเดอร์ “${esc(R.dir)}”`,`<p>เลือกโฟลเดอร์ที่มีโฟลเดอร์รอบ เช่น “${esc(R.want)}” อยู่ข้างใน (หรือเลือกโฟลเดอร์รอบนั้นเลย)</p>`)+btn;
- else{const grp=([g,lb,ds])=>{const I=R.iss.filter(x=>x.g===g);return I.length?`<div class="cmpg g-${g}"><h4>${lb}<span>${I.length}</span></h4><p class="hint">${ds}</p><ol class="cmpl">${I.map(x=>`<li><b>${esc(x.nm)}</b><span class="do">${esc(x.act)}</span>${x.pair?`<small>${x.pair.map(([f,n],i)=>'ใน “'+esc(f)+'”: '+cHl(n,x.pair[1-i][1])).join('<br>')}</small>`:x.now?`<small>${esc(x.now).replace(/\n/g,'<br>')}</small>`:''}</li>`).join('')}</ol></div>`:''};
+ else{const li=x=>`<li><b>${esc(x.nm)}</b><span class="do">${esc(x.act)}</span>${x.pair?`<small>${x.pair.map(([f,n],i)=>'ใน “'+esc(f)+'”: '+cHl(n,x.pair[1-i][1])).join('<br>')}</small>`:x.now?`<small>${esc(x.now).replace(/\n/g,'<br>')}</small>`:''}</li>`,grp=([g,lb,ds])=>{const I=R.iss.filter(x=>x.g===g);return I.length?`<div class="cmpg g-${g}"><h4>${lb}<span>${I.length}</span></h4><p class="hint">${ds}</p><ol class="cmpl">${I.map(li).join('')}</ol></div>`:''},OT=R.oth||[];
   b=`${R.prev?alertHTML('wr',`ยังไม่มีโฟลเดอร์รอบ ${esc(R.want)}`,`<p>ระบบตรวจโฟลเดอร์รอบล่าสุด “${esc(R.rdn)}” แทน รายการด้านล่างคือสิ่งที่ต้องแก้ตอนทำโฟลเดอร์รอบใหม่</p>`):''}
- ${R.n?alertHTML('wr',`ต้องแก้ ${R.n.toLocaleString()} เรื่อง`,`<p>รอบ “${esc(R.rdn)}” • ตรวจจอในใบเช็ค ${R.nk} จอ ถูกต้อง ${R.okK} จอ</p>`):alertHTML('ok','ถูกต้องทั้งหมด',`<p>รอบ “${esc(R.rdn)}” • จอในใบเช็ค ${R.nk} จออยู่ในโฟลเดอร์แพคที่ถูกต้อง และชื่อจอใน Plan B TV 240 ตรงกับโฟลเดอร์แพค</p>`)}
+ ${R.n?alertHTML('wr',`ต้องแก้ ${R.n.toLocaleString()} เรื่อง`,`<p>รอบ “${esc(R.rdn)}” • ตรวจจอในใบเช็ค ${R.nk} จอ ถูกต้อง ${R.okK} จอ</p>`):alertHTML('ok','ถูกต้องทั้งหมด',`<p>รอบ “${esc(R.rdn)}” • จอในใบเช็ค ${R.nk} จออยู่ในโฟลเดอร์แพคที่ถูกต้อง</p>`)}
  ${R.G.map(grp).join('')}
+ ${OT.length?`<details class="picd cmpo"><summary>จออื่นที่ไม่อยู่ในใบเช็คที่เติม ${OT.length} รายการ (ไม่นับรวม)</summary><p class="hint">ระบบเจอตอนเทียบโฟลเดอร์ในเครื่อง เช่น ชื่อใน Plan B TV 240 ไม่ตรง หรือจอเดียวกันมีโฟลเดอร์ 2 แพค ไม่ใช่จอในใบเช็คที่เติม ดูไว้เผื่อแก้</p><ol class="cmpl g-oth">${OT.map(li).join('')}</ol></details>`:''}
  <details class="picd"><summary>ดูจำนวนแต่ละแพค</summary><div class="cmpw"><table class="cmpt"><thead><tr><th>โฟลเดอร์แพค</th><th>โฟลเดอร์ในเครื่อง</th><th>จอในใบเช็ค</th><th>ถูกต้อง</th><th>ต้องแก้</th></tr></thead><tbody>${R.rows.map(r=>`<tr><td>${esc(r.n)}</td><td>${r.nf}</td><td>${r.nk==null?'–':r.nk}</td><td>${r.ok==null?'–':r.ok}</td><td class="${r.bad?'bad':''}">${r.bad}</td></tr>`).join('')}</tbody></table></div></details>
  <p class="hint">ระบบดูอย่างเดียว ไม่ได้ย้ายหรือแก้อะไรในเครื่อง • ตรวจเฉพาะจอที่มีในใบเช็คที่เติม • แก้แล้วกด “ตรวจอีกครั้ง”${R.other.length?` • โฟลเดอร์อื่นในโฟลเดอร์รอบ (ข้าม): ${esc(R.other.join(', '))}`:''}</p>${btn}`}
  return`<section class="pic cmp"><h3>${IC.folder}ตรวจโฟลเดอร์เทียบจอ Plan B TV BKK</h3>${b}</section>`};
