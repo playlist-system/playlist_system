@@ -1197,7 +1197,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.12 (21 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.12.1 (21 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -1533,7 +1533,7 @@ const vShot=()=>{if(!C.length)return'';if(SHOT&&SHOT.sig!==ckSig())SHOT=null;con
  else{const nr=new Set(FL.map(x=>x.scr+'|'+x.f)).size,n1=R.none.filter(x=>x.rnd==='1-15').length,n2=R.none.length-n1;
   const bg=new Map();for(const x of R.bad){const k=x.scr+'|'+x.f+'|'+x.rnd;if(!bg.has(k))bg.set(k,[]);bg.get(k).push(x)}
   const badH=R.bad.length?`<details class="picd" ${Object.keys(M).length?'open':''}><summary><b>มีรูป แต่ใส่วันที่ให้ไม่ได้</b> ${R.bad.length} ช่อง — เลือกวันที่ถ่ายเองได้</summary><p class="shm">เช่น รูปที่ส่งต่อทาง LINE (วันที่ถ่ายหายไป) หรือวันที่ในกล้องผิด เลือกวันที่ถ่ายของจอนั้น แล้วระบบใส่ให้ทุกเรื่องในรายการของจอนั้น</p><ul>${[...bg].slice(0,150).map(([k,L])=>{const q=L[0],a=q.rnd==='1-15'?1:16,z=q.rnd==='1-15'?15:+q.rnd.split('-')[1];return`<li><b>${esc(q.scr)}</b> <span class="shm">${esc(q.f)} • รอบ ${esc(q.rnd)}</span> — ${L.length} ช่อง <label class="picr" style="display:inline-flex;margin-left:6px"><span>วันที่ถ่าย</span><select data-shotman="${esc(k)}" aria-label="วันที่ถ่ายของ ${esc(q.scr)} รอบ ${esc(q.rnd)}"><option value="">— เลือก —</option>${Array.from({length:z-a+1},(_,i)=>a+i).map(d=>`<option value="${d}" ${M[k]===d?'selected':''}>${d}</option>`).join('')}</select></label><small>${esc(L.slice(0,6).map(x=>x.nm+': '+x.why).join(' • '))}${L.length>6?' …':''}</small></li>`}).join('')}</ul></details>`:'';
-  b=`${D?(D.bad?alertHTML('er','บันทึกไม่ได้',`<p>${esc(D.bad)}</p>`):alertHTML('ok',`ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง ใน ${D.files.length} ไฟล์`,`<p>ใบเช็คในรายการด้านบนเป็นฉบับที่ใส่แล้ว (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้) ${D.saved?'<b>บันทึกทับไฟล์เดิมแล้ว</b> — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย':'ดาวน์โหลด หรือบันทึกทับไฟล์เดิมด้านล่าง'}</p>`)):''}
+  b=`${D?(D.bad?alertHTML('er','บันทึกไม่ได้',`<p>${esc(D.bad)}</p>`):alertHTML('ok',`ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง ใน ${D.files.length} ไฟล์`,`<p>ใบเช็คในรายการด้านบนเป็นฉบับที่ใส่แล้ว (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้) ${D.saved&&D.sv?`<b>บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว</b> (ทับ ${D.sv.ok-D.sv.neu} ไฟล์${D.sv.neu?` • ไฟล์ใหม่ ${D.sv.neu} ไฟล์ เพราะโฟลเดอร์นี้ไม่มีไฟล์ชื่อเดียวกัน`:''}) — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย/${esc(D.sv.day)}`:'ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็คด้านล่าง'}</p>`)):''}
  <p class="hint">โฟลเดอร์ “${esc(R.dir)}” • ตรวจ ${R.cells.toLocaleString()} ช่อง${R.read.length?` • เปิดไม่ได้: ${esc(R.read.join(', '))}`:''}</p>
  ${D?'':NF?`<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL,x=>x.nm+' = '+x.day+(x.man?' (เลือกเอง)':''))}</details>`:'<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}
  <div class="shg">${grp('มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์',R.has,'อาจลืมคัดลอกรูป หรือชื่อโฟลเดอร์ไม่ตรงกับชื่อหนัง',x=>x.nm+' ('+x.v+')')}
@@ -1541,7 +1541,7 @@ const vShot=()=>{if(!C.length)return'';if(SHOT&&SHOT.sig!==ckSig())SHOT=null;con
  ${badH}
  ${grp('ยังไม่มีรูป (ช่องยังว่าง)',R.none,`รอบ 1–15: ${n1} ช่อง • รอบ 16–สิ้นเดือน: ${n2} ช่อง`,x=>x.nm+(x.nornd?' (ยังไม่มีโฟลเดอร์รอบ '+x.rnd+')':x.nofold?' (ไม่มีโฟลเดอร์)':''))}
  ${R.miss.length?`<details class="picd"><summary><b>หาโฟลเดอร์จอไม่เจอ</b> ${R.miss.length} จอ</summary><ul>${R.miss.map(x=>`<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>`:''}</div>
- <div class="picb">${D?`<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved?'':`<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับไฟล์เดิม${CKDIR?` (${esc(CKDIR.name)})`:''}</button>`}`:NF?`<button class="btn primary" data-a="shotapply">ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค</button>`:''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`}
+ <div class="picb">${D?`<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved?'':CKDIR?`<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>`:`<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved||CKDIR?`<button class="linkb" data-a="shotsave" data-k="pick">${D.saved?'บันทึกไปโฟลเดอร์อื่นด้วย…':'บันทึกลงโฟลเดอร์อื่น…'}</button>`:''}`:NF?`<button class="btn primary" data-a="shotapply">ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค</button>`:''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`}
  return`<section class="pic"><h3>${IC.folder}ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป</h3>${b}</section>`};
 const vPicCk=()=>{if(!C.length)return'';if(PICX&&PICX.sig!==ckSig())PICX=null;if(PICX&&PICX.res.some(r=>r.fold.length))return vPic();
  return`<section class="pic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูปจากใบเช็คนี้</h3><p class="hint">ไม่ต้องใส่ Playlist — ระบบอ่านรายชื่อหนังที่อยู่ในใบเช็คที่ใส่ไว้ (ใบที่เติมแล้ว) แล้วสร้างโฟลเดอร์ที่ยังไม่มีในโฟลเดอร์แยกรูป เลือกรอบและวันที่ได้หลังอ่าน ระบบไม่แก้ใบเช็ค</p>${PICX?alertHTML('wr','ไม่พบรายชื่อหนังในใบเช็คที่ใส่',`<p>${esc(PICX.bad.join(', ')||'ตรวจว่าเป็นใบเช็ครูปที่มีแถบวันที่และรายชื่อหนัง')}</p>`):''}<div><button class="btn secondary" data-a="picck">${IC.folder}อ่านรายชื่อหนังจากใบเช็ค</button></div></section>`};
@@ -1801,23 +1801,26 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
   note=R.cells?(R.n?`ตรวจแล้ว จะใส่วันที่ถ่าย ${R.n.toLocaleString()} ช่อง`:'ตรวจแล้ว ไม่มีช่องที่ต้องใส่'):`ไม่พบจอในใบเช็คที่ตรงกับโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`},
  shotapply:async()=>{const FL=shotFill();if(!FL.length)return;note='กำลังใส่วันที่ถ่าย …';view();const RR={...SHOT.R,fill:FL};
   const out=await shotApply(RR,C),by=new Map(out.map(x=>[x.name,x]));
+  const orig=new Map(C.filter(f=>by.has(f.name)).map(f=>[f.name,f.buf]));
   C=C.map(f=>{const x=by.get(f.name);return x?{...f,buf:x.blob.buffer.slice(x.blob.byteOffset,x.blob.byteOffset+x.blob.byteLength)}:f});
-  SHOT.done={files:out,n:out.reduce((t,x)=>t+x.n,0),saved:false,txt:shotTxt(RR)};SHOT.sig=ckSig();
+  SHOT.done={files:out,n:out.reduce((t,x)=>t+x.n,0),saved:false,txt:shotTxt(RR),orig,sv:null};SHOT.sig=ckSig();
   note=`ใส่วันที่ถ่ายแล้ว ${SHOT.done.n.toLocaleString()} ช่อง`},
  shotdl:async()=>{const D=SHOT&&SHOT.done;if(!D)return;const z=new JSZip();for(const x of D.files)z.file(x.name,x.blob,{createFolders:false});z.file('รายงานวันที่ถ่าย.txt',D.txt);
   saveBlob('ใบเช็ครูป_ใส่วันที่ถ่าย.zip',await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
- shotsave:async()=>{const D=SHOT&&SHOT.done;if(!D||!FSA)return;let d=CKDIR;
-  try{if(!d){const x=await HDB.get('ck').catch(()=>null);if(x)d=x}
-   if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;
-   if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite'})}catch(e){if(e&&e.name==='AbortError')return;note='เลือกโฟลเดอร์ไม่ได้';return}
+ shotsave:async k=>{const D=SHOT&&SHOT.done;if(!D||!FSA)return;let d=k==='pick'?null:CKDIR;
+  try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;
+   if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}catch(e){if(e&&e.name==='AbortError')return;note='เลือกโฟลเดอร์ไม่ได้';return}
+  const has0=async(dir,n)=>{try{return await (await dir.getFileHandle(n)).getFile()}catch(_){return null}},same=async(f,b)=>{if(!f||!b||f.size!==b.byteLength)return false;const u=new Uint8Array(await f.arrayBuffer()),v=new Uint8Array(b);for(let i=0;i<u.length;i++)if(u[i]!==v[i])return false;return true};
+  const dif=[];for(const x of D.files){const old=await has0(d,x.name);if(old&&!(await same(old,D.orig&&D.orig.get(x.name)))&&!(await same(old,x.blob.buffer.slice(x.blob.byteOffset,x.blob.byteOffset+x.blob.byteLength))))dif.push(x.name)}
+  if(dif.length&&!confirm(`ไฟล์ในโฟลเดอร์ “${d.name}” ไม่ใช่ฉบับเดียวกับที่ใส่วันที่ถ่าย (อาจถูกแก้ทีหลัง หรือเป็นคนละไฟล์):\n${dif.join('\n')}\n\nบันทึกทับไหม? ไฟล์เดิมจะเก็บไว้ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย`)){note='ยังไม่ได้บันทึก — ถ้าจะใส่วันที่ลงไฟล์ในโฟลเดอร์นั้น กด “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์นั้น แล้วตรวจและใส่อีกครั้ง';return}
   CKDIR=d;HDB.set('ck',d).catch(()=>{});const day=isoD(new Date(Date.now()+7*36e5));
   const bk=await (await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย',{create:true})).getDirectoryHandle(day,{create:true});
-  const has=async(dir,n)=>{try{return await (await dir.getFileHandle(n)).getFile()}catch(_){return null}};const bad=[];
-  for(const x of D.files){try{const old=await has(d,x.name);if(old&&!(await has(bk,x.name))){const w=await (await bk.getFileHandle(x.name,{create:true})).createWritable();await w.write(await old.arrayBuffer());await w.close()}
+  const has=has0;const bad=[];let neu=0;
+  for(const x of D.files){try{const old=await has(d,x.name);if(!old)neu++;if(old&&!(await has(bk,x.name))){const w=await (await bk.getFileHandle(x.name,{create:true})).createWritable();await w.write(await old.arrayBuffer());await w.close()}
     const w=await (await d.getFileHandle(x.name,{create:true})).createWritable();await w.write(x.blob);await w.close()}catch(_){bad.push(x.name)}}
   try{const w=await (await bk.getFileHandle('รายงานวันที่ถ่าย.txt',{create:true})).createWritable();await w.write(D.txt);await w.close()}catch(_){}
   if(bad.length){note=`บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
-  D.saved=true;note=`บันทึกทับ ${D.files.length} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`},
+  D.saved=true;D.sv={dir:d.name,ok:D.files.length,neu,day};note=`บันทึกลงโฟลเดอร์ “${d.name}” แล้ว ${D.files.length} ไฟล์`},
  picck:async()=>{if(!C.length)return;const keep=PICX&&PICX.pic&&PICX.pic.d,res=[],bad=[];let mx=0,i=0;
   for(const f of C){i++;note=`กำลังอ่านใบเช็ค ${i} / ${C.length} …`;view();await new Promise(r=>setTimeout(r,20));
    try{const x=await chkFold(f);if(x.fold.length){res.push({name:f.name,fold:x.fold});if(x.mx>mx)mx=x.mx}else bad.push(f.name)}catch(_){bad.push(f.name)}}

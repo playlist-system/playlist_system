@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.12 • 21 ต.ค. 2569
+ *  เวอร์ชัน 3.12.1 • 21 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -4295,7 +4295,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.12 (21 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.12.1 (21 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -5453,7 +5453,7 @@ const vShot = () => {
           })
           .join('')}</ul></details>`
       : '';
-    b = `${D ? (D.bad ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`) : alertHTML('ok', `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง ใน ${D.files.length} ไฟล์`, `<p>ใบเช็คในรายการด้านบนเป็นฉบับที่ใส่แล้ว (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้) ${D.saved ? '<b>บันทึกทับไฟล์เดิมแล้ว</b> — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย' : 'ดาวน์โหลด หรือบันทึกทับไฟล์เดิมด้านล่าง'}</p>`)) : ''}
+    b = `${D ? (D.bad ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`) : alertHTML('ok', `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง ใน ${D.files.length} ไฟล์`, `<p>ใบเช็คในรายการด้านบนเป็นฉบับที่ใส่แล้ว (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้) ${D.saved && D.sv ? `<b>บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว</b> (ทับ ${D.sv.ok - D.sv.neu} ไฟล์${D.sv.neu ? ` • ไฟล์ใหม่ ${D.sv.neu} ไฟล์ เพราะโฟลเดอร์นี้ไม่มีไฟล์ชื่อเดียวกัน` : ''}) — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย/${esc(D.sv.day)}` : 'ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็คด้านล่าง'}</p>`)) : ''}
  <p class="hint">โฟลเดอร์ “${esc(R.dir)}” • ตรวจ ${R.cells.toLocaleString()} ช่อง${R.read.length ? ` • เปิดไม่ได้: ${esc(R.read.join(', '))}` : ''}</p>
  ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man ? ' (เลือกเอง)' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}
  <div class="shg">${grp('มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์', R.has, 'อาจลืมคัดลอกรูป หรือชื่อโฟลเดอร์ไม่ตรงกับชื่อหนัง', x => x.nm + ' (' + x.v + ')')}
@@ -5461,7 +5461,7 @@ const vShot = () => {
  ${badH}
  ${grp('ยังไม่มีรูป (ช่องยังว่าง)', R.none, `รอบ 1–15: ${n1} ช่อง • รอบ 16–สิ้นเดือน: ${n2} ช่อง`, x => x.nm + (x.nornd ? ' (ยังไม่มีโฟลเดอร์รอบ ' + x.rnd + ')' : x.nofold ? ' (ไม่มีโฟลเดอร์)' : ''))}
  ${R.miss.length ? `<details class="picd"><summary><b>หาโฟลเดอร์จอไม่เจอ</b> ${R.miss.length} จอ</summary><ul>${R.miss.map(x => `<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>` : ''}</div>
- <div class="picb">${D ? `<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับไฟล์เดิม${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>`}` : NF ? `<button class="btn primary" data-a="shotapply">ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
+ <div class="picb">${D ? `<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="shotsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}` : NF ? `<button class="btn primary" data-a="shotapply">ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
   }
   return `<section class="pic"><h3>${IC.folder}ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป</h3>${b}</section>`;
 };
@@ -6576,13 +6576,21 @@ const ACT = {
     const RR = { ...SHOT.R, fill: FL };
     const out = await shotApply(RR, C),
       by = new Map(out.map(x => [x.name, x]));
+    const orig = new Map(C.filter(f => by.has(f.name)).map(f => [f.name, f.buf]));
     C = C.map(f => {
       const x = by.get(f.name);
       return x
         ? { ...f, buf: x.blob.buffer.slice(x.blob.byteOffset, x.blob.byteOffset + x.blob.byteLength) }
         : f;
     });
-    SHOT.done = { files: out, n: out.reduce((t, x) => t + x.n, 0), saved: false, txt: shotTxt(RR) };
+    SHOT.done = {
+      files: out,
+      n: out.reduce((t, x) => t + x.n, 0),
+      saved: false,
+      txt: shotTxt(RR),
+      orig,
+      sv: null,
+    };
     SHOT.sig = ckSig();
     note = `ใส่วันที่ถ่ายแล้ว ${SHOT.done.n.toLocaleString()} ช่อง`;
   },
@@ -6597,25 +6605,55 @@ const ACT = {
       await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
     );
   },
-  shotsave: async () => {
+  shotsave: async k => {
     const D = SHOT && SHOT.done;
     if (!D || !FSA) return;
-    let d = CKDIR;
+    let d = k === 'pick' ? null : CKDIR;
     try {
-      if (!d) {
-        const x = await HDB.get('ck').catch(() => null);
-        if (x) d = x;
-      }
       if (
         d &&
         (await d.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
         (await d.requestPermission({ mode: 'readwrite' })) !== 'granted'
       )
         d = null;
-      if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
+      if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
     } catch (e) {
       if (e && e.name === 'AbortError') return;
       note = 'เลือกโฟลเดอร์ไม่ได้';
+      return;
+    }
+    const has0 = async (dir, n) => {
+        try {
+          return await (await dir.getFileHandle(n)).getFile();
+        } catch (_) {
+          return null;
+        }
+      },
+      same = async (f, b) => {
+        if (!f || !b || f.size !== b.byteLength) return false;
+        const u = new Uint8Array(await f.arrayBuffer()),
+          v = new Uint8Array(b);
+        for (let i = 0; i < u.length; i++) if (u[i] !== v[i]) return false;
+        return true;
+      };
+    const dif = [];
+    for (const x of D.files) {
+      const old = await has0(d, x.name);
+      if (
+        old &&
+        !(await same(old, D.orig && D.orig.get(x.name))) &&
+        !(await same(old, x.blob.buffer.slice(x.blob.byteOffset, x.blob.byteOffset + x.blob.byteLength)))
+      )
+        dif.push(x.name);
+    }
+    if (
+      dif.length &&
+      !confirm(
+        `ไฟล์ในโฟลเดอร์ “${d.name}” ไม่ใช่ฉบับเดียวกับที่ใส่วันที่ถ่าย (อาจถูกแก้ทีหลัง หรือเป็นคนละไฟล์):\n${dif.join('\n')}\n\nบันทึกทับไหม? ไฟล์เดิมจะเก็บไว้ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย`,
+      )
+    ) {
+      note =
+        'ยังไม่ได้บันทึก — ถ้าจะใส่วันที่ลงไฟล์ในโฟลเดอร์นั้น กด “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์นั้น แล้วตรวจและใส่อีกครั้ง';
       return;
     }
     CKDIR = d;
@@ -6624,17 +6662,13 @@ const ACT = {
     const bk = await (
       await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย', { create: true })
     ).getDirectoryHandle(day, { create: true });
-    const has = async (dir, n) => {
-      try {
-        return await (await dir.getFileHandle(n)).getFile();
-      } catch (_) {
-        return null;
-      }
-    };
+    const has = has0;
     const bad = [];
+    let neu = 0;
     for (const x of D.files) {
       try {
         const old = await has(d, x.name);
+        if (!old) neu++;
         if (old && !(await has(bk, x.name))) {
           const w = await (await bk.getFileHandle(x.name, { create: true })).createWritable();
           await w.write(await old.arrayBuffer());
@@ -6657,7 +6691,8 @@ const ACT = {
       return;
     }
     D.saved = true;
-    note = `บันทึกทับ ${D.files.length} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`;
+    D.sv = { dir: d.name, ok: D.files.length, neu, day };
+    note = `บันทึกลงโฟลเดอร์ “${d.name}” แล้ว ${D.files.length} ไฟล์`;
   },
   picck: async () => {
     if (!C.length) return;
