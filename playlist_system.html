@@ -757,7 +757,7 @@ async function chkRead(f){const sheets=[];let mx=0;
   sheets.push({sn,ws,sh,blocks:L})}
  return{sheets,mx}}
 /* ----- ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป (3.12) อ่านรูปอย่างเดียว เขียนเฉพาะช่องวันที่ถ่ายที่ยังว่างในใบเช็ค
-   แถวหนังใต้แถบวันที่ 1–15 → โฟลเดอร์รอบ 1-15 (ไม่มีรูปที่ใช้ได้ ดู 16-30 / 16-31 ด้วย ยกเว้นหนังที่ต่อสัญญามีแถวใหม่ใต้แถบ 16), ใต้แถบ 16 ขึ้นไป → 16-30 / 16-31
+   แถวหนังใต้แถบวันที่ 1–15 → โฟลเดอร์รอบ 1-15 (ไม่มีรูปที่ใช้ได้ ดู 16-30 / 16-31 ด้วย รวมหนังชื่อซ้ำที่ต่อสัญญา 3.12.3), ใต้แถบ 16 ขึ้นไป → 16-30 / 16-31
    วันที่ที่ใช้ได้ = เดือนเดียวกัน ไม่ก่อนวันที่หนังขึ้น และไม่หลังวันที่ออก (3.12.2) • ชื่อโฟลเดอร์หนัง = ชื่อหนังในใบเช็ค (แบบที่ระบบสร้าง)
    วันที่ถ่าย = วันที่ล่าสุดในรูป (EXIF — รูปที่ไม่มีวันที่ถ่ายในไฟล์ไม่เดา บอกไว้ให้ตรวจ) ที่อยู่ในรอบนั้น และไม่ก่อนวันที่หนังขึ้น • อ่านรูปไม่เกิน 6 รูปต่อโฟลเดอร์ ----- */
 async function exifDay(file){try{const b=new DataView(await file.slice(0,131072).arrayBuffer());if(b.byteLength<4||b.getUint16(0)!==0xFFD8)return 0;let o=2;
@@ -791,13 +791,13 @@ async function shotScan(root,files,prog){
     const t=picTg(tb,S)[0];if(!t)return;if(!t[2]){const z={f:f.name,sn:x.sn,id:t[0]};if(!R.miss.concat(R.closed).some(q=>q.f===z.f&&q.sn===z.sn&&q.id===z.id))(t[1]&&shut.some(q=>same(q,t[1]))?R.closed:R.miss).push(z);return}
     cols.push({c:n2col(c),id:t[0],s:t[2]})});for(const C of cols){C.st=stOf(C.c,b.items.map(q=>q[2]));if(C.st==null)C.st=sheetSt()} /* สีช่องที่มีวันที่ถ่ายแล้วในคอลัมน์นี้ (ส่วนใหญ่) */
    const ren=new Set(b.items.filter(q=>q[1]>=cut&&q[1]<m1).map(q=>String(q[0]).trim().toLowerCase())); /* หนังที่มีแถวใต้แถบ 16 (ต่อสัญญา / ขึ้นใหม่) */
-   for(const[nm,g,r,ed]of b.items){if(g<m0||g>=m1)continue;const two=g>=cut,rn=two?'16-'+ld:'1-15',fk=fsafe(nm).toLowerCase(),late=!two&&!ren.has(String(nm).trim().toLowerCase());
+   for(const[nm,g,r,ed]of b.items){if(g<m0||g>=m1)continue;const two=g>=cut,rn=two?'16-'+ld:'1-15',fk=fsafe(nm).toLowerCase(),late=!two,isRen=ren.has(String(nm).trim().toLowerCase());
     for(const C of cols){R.cells++;const xv=x.ws[C.c+r],e=x.sh&&x.sh.cell(C.c,r,false),hasF=!!(e&&e.getElementsByTagNameNS(NS,'f').length),val=xv&&xv.v!=null&&String(xv.v).trim()!==''?xv.v:null;
      if(hasF)continue;
      const look=async t=>{const rd=await rdir(C.s,y,m,t),fh=rd&&rd.get(fk);return{rd,fh,P:fh?await pics(fh,C.s.path.join('/')+'|'+t+'|'+fk):{n:0,days:[],fdays:[]}}};
-     const okD=P=>P.days.filter(d=>d>=g&&d<m1&&(!ed||d<=ed));
-     const A=await look(two);let B=null;if(late&&!okD(A.P).length)B=await look(true); /* หนังรอบ 1–15 ที่ถ่ายตอนรอบ 16 → รูปอยู่โฟลเดอร์ 16-30 / 16-31 */
-     const okA=okD(A.P),okB=B?okD(B.P):[],src=okA.length?'':okB.length?'16-'+ld:'',ok=okA.length?okA:okB,day=ok.length?new Date(Math.max(...ok)).getUTCDate():0;
+     const okD=(P,ie)=>P.days.filter(d=>d>=g&&d<m1&&(ie||!ed||d<=ed)); /* ie: หนังชื่อซ้ำ (ต่อสัญญา) — “ออก 16” ของแถวเดิมเป็นวันจบสัญญาเดิม ไม่ใช้ตัดรูปรอบ 16 */
+     const A=await look(two);let B=null;if(late&&!okD(A.P).length)B=await look(true); /* หนังรอบ 1–15 ที่ถ่ายตอนรอบ 16 (รวมหนังชื่อซ้ำที่ต่อสัญญา) → รูปอยู่โฟลเดอร์ 16-30 / 16-31 */
+     const okA=okD(A.P),okB=B?okD(B.P,isRen):[],src=okA.length?'':okB.length?'16-'+ld:'',ok=okA.length?okA:okB,day=ok.length?new Date(Math.max(...ok)).getUTCDate():0;
      const n=A.P.n+(B?B.P.n:0),days=[...A.P.days,...(B?B.P.days:[])],fdays=[...A.P.fdays,...(B?B.P.fdays:[])];
      const row={f:f.name,sn:x.sn,scr:C.id,nm,r,c:C.c,rnd:rn,v:val,day,n,fd:fdays.length,nofold:!A.fh&&!(B&&B.fh),nornd:!A.rd&&!(B&&B.rd),st:C.st,src};
      if(val!=null){if(!n)R.has.push(row);else if(day&&/^\d{1,2}$/.test(String(val).trim())&&+val!==day)R.diff.push(row)}
@@ -1204,7 +1204,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.12.2 (21 ต.ค. 2569)';
+const VERTXT='ระบบเติมใบเช็ครูป เวอร์ชัน 3.12.3 (21 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
