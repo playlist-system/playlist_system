@@ -1,7 +1,7 @@
 /*
  * ======================================================================
  *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.8.3 • 20 ต.ค. 2569
+ *  เวอร์ชัน 3.9 • 20 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -68,7 +68,8 @@
  *   เวอร์ชัน 3.6 แก้ส่วน 5 และ 9: แถบวันที่ตามแบบของแต่ละใบ — แถบวันถัดไปท้ายตาราง (TRAIL) และวันที่ในแถบของจอที่ 2
  *   เป็นตัวเลขหรือสูตร (BVAL) • ตัวเลือกรายไฟล์ “ต่อสัญญาวันที่ 16 แถวเดิมไม่ใส่ออก” (k16 ใน fcol)
  *   เวอร์ชัน 3.7 เพิ่มในส่วน 5, 6, 9 และ 12: สร้างโฟลเดอร์แยกรูปของรอบปัจจุบันจากใบเช็คที่เติมแล้ว (picId, picPlan, picMake, vPic)
- *   เวอร์ชัน 3.8 เพิ่มในส่วนเดียวกัน: ตรวจโฟลเดอร์เทียบจอ — เทียบใบเช็คที่เติมแล้วกับโฟลเดอร์รอบ → แพค → จอในเครื่อง (cmpCK, cmpCheck, vCmp))
+ *   เวอร์ชัน 3.8 เพิ่มในส่วนเดียวกัน: ตรวจโฟลเดอร์เทียบจอ — เทียบใบเช็คที่เติมแล้วกับโฟลเดอร์รอบ → แพค → จอในเครื่อง (cmpCK, cmpCheck, vCmp)
+ *   เวอร์ชัน 3.9 เพิ่มในส่วน 5 และ 12: เลือกสีช่องว่างเหนือแถบวันที่ได้ (PADS, effPad, PADK / MARK.p ใน layoutChk))
  * ======================================================================
  */
 
@@ -604,7 +605,11 @@ const MARK = {
   test(v) {
     v = String(v || '').toUpperCase();
     const h = v.length === 8 ? v.slice(2) : v;
-    return /^(8AEDFE|82ECFE|002060|375623|FFFF00|4472C4|2F5597|203864|1F4E79)$/.test(h) || this.x.has(h);
+    return (
+      /^(8AEDFE|82ECFE|002060|375623|FFFF00|4472C4|2F5597|203864|1F4E79)$/.test(h) ||
+      this.x.has(h) ||
+      !!(this.p && this.p.has(h))
+    );
   },
 }; /* สีที่ถือว่าเป็นแถบ/ไฮไลต์ รวมสีที่ผู้ใช้เลือก */
 const modeF = (sh, col, a, b, f, ST, inc) => {
@@ -663,6 +668,19 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     SCAN = 1500,
     dd = +W,
     noNotes = W.getUTCDate() === 1;
+  const PADK = [
+      ...new Set([
+        '8AEDFE',
+        '82ECFE',
+        ...PADS.slice(1).map(x => x[0].slice(-6)),
+        ...(o.padh || []).map(c => String(c).slice(-6).toUpperCase()),
+      ]),
+    ],
+    PADO = o.padc ? String(o.padc).toUpperCase() : '',
+    PADRE = new RegExp('^(FF)?(' + PADK.join('|') + ')$', 'i');
+  MARK.p = new Set(
+    PADO ? [...PADK, PADO.slice(-6)] : PADK,
+  ); /* สีช่องว่างเหนือแถบวันที่ (3.9): สีที่เลือก / สีชุดให้เลือก / สีที่เคยเลือกในเครื่องนี้ ถือเป็นสีแถบ */
   const B = jobs.map(j => {
     const kind = j[4],
       all = kind === 'keep' ? [] : chkRows(j[3], { ...o, off: true }, kind),
@@ -690,18 +708,20 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     for (const b of B) if (b.bl == null) b.bl = any != null ? any : b.be || sh.getS(b.lc, hr + 1) || '0';
     for (const b of B) if (!ST.hasBorder(b.bl)) b.bl = ST.derive(b.bl, 'bord', { border: true });
   }
-  var PADC = 'FF8AEDFE';
-  padscan: for (const b of B)
-    for (let r = hr + 1; r <= hr + 400; r++)
-      for (const L of [b.lc, b.pc]) {
-        const st = sh.getS(L, r);
-        if (st == null) continue;
-        const fc = ST.fillOf(st);
-        if (/^(FF)?(8AEDFE|82ECFE)$/i.test(fc)) {
-          PADC = (fc.length === 6 ? 'FF' + fc : fc).toUpperCase();
-          break padscan;
+  var PADC = PADO || 'FF8AEDFE';
+  if (!PADO) {
+    padscan: for (const b of B)
+      for (let r = hr + 1; r <= hr + 400; r++)
+        for (const L of [b.lc, b.pc]) {
+          const st = sh.getS(L, r);
+          if (st == null) continue;
+          const fc = ST.fillOf(st);
+          if (PADRE.test(fc)) {
+            PADC = (fc.length === 6 ? 'FF' + fc : fc).toUpperCase();
+            break padscan;
+          }
         }
-      }
+  } /* เลือกสีไว้ = ใช้สีนั้น • ตามชีต = สีที่ชีตใช้อยู่ ไม่มีใช้ฟ้าอ่อน */
   /* อ่านของเดิมในชีต: แถบวันที่ (คอลัมน์วันที่ของบล็อกแรก) ชื่อหนัง และ “ออกวันที่” */
   const vOf = (c, r) => {
       const x = wsv && wsv[c + r];
@@ -3683,7 +3703,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.8.3 (20 ต.ค. 2569)';
+const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.9 (20 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -3746,6 +3766,7 @@ try {
 
 OP.col1 = store.get('ps_col1') || '';
 OP.col2 = store.get('ps_col2') || '';
+OP.padc = store.get('ps_padc') || '';
 let adv = false,
   HELP = false,
   HOW = false,
@@ -3841,7 +3862,43 @@ const fcol = n => {
   }
 }; /* k16 = ต่อสัญญาวันที่ 16 แถวเดิมไม่ใส่ออก */
 const effCol = (r, f) => (f && fcol(f.name)[r]) || OP['col' + r] || '';
+/* ----- สีช่องว่างเหนือแถบวันที่ (3.9): ค่ากลาง OP.padc และแยกรายไฟล์ (fcol .p) ----- */
+const PADS = [
+  ['', 'ตามชีต'],
+  ['FF8AEDFE', 'ฟ้าอ่อน'],
+  ['FFFFF2A8', 'เหลืองอ่อน'],
+  ['FFC9F2C7', 'เขียวอ่อน'],
+  ['FFFFD6E7', 'ชมพูอ่อน'],
+  ['FFFFDDB8', 'ส้มอ่อน'],
+  ['FFE2E5EA', 'เทาอ่อน'],
+];
+const padName = c => (PADS.find(x => x[0] === c) || [0, 'สีที่เลือกเอง'])[1];
+const padHist = () => {
+  try {
+    const a = JSON.parse(store.get('ps_padh') || '[]');
+    return Array.isArray(a) ? a : [];
+  } catch (_) {
+    return [];
+  }
+};
+const padAdd = c => {
+  const x = String(c || '')
+    .slice(-6)
+    .toUpperCase();
+  if (!/^[0-9A-F]{6}$/.test(x)) return;
+  const a = padHist();
+  if (!a.includes(x)) {
+    a.push(x);
+    store.set('ps_padh', JSON.stringify(a.slice(-12)));
+  }
+}; /* สีที่เคยเลือกเอง: ชีตที่ใช้สีนั้นอยู่ ตอนตั้งกลับเป็น “ตามชีต” ระบบยังอ่านออก */
+const effPad = f => (f && fcol(f.name).p) || OP.padc || '';
 const shownCol = (r, f) => effCol(r, f) || (r === 2 ? 'FF4472C4' : 'FF002060');
+function vPadPick() {
+  const cur = OP.padc || '',
+    custom = cur && !PADS.some(x => x[0] === cur);
+  return `<div class="swl" role="group" aria-label="สีช่องว่างเหนือแถบวันที่">${PADS.map(([c, t]) => `<button class="swb ${cur === c ? 'on' : ''}" data-a="padc" data-k="${c}" aria-pressed="${cur === c}" title="${t}">${c ? `<i style="background:${swHex(c)}"></i>` : '<i class="autop"></i>'}<span>${t}</span></button>`).join('')}<button class="swb ${custom ? 'on' : ''}" data-a="padcc" aria-pressed="${!!custom}" title="เลือกสีเอง"><i class="${custom ? '' : 'rb'}" style="${custom ? 'background:' + swHex(cur) : ''}"></i><span>เลือกเอง</span></button></div>`;
+}
 function vColPick(k) {
   const cur = OP['col' + k],
     custom = cur && !COLS.some(x => x[0] === cur);
@@ -4432,7 +4489,16 @@ function vTl() {
 
 /* ----- ขั้นที่ 3 ----- */
 function vCk(f, r, i, rk) {
-  const fc = fcol(f.name)[rk],
+  const fp = fcol(f.name).p || '',
+    pcu = fp && !PADS.some(x => x[0] === fp),
+    psel = `<label class="fcol"><span>สีช่องว่างเหนือแถบวันที่</span><select data-fpad="${esc(f.name)}" aria-label="สีช่องว่างเหนือแถบวันที่ของ ${esc(f.name)}"><option value="" ${fp ? '' : 'selected'}>ตามการตั้งค่า (${padName(OP.padc || '')})</option>${PADS.slice(
+      1,
+    )
+      .map(([c, t]) => `<option value="${c}" ${fp === c ? 'selected' : ''}>${t}</option>`)
+      .join(
+        '',
+      )}${pcu ? `<option value="${fp}" selected>สีที่เลือกเอง</option>` : ''}</select><i class="dot" style="background:${swHex(effPad(f) || 'FF8AEDFE')}"></i></label>`,
+    fc = fcol(f.name)[rk],
     cust = fc && !COLS.some(x => x[0] === fc),
     sel = `<label class="fcol"><span>สีแถบรอบ ${rk === 2 ? '16–สิ้นเดือน' : '1–15'}</span><select data-fcol="${esc(f.name)}" data-r="${rk}" aria-label="สีแถบของ ${esc(f.name)}"><option value="" ${fc ? '' : 'selected'}>ตามการตั้งค่า (${colName(OP['col' + rk])})</option>${COLS.slice(
       1,
@@ -4464,7 +4530,7 @@ function vCk(f, r, i, rk) {
         '',
       )}${r.nf.length > 12 ? `<span class="need miss">และอีก ${r.nf.length - 12} จอ</span>` : ''}</div>${r.warn.length ? `<p class="nfline">ใช้รายการแทน (จะขึ้นใน “ควรตรวจ”): ${esc(r.warn.join(', '))}</p>` : ''}${r.skip.length ? `<p class="hint" style="margin-top:6px">ข้าม ${r.skip.length} จอตามตัวเลือก “สื่อ” (จะขึ้นใน “ควรตรวจ” ว่าไม่พบจอ)</p>` : ''}`;
   }
-  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}${r && !r.bad && !r.empty ? sel + (rk === 2 && OP.r2 !== 'new' ? `<label class="fcol"><input type="checkbox" data-f16="${esc(f.name)}" ${fcol(f.name).k16 ? 'checked' : ''}><span>หนังต่อสัญญาวันที่ 16: แถวเดิมไม่ใส่ “ออก 16” (ใส่ออกที่แถวใต้แถบ 16) — ระบบจำไว้สำหรับไฟล์นี้</span></label>` : '') : ''}</div>`;
+  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}${r && !r.bad && !r.empty ? sel + psel + (rk === 2 && OP.r2 !== 'new' ? `<label class="fcol"><input type="checkbox" data-f16="${esc(f.name)}" ${fcol(f.name).k16 ? 'checked' : ''}><span>หนังต่อสัญญาวันที่ 16: แถวเดิมไม่ใส่ “ออก 16” (ใส่ออกที่แถวใต้แถบ 16) — ระบบจำไว้สำหรับไฟล์นี้</span></label>` : '') : ''}</div>`;
 }
 function vFl() {
   const ms = ['ทั้งหมด', ...new Set(DB.filter(s => /^(40|80|CITY|Spare)/.test(s.m)).map(s => s.m))];
@@ -4558,6 +4624,7 @@ function vFl() {
  <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายวันที่ถ่าย (ช่องหลังชื่อหนัง ทุกจอ) ตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
  ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และวันที่ถ่าย (ช่องหลังชื่อหนัง) จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
  <div class="cols"><p class="cl">สีแถบวันที่</p><div class="crow"><span>รอบ 1–15</span>${vColPick(1)}</div><div class="crow"><span>รอบ 16–สิ้นเดือน</span>${vColPick(2)}</div><small>“ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ (รอบ 16 ถ้าชีตยังไม่มีแถบรอบ 2 ใช้สีฟ้า) เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
+ <div class="cols"><p class="cl">สีช่องว่างเหนือแถบวันที่</p><div class="crow">${vPadPick()}</div><small>แถบสีในช่องว่างใต้รายการของจอที่หนังน้อยกว่า ก่อนถึงแถบวันที่ถัดไป (ปกติสีฟ้าอ่อน) “ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <button class="adv" data-a="adv" aria-expanded="${adv}"><span>ตัวเลือกเพิ่มเติม${advChg() ? ` <em class="chg">เปลี่ยนจากค่าแนะนำ ${advChg()} ข้อ</em>` : ''}</span>${IC.chev}</button>
  <div class="advb" ${adv ? '' : 'hidden'}>
  <div class="opt"><label class="fld"><span>สื่อ</span><select id="o_media" aria-describedby="d_media">${ms.map(m => `<option>${esc(m)}</option>`).join('')}</select></label><small id="d_media">เติมจอแยก (40/80 Blue/Red, CITY, Spare) เฉพาะสื่อที่เลือก ชีตจอแยกของสื่ออื่นจะไม่ถูกเติม ส่วน Signature Max, Show DC, BKJ และ Metro LED เติมตามปกติ ใช้เมื่ออยากเติมใหม่แค่สื่อเดียว <b>แนะนำ: ทั้งหมด</b></small></div>
@@ -4724,7 +4791,7 @@ const vHelp =
 <li>วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่เป็นอีกสี (เลือกสีได้ในขั้นที่ 3) หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 แถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว (ถ้าต้องการเริ่มรายการใหม่ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”) แถบท้ายตารางเป็นวันถัดไปเสมอ</li>
 <li>อ่านหมายเหตุใน Playlist ให้: ไม่ออน / ออนเฉพาะ / เฉพาะจอ / ทุกจอยกเว้น (Signature Max, Show DC — เทียบชื่อย่อจอ เช่น SO TWT สาทร AOT BIGY), ขึ้นเฉพาะ / ยกเว้นจอ (BKJ), Tags LEDMETRO (Metro LED)</li>
 <li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
-<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>แถบวันที่ทำตามแบบของแต่ละใบ: ใบที่ใส่แถบวันถัดไปรอไว้ท้ายตาราง ระบบใส่ให้ ใบที่ไม่ใส่ ระบบก็ไม่ใส่ • วันที่ในแถบของจอที่ 2 เป็นต้นไปเป็นสูตร (=C25) หรือตัวเลขตามที่ใบนั้นใช้ • หนังต่อสัญญาวันที่ 16 ปกติแถวเดิมใส่ “ออก 16” ถ้าใบไหนไม่ใส่ ติ๊กตัวเลือกใต้ชื่อไฟล์ในขั้นที่ 3 (ระบบจำไว้ตามชื่อไฟล์)</li><li>ตรวจโฟลเดอร์เทียบจอ (ขั้นที่ 4, Chrome / Edge): หลังเติมใบเช็ค กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>โฟลเดอร์แยกรูป (ขั้นที่ 4, Chrome / Edge): เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
+<li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>แถบวันที่ทำตามแบบของแต่ละใบ: ใบที่ใส่แถบวันถัดไปรอไว้ท้ายตาราง ระบบใส่ให้ ใบที่ไม่ใส่ ระบบก็ไม่ใส่ • วันที่ในแถบของจอที่ 2 เป็นต้นไปเป็นสูตร (=C25) หรือตัวเลขตามที่ใบนั้นใช้ • หนังต่อสัญญาวันที่ 16 ปกติแถวเดิมใส่ “ออก 16” ถ้าใบไหนไม่ใส่ ติ๊กตัวเลือกใต้ชื่อไฟล์ในขั้นที่ 3 (ระบบจำไว้ตามชื่อไฟล์)</li><li>ตรวจโฟลเดอร์เทียบจอ (ขั้นที่ 4, Chrome / Edge): หลังเติมใบเช็ค กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>โฟลเดอร์แยกรูป (ขั้นที่ 4, Chrome / Edge): เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>สีช่องว่างเหนือแถบวันที่ (แถบสีฟ้าอ่อนใต้รายการของจอที่หนังน้อยกว่า): เลือกได้ในขั้นที่ 3 ข้างสีแถบวันที่ และเลือกแยกรายไฟล์ได้ในรายการใบเช็ค • “ตามชีต” = ใช้สีที่ชีตใช้อยู่ (ปกติฟ้าอ่อน) ใบที่ไม่ได้เลือกสีได้ผลเหมือนเดิม</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
@@ -5365,6 +5432,17 @@ const ACT = {
     OP['col' + r] = c || '';
     store.set('ps_col' + r, c || '');
   },
+  padc: k => {
+    OP.padc = k || '';
+    store.set('ps_padc', OP.padc);
+  },
+  padcc: () => {
+    const p = $('#colpick');
+    if (!p) return;
+    p.dataset.k = 'p';
+    p.value = swHex(OP.padc) || '#8aedfe';
+    p.click();
+  },
   colc: k => {
     const p = $('#colpick');
     if (!p) return;
@@ -5897,6 +5975,8 @@ const ACT = {
               col1: effCol(1, f),
               col2: effCol(2, f),
               k16: !!fcol(f.name).k16,
+              padc: effPad(f),
+              padh: padHist(),
             });
           } catch (e) {
             r = {
@@ -6001,6 +6081,20 @@ document.addEventListener('change', e => {
     OP.off = $('#o_off').checked;
     OP.hand = $('#o_hand').checked;
     OP.r2 = $('#o_r2').value;
+    softView();
+    return;
+  }
+  if (t.id === 'colpick' && t.dataset.k === 'p') {
+    OP.padc = 'FF' + t.value.slice(1).toUpperCase();
+    store.set('ps_padc', OP.padc);
+    padAdd(OP.padc);
+    view();
+    return;
+  }
+  if (t.dataset.fpad != null) {
+    const m = fcol(t.dataset.fpad);
+    m.p = t.value;
+    store.set(fkey(t.dataset.fpad), JSON.stringify(m));
     softView();
     return;
   }
