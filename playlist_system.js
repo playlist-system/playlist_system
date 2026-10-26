@@ -1,7 +1,7 @@
 /*
  * ======================================================================
- *  ระบบเติมใบเช็ครูปอัตโนมัติ — โค้ด JavaScript ของระบบ
- *  เวอร์ชัน 3.14 • 21 ต.ค. 2569
+ *  PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูปอัตโนมัติ) — โค้ด JavaScript ของระบบ
+ *  เวอร์ชัน 4.0 • 26 ต.ค. 2569
  *  ระบบ : https://playlist-system.github.io/playlist_system/
  *  โค้ด : https://github.com/playlist-system/playlist_system
  * ======================================================================
@@ -3274,7 +3274,7 @@ const OP = {
   r2: 'cont',
 };
 let DB = [],
-  tab = 'dat',
+  tab = 'home',
   fm = 'ทั้งหมด',
   q = '',
   cs = null,
@@ -4348,7 +4348,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'ระบบเติมใบเช็ครูป เวอร์ชัน 3.14 (21 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.0 (26 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -4831,7 +4831,7 @@ function scanLater() {
       f.nd = { bad: 'ไฟล์เสียหรือเปิดไม่ได้' };
     }
     SCANNING = false;
-    if (tab === 'fl') softView();
+    if (tab === 'fl' || tab === 'home') softView();
     else scanLater();
   }, 30);
 }
@@ -4875,8 +4875,11 @@ const vSteps = () => {
   }).join('');
 };
 const vNav = () => {
-  const tl = THEME === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด';
-  return `<button class="btn ghost" data-a="how" aria-label="ระบบทำงานอย่างไร" title="ระบบทำงานอย่างไร">${IC.how}<span class="lbl">ระบบทำงานอย่างไร</span></button><button class="btn ghost" data-a="tour" aria-label="แนะนำการใช้" title="แนะนำการใช้หน้านี้">${IC.tour}<span class="lbl">แนะนำการใช้</span></button><button class="btn ghost" data-a="help" aria-haspopup="dialog" aria-label="วิธีใช้" title="วิธีใช้">${IC.book}<span class="lbl">วิธีใช้</span></button><button class="btn ghost tg${mqOn() ? '' : ' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${mqOn() ? 'ปิดผู้ช่วยน้องเช็ค' : 'เปิดผู้ช่วยน้องเช็ค'}" title="${mqOn() ? 'ปิดผู้ช่วยน้องเช็ค' : 'เปิดผู้ช่วยน้องเช็ค'}">${IC.bot}</button><button class="btn secondary tg" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button>`;
+  const tl = THEME === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด',
+    t = tab === 'tools',
+    wd = DB.length ? workDate() : null,
+    ml = mqOn() ? 'ปิดผู้ช่วยน้องเช็ค' : 'เปิดผู้ช่วยน้องเช็ค';
+  return `<div class="tops" role="navigation" aria-label="ส่วนของระบบ" data-tour="sect"><button class="tp${t ? '' : ' on'}" data-a="fillsec" ${t ? '' : 'aria-current="page"'}>${IC.fillI}<span>เติมใบเช็ครูป</span></button><button class="tp${t ? ' on' : ''}" data-a="tools" ${t ? 'aria-current="page"' : ''}>${IC.folder}<span>งานโฟลเดอร์และรูป</span></button><button class="tp" data-a="help" aria-haspopup="dialog">${IC.book}<span>วิธีใช้</span></button></div><div class="hright" data-tour="hdr">${wd ? `<span class="dchip">${IC.cal}<span><b>Playlist ${thd(wd)}</b><small>รอบ ${rndOf(+wd)}</small></span></span>` : ''}<button class="rb${mqOn() ? '' : ' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${ml}" title="${ml}">${IC.bot}</button><button class="rb" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button></div>`;
 };
 const shead = (t, p, extra = '') =>
   `<div class="shead"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ''}</div>${extra}</div>`;
@@ -5299,7 +5302,7 @@ let TC = [],
   TCL = null,
   TCN = '',
   FTAB =
-    'dat'; /* ใบเช็คของหน้างานโฟลเดอร์และรูป (3.13): TCS = last ใบที่เพิ่งเติม / c ใบในขั้นที่ 3 / dir เปิดทั้งโฟลเดอร์ / own เพิ่มเอง • TCK = ต้นทางตอนเลือก • TCL = ผลการเติมตอนเลือก • FTAB = ขั้นที่ค้างไว้ */
+    'home'; /* ใบเช็คของหน้างานโฟลเดอร์และรูป (3.13): TCS = last ใบที่เพิ่งเติม / c ใบในขั้นที่ 3 / dir เปิดทั้งโฟลเดอร์ / own เพิ่มเอง • TCK = ต้นทางตอนเลือก • TCL = ผลการเติมตอนเลือก • FTAB = ขั้นที่ค้างไว้ */
 const sigOf = A => A.map(f => f.name + ':' + f.buf.byteLength).join('|'),
   picS = () => PICX,
   ckSig = () =>
@@ -5796,9 +5799,13 @@ function busyPaint() {
 
 /* ===== การ์ดเครื่องมือ (3.14): สรุปสถานะ 3 เครื่องมือ เปิดทีละอย่าง (TOOLV) ===== */
 let TOOLV = 'pic';
-function vTCards() {
+function tcStat() {
   if (PICX && PICX.sig !== ckSig()) PICX = null;
   if (SHOT && SHOT.sig !== ckSig()) SHOT = null;
+  if (!TC.length) {
+    const z = ['mu', '—', '', 'เลือกใบเช็คก่อน'];
+    return { pic: z, shot: z, cmp: z };
+  }
   const L = PICX,
     p = L && L.pic,
     P = p && p.P,
@@ -5852,6 +5859,10 @@ function vTCards() {
         : CR.n
           ? ['er', CR.n.toLocaleString(), 'เรื่องที่ต้องแก้', `รอบ “${esc(CR.rdn)}”`]
           : ['ok', '0', 'เรื่องที่ต้องแก้', `ถูกต้องทั้งหมด • รอบ “${esc(CR.rdn)}”`];
+  return { pic, shot, cmp };
+}
+function vTCards() {
+  const { pic, shot, cmp } = tcStat();
   const C3 = [
     [
       'pic',
@@ -5879,6 +5890,215 @@ function vTCards() {
     const on = TOOLV === k;
     return `<article class="tcard st-${st}${on ? ' sel' : ''}"><div class="tch"><span class="tci">${ic}</span><h3>${t}</h3></div><p class="tcd">${d}</p><div class="tcs"><span class="tcn"><b>${big}</b>${unit ? `<span>${unit}</span>` : ''}</span><small>${s}</small></div><button class="btn ${on ? 'primary' : 'secondary'}" data-a="toolv" data-k="${k}" aria-expanded="${on}" aria-controls="tdetail">${on ? 'เปิดอยู่ด้านล่าง' : 'เปิด'}</button></article>`;
   }).join('')}</div>`;
+}
+/* ===== 4.0 PHOTO CHECK STUDIO: แถบบน / เมนูซ้าย / หน้าหลัก ===== */
+IC.homeI = '<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>';
+IC.editI = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg>';
+IC.fillI = '<svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20.5H7zM14 3.5V8h4M10 13l2 2 3.5-4"/></svg>';
+IC.resI = '<svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14"/></svg>';
+IC.cal = '<svg viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M9 3v4M15 3v4"/></svg>';
+IC.mon = '<svg viewBox="0 0 24 24"><path d="M3 5h18v11H3zM8 20h8M12 16v4"/></svg>';
+IC.layers = '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></svg>';
+IC.clip =
+  '<svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 5.5H5.5V20.5h13V5.5H17M8.5 12l2.5 2.5 4.5-5"/></svg>';
+IC.shield =
+  '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6zM12 8.5v4M12 15.5h.01"/></svg>';
+IC.grid = '<svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>';
+let HTAB = 'all';
+const sideFoot = () =>
+  `<p class="sgrp">ตัวช่วย</p><button class="sh" data-a="how">${IC.how}ระบบทำงานอย่างไร</button><button class="sh" data-a="tour">${IC.tour}แนะนำการใช้</button><div class="sinfo"><b>ทำงานในเครื่อง 100%</b><small>ไม่อัปโหลดไฟล์ Playlist หรือใบเช็คขึ้นที่ใด</small></div>`;
+function vSide() {
+  if (tab === 'tools') {
+    const S = tcStat(),
+      sv = x => (x[1] !== '—' ? (x[1] + ' ' + x[2]).trim() : x[3]),
+      it = (k, a, t, sub, ic, on) =>
+        `<button class="si${on ? ' on' : ''}" data-a="${a}" data-k="${k}" ${on ? 'aria-current="page"' : ''}>${ic}<span><b>${t}</b><small>${esc(sub)}</small></span></button>`;
+    return (
+      it(
+        'top',
+        'tooltop',
+        'ภาพรวม',
+        TC.length ? `ใบเช็ค ${TC.length} ไฟล์` : 'เลือกใบเช็คที่ใช้',
+        IC.grid,
+        false,
+      ) +
+      it('pic', 'toolv', 'สร้างโฟลเดอร์แยกรูป', sv(S.pic), IC.folder, TOOLV === 'pic') +
+      it('shot', 'toolv', 'ใส่วันที่ถ่าย', sv(S.shot), IC.cam, TOOLV === 'shot') +
+      it('cmp', 'toolv', 'ตรวจโฟลเดอร์เทียบจอ', sv(S.cmp), IC.cmpi, TOOLV === 'cmp') +
+      sideFoot()
+    );
+  }
+  const sk = stepKey(),
+    dn = { dat: DB.length > 0, pl: DB.some(s => s.ed), fl: !!last, res: !!(last && last.saved) };
+  const it = (k, t, sub, ic) => {
+    const on = k === 'home' ? tab === 'home' : sk === k,
+      dis = k === 'res' && !last;
+    return `<button class="si${on ? ' on' : ''}" data-a="tab" data-k="${k}" ${on ? 'aria-current="page"' : ''} ${dis ? 'disabled' : ''}>${ic}<span><b>${t}</b><small>${sub}</small></span>${dn[k] && !on ? `<span class="dn"><span class="sr">ทำแล้ว</span>${IC.check}</span>` : ''}</button>`;
+  };
+  return (
+    it('home', 'หน้าหลัก', 'ภาพรวมวันนี้', IC.homeI) +
+    it('dat', 'ใส่ Playlist', stepSub('dat'), IC.up) +
+    it('pl', 'ตรวจ / แก้ไข', stepSub('pl'), IC.editI) +
+    it('fl', 'เติมใบเช็ครูป', stepSub('fl'), IC.fillI) +
+    it('res', 'ผลการเติม', stepSub('res'), IC.resI) +
+    sideFoot()
+  );
+}
+function vHome() {
+  const has = DB.length > 0,
+    nk = KINDS.filter(K => !K.x && DB.some(K.has)).length,
+    L = last,
+    LF = L && L.csig === sigOf(C) ? L : null,
+    R = C.map(readyOf),
+    nOk = R.filter(r => r && r.ok).length,
+    nw = L ? L.res.reduce((t, r) => t + r.rep.filter(isWarn).length, 0) : 0,
+    nf = L ? L.res.filter(r => r.blob).length : 0,
+    ns = L ? L.res.reduce((t, r) => t + r.rep.filter(isFilled).length, 0) : 0;
+  /* สถานะของวันนี้ = สิ่งที่ควรทำต่อ */
+  const st = !has
+    ? ['in', 'ยังไม่ได้ใส่ Playlist', 'เริ่มจากใส่ไฟล์ Playlist ของวันนี้', 'dat', 'เริ่มใส่ Playlist']
+    : nk < 11 && !C.length
+      ? [
+          'wr',
+          `ใส่ Playlist แล้ว ${nk} จาก 11 แบบ`,
+          'ใส่ไฟล์ที่ยังขาด หรือไปใส่ใบเช็คต่อได้ถ้าวันนี้ไม่มีไฟล์นั้น',
+          'dat',
+          'ดูเช็กลิสต์ Playlist',
+        ]
+      : !C.length
+        ? ['in', 'รอใบเช็ครูป', 'ใส่ใบเช็คของวันก่อนหน้าในขั้นที่ 3', 'fl', 'ไปใส่ใบเช็ครูป']
+        : LF && !LF.saved
+          ? [
+              'wr',
+              'เติมแล้ว ยังไม่ได้บันทึก',
+              'บันทึกทับไฟล์เดิม หรือดาวน์โหลดก่อนปิดหน้า',
+              'res',
+              'ไปผลการเติม',
+            ]
+          : LF
+            ? ['ok', 'บันทึกแล้ว', 'ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันถัดไป', 'res', 'ดูผลการเติม']
+            : ['ok', 'พร้อมเติม', `ใบเช็ค ${C.length} ไฟล์ • พร้อมเติม ${nOk} ไฟล์`, 'fl', 'ไปเติมใบเช็ครูป'];
+  const dn = { dat: has, pl: DB.some(s => s.ed), fl: !!LF, res: !!(LF && LF.saved) };
+  const flow = [
+    ['dat', '1', 'ใส่ Playlist', IC.up],
+    ['pl', '2', 'ตรวจ / แก้ไข', IC.editI],
+    ['fl', '3', 'เติมใบเช็ครูป', IC.fillI],
+    ['res', '4', 'ผลการเติม', IC.resI],
+  ]
+    .map(
+      ([k, n, t, ic]) =>
+        `<li><button class="${dn[k] ? 'dn' : ''}${st[3] === k ? ' on' : ''}" data-a="tab" data-k="${k}" ${k === 'res' && !last ? 'disabled' : ''}><span class="n">${n}</span><span class="ic" aria-hidden="true">${dn[k] ? IC.check : ic}</span><b>${t}</b><small>${stepSub(k)}</small></button></li>`,
+    )
+    .join('');
+  const kp = (c, ic, t, v, u, vc) =>
+    `<div class="kp"><span class="ki ${c}" aria-hidden="true">${ic}</span><span><small>${t}</small><span class="kv"><b${vc ? ` style="color:var(--${vc})"` : ''}>${v}</b><span>${u}</span></span></span></div>`;
+  const ring = `<svg class="kring" viewBox="0 0 58 58" aria-hidden="true"><circle cx="29" cy="29" r="23" class="r0"/><circle cx="29" cy="29" r="23" class="r1 ${st[0]}"/><path class="r2 ${st[0]}" d="${st[0] === 'ok' ? 'M21 29.5l5.5 5.5L37 24.5' : st[0] === 'wr' ? 'M29 20v11M29 37h.01' : 'M22 29h14'}"/></svg>`;
+  const kpis =
+    kp('k1', IC.mon, 'จอใน Playlist', has ? DB.length.toLocaleString() : '—', 'จอ') +
+    kp('k2', IC.layers, 'Playlist', nk + '/11', 'แบบ') +
+    kp('k3', IC.clip, 'ใบเช็ครูป', C.length, 'ไฟล์') +
+    kp('k4', IC.shield, 'ควรตรวจ', L ? nw : '—', 'รายการ', L && nw ? 'wr' : '');
+  const now = `<div class="hnow kst ${st[0]}" role="status">${ring}<span><small>ตอนนี้</small><b class="${st[0]}">${st[1]}</b><span class="kss">${st[2]}</span></span></div>`;
+  /* ตารางใบเช็ครูปวันนี้ */
+  const rows = C.map((f, i) => {
+    const r = R[i],
+      x = LF && LF.res.find(q => q.name === f.name);
+    let k,
+      chip,
+      note = '–',
+      sc = '–',
+      wn = '–',
+      sub = '';
+    if (r && !r.bad && !r.empty) sub = `${r.sheets} ชีต • ใช้ Playlist ${r.items.length} แบบ`;
+    if (x) {
+      const w = x.rep.filter(isWarn).length;
+      sc = x.rep.filter(isFilled).length;
+      wn = w;
+      if (!x.blob) {
+        k = 'wait';
+        chip = ['er', 'เติมไม่ได้'];
+        note = (x.rep.find(isWarn) || [])[2] || 'ดูรายละเอียดในผลการเติม';
+      } else if (w) {
+        k = 'warn';
+        chip = ['wr', 'ควรตรวจ'];
+      } else {
+        k = 'done';
+        chip = ['ok', 'เติมแล้ว'];
+      }
+    } else if (!r) {
+      k = 'wait';
+      chip = ['in', 'กำลังตรวจไฟล์…'];
+    } else if (r.bad || r.empty) {
+      k = 'wait';
+      chip = ['er', 'ใช้ไม่ได้'];
+      note = r.bad || 'ไม่พบชีตของใบเช็ครูป';
+    } else if (r.ok) {
+      k = 'ready';
+      chip = ['in', 'พร้อมเติม'];
+    } else {
+      k = 'wait';
+      chip = ['wr', 'ยังไม่พร้อม'];
+      note =
+        [
+          r.miss
+            ? 'ยังขาด Playlist ' +
+              r.items
+                .filter(q => !q.ok)
+                .map(q => q.k)
+                .join(', ')
+            : '',
+          r.nf.length ? `หาไม่พบ ${r.nf.length} จอ` : '',
+        ]
+          .filter(Boolean)
+          .join(' • ') || '–';
+    }
+    return {
+      k,
+      h: `<div class="hrw" role="row"><span role="cell">${i + 1}</span><span role="cell" class="hfn"><b title="${esc(f.name)}">${esc(f.name)}</b>${sub ? `<small>${sub}</small>` : ''}</span><span role="cell">${sc}</span><span role="cell">${wn}</span><span role="cell"><span class="hchip ${chip[0]}">${chip[1]}</span></span><span role="cell" class="hnote">${esc(note)}</span></div>`,
+    };
+  });
+  const T = [
+      ['all', 'ทั้งหมด'],
+      ['ready', 'พร้อมเติม'],
+      ['warn', 'ควรตรวจ'],
+      ['done', 'เติมแล้ว'],
+      ['wait', 'ยังไม่พร้อม'],
+    ],
+    cnt = { all: rows.length };
+  for (const [k] of T.slice(1)) cnt[k] = rows.filter(r => r.k === k).length;
+  if (!cnt[HTAB] && HTAB !== 'all') HTAB = 'all';
+  const shown = rows.filter(r => HTAB === 'all' || r.k === HTAB);
+  const table = C.length
+    ? `<div class="htabs" role="tablist" aria-label="กรองใบเช็ครูป">${T.map(([k, t]) => `<button role="tab" aria-selected="${HTAB === k}" class="${HTAB === k ? 'on' : ''}" data-a="htab" data-k="${k}">${t}<em>${cnt[k]}</em></button>`).join('')}</div>
+  <div class="htw"><div role="table" aria-label="ใบเช็ครูปวันนี้"><div class="hrw th" role="row"><span role="columnheader">#</span><span role="columnheader">ไฟล์ใบเช็ค</span><span role="columnheader">จอที่เติม</span><span role="columnheader">ควรตรวจ</span><span role="columnheader">สถานะ</span><span role="columnheader">หมายเหตุ</span></div>${shown.map(r => r.h).join('')}</div></div>`
+    : `<div class="hempty"><b>ยังไม่มีใบเช็ครูป</b><span>ใส่ใบเช็คของวันก่อนหน้าในขั้นที่ 3 หรือลากไฟล์ .xlsm มาวางที่หน้านี้</span><button class="btn secondary" data-a="tab" data-k="fl">${IC.fillI}ไปใส่ใบเช็ครูป</button></div>`;
+  /* คอลัมน์ขวา */
+  const fl = (() => {
+    const M = new Map();
+    for (const x of DB) if (x.pf && (!M.has(x.pf) || x.pd > M.get(x.pf))) M.set(x.pf, x.pd || 0);
+    return [...M];
+  })();
+  const plCard = `<section class="hcard" aria-labelledby="hpl"><div class="hch"><h2 id="hpl">ไฟล์ Playlist</h2>${has ? '<button class="linkb" data-a="tab" data-k="dat">ดูทั้งหมด</button>' : ''}</div>${
+    fl.length
+      ? fl
+          .slice(0, 4)
+          .map(
+            ([f, d]) =>
+              `<div class="hfile"><span class="xi" aria-hidden="true">X</span><span><b title="${esc(f)}">${esc(f)}</b><small>${d ? 'วันที่ ' + thd(new Date(d)) : 'ใส่แล้ว'}</small></span><span class="hok" aria-hidden="true">${IC.okc}</span></div>`,
+          )
+          .join('') +
+        `<p class="hint">${fl.length > 4 ? `และอีก ${fl.length - 4} ไฟล์ • ` : ''}ครบ ${nk} จาก 11 แบบ${PLX.length ? ` • อ่านไม่ได้ ${PLX.length} ไฟล์` : ''}</p>`
+      : `<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns"><button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button></div>`
+  }</section>`;
+  const resCard = `<section class="hcard" aria-labelledby="hrs"><h2 id="hrs">ผลการเติมล่าสุด</h2>${
+    L
+      ? `<div class="hfile"><span class="xi z" aria-hidden="true">${IC.fillI}</span><span><b>ใบเช็ครูป_เติมแล้ว.zip</b><small>${nf} ไฟล์ • ${ns.toLocaleString()} จอ${nw ? ` • ควรตรวจ ${nw}` : ''}</small></span><button class="ib" data-a="dlz" aria-label="ดาวน์โหลดใบเช็คที่เติมแล้ว (.zip)" title="ดาวน์โหลด (.zip)">${IC.dl}</button></div>${L.saved ? '<p class="hint">บันทึก / ดาวน์โหลดแล้ว</p>' : ''}<div class="hbtns">${FSA && !L.saved ? `<button class="btn primary" data-a="savedir">${IC.save}บันทึกทับไฟล์เดิม</button>` : ''}<button class="btn secondary" data-a="tab" data-k="res">ดูผลการเติม</button></div>`
+      : '<p class="hint" style="margin-top:0">ยังไม่ได้เติมใบเช็คในรอบนี้ เติมเสร็จแล้วไฟล์จะขึ้นที่นี่</p>'
+  }</section>`;
+  const hero = `<section class="hhero" data-tour="hhero" aria-labelledby="hht"><div class="ht"><small>ยินดีต้อนรับสู่</small><h1 id="hht">PHOTO CHECK STUDIO</h1><p>เติมใบเช็ครูปของทุกคนจาก Playlist ของวันนี้ สร้างโฟลเดอร์แยกรูป และใส่วันที่ถ่าย ในที่เดียว • ลากไฟล์ Playlist และใบเช็คมาวางที่หน้านี้ได้เลย ระบบแยกให้เอง</p><button class="btn primary" data-a="tab" data-k="${st[3]}">${st[4]}<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>${mqOn() ? `<div class="hmq" aria-hidden="true"><i></i><span class="mq">${mqSVG(st[0] === 'wr' ? 'warn' : LF ? 'done' : 'idle')}</span></div>` : ''}</section>`;
+  return `<div class="hgrid">${hero}<section class="hflow" data-tour="hflow" aria-labelledby="hfw"><h2 id="hfw">ขั้นตอนการทำงาน</h2><ol class="hfl">${flow}</ol>${now}</section></div>
+ <div class="hkpi" data-tour="hkpi">${kpis}</div>
+ <div class="hrow"><section class="hcard htbl" data-tour="htbl" aria-labelledby="htt"><div class="hch"><h2 id="htt">ใบเช็ครูปวันนี้</h2>${C.length ? '<button class="linkb" data-a="tab" data-k="fl">ไปขั้นเติมใบเช็ครูป</button>' : ''}</div>${table}</section><div class="hside" data-tour="hside">${plCard}${resCard}</div></div>`;
 }
 function vRes() {
   if (!last) return vFl();
@@ -5945,7 +6165,7 @@ const vHelp =
 <li><b>ขั้นที่ 2 ตรวจ / แก้ไข (ไม่บังคับ)</b><span>ใช้เมื่อต้องปลด เพิ่ม หรือเปลี่ยนชื่อหนังก่อนเติม</span></li>
 <li><b>ขั้นที่ 3 เติมใบเช็ครูป</b><span>ลากใบเช็ครูปลงกล่อง ดูว่าแต่ละไฟล์ขึ้น “พร้อมเติม” วันที่ทำงานและรอบถูกต้อง แล้วกด “เติมใบเช็ครูป”</span></li>
 <li><b>ขั้นที่ 4 ผลการเติม</b><span>เปิดดูรายการ “ควรตรวจ” ของแต่ละไฟล์ แล้วกด “ดาวน์โหลดทั้งหมด (.zip)” ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันพรุ่งนี้</span></li></ol>
-<h3>หน้าตาและผู้ช่วย</h3><ul class="hr2"><li>โหมดมืดโทนน้ำเงินกรมเป็นค่าเริ่มต้น สลับเป็นโหมดสว่างได้ที่ปุ่มมุมขวาบน (ระบบจำไว้ในเครื่อง)</li><li>“น้องเช็ค” ผู้ช่วยตัวการ์ตูน โผล่มุมขวาล่างตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู แล้วหายไปเอง (กด “ปิด” ให้หายทันทีได้) และอยู่ในกล่องรอระหว่างทำงาน • ปิด / เปิดได้ที่ปุ่มหน้ายิ้มมุมขวาบน • เครื่องที่ตั้งค่าลดการเคลื่อนไหวไว้ ตัวการ์ตูนจะไม่ขยับ</li></ul>
+<h3>หน้าตาและผู้ช่วย</h3><ul class="hr2"><li>PHOTO CHECK STUDIO: แท็บด้านบนสลับ “เติมใบเช็ครูป” / “งานโฟลเดอร์และรูป” / “วิธีใช้” • เมนูด้านซ้ายคือขั้นของส่วนนั้น • “หน้าหลัก” สรุปงานของวันนี้และพาไปสิ่งที่ควรทำต่อ (ลากไฟล์ Playlist และใบเช็คมาวางที่หน้าหลักได้ ระบบแยกให้เอง)</li><li>โหมดมืดเป็นค่าเริ่มต้น สลับเป็นโหมดสว่างได้ที่ปุ่มมุมขวาบน (ระบบจำไว้ในเครื่อง)</li><li>“น้องเช็ค” ผู้ช่วยตัวการ์ตูน โผล่มุมขวาล่างตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู แล้วหายไปเอง (กด “ปิด” ให้หายทันทีได้) และอยู่ในกล่องรอระหว่างทำงาน • ปิด / เปิดได้ที่ปุ่มหน้ายิ้มมุมขวาบน • เครื่องที่ตั้งค่าลดการเคลื่อนไหวไว้ ตัวการ์ตูนจะไม่ขยับ</li></ul>
 <h3>งานโฟลเดอร์และรูป (หน้าแยก, Chrome / Edge)</h3><ul class="hr2"><li>กดปุ่ม “งานโฟลเดอร์และรูป” ด้านบน (กลับมาเติมใบเช็ค กด “เติมใบเช็ครูป” งานที่ค้างไว้ไม่หาย) • กล่อง “ใบเช็คที่ใช้” คือชุดที่ทุกเครื่องมือในหน้านี้อ่าน: ถ้าเพิ่งเติม ระบบใช้ใบที่เพิ่งเติมให้เลย ถ้ายังไม่เติม ใช้ใบในขั้นที่ 3 หรือกด “เปิดใบเช็คทั้งโฟลเดอร์” / ลากไฟล์มาวาง ไม่ต้องใส่ Playlist • การ์ด 3 ใบบอกสถานะของแต่ละเครื่องมือ (เหลือง = รอทำ เขียว = เรียบร้อย แดง = ต้องแก้) กด “เปิด” เพื่อทำงานนั้นด้านล่าง</li><li>สร้างโฟลเดอร์แยกรูป: เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • ตั้งแต่วันที่ 16 เลือกได้ว่าจะสร้างรอบนี้ / รอบ 1–15 (จอที่ยังไม่ได้สร้างรอบแรก) / ทั้ง 2 รอบ • ช่อง “หนังที่ขึ้นจอถึงวันที่” = ทุกเรื่องในรอบ (ค่าปกติ) หรือเลือกวันที่ เพื่อสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่) ไม่เกินวันนั้น • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>ใส่วันที่ถ่าย: ใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ และบอกเรื่องที่น่าจะลืมหรือใส่ผิด ดูรายการก่อนกดใส่ แล้วดาวน์โหลด หรือบันทึกทับในโฟลเดอร์ใบเช็ค (ไฟล์เดิมเก็บไว้ใน สำรองก่อนใส่วันที่ถ่าย) • ง่ายที่สุด: “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์ใบเช็คจริงก่อน ระบบบันทึกกลับโฟลเดอร์เดิม</li><li>ตรวจโฟลเดอร์เทียบจอ: กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ที่ใส่ไว้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>หน้าแบบเดิม (3.12.3) ยังเปิดได้ชั่วคราวจากลิงก์ “เปิดหน้าเดิม (3.12.3)” ท้ายหน้า (เปิดจากลิงก์ระบบ)</li></ul>
 <h3>ระบบจัดให้อย่างไร</h3><ul class="hr2">
 <li>วันที่ 1 ลงหนังที่ออนอยู่ทั้งหมด หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z</li>
@@ -5969,7 +6189,7 @@ const vHelp =
 <p class="hn">ถ้าผลไม่ตรง เก็บไฟล์ Playlist ใบเช็คก่อนเติม และไฟล์ zip ของวันนั้นไว้ส่งให้ผู้ดูแลระบบ</p>
 <div class="dlgf"><button class="btn primary" data-a="htour">${IC.tour}ดูทัวร์แนะนำหน้านี้</button><button class="btn secondary" data-a="hhow">${IC.how}ระบบทำงานอย่างไร</button></div></div></div>`;
 const vWelcome = () =>
-  `<div class="ov"><div class="dlg welcome" role="dialog" aria-modal="true" aria-labelledby="wlt"><div class="wv" aria-hidden="true">${['l', 'l', 'l', '', 'l', 'l', 'l', '', 'l', 'a', 'l', ''].map(x => `<i class="${x}"></i>`).join('')}</div><div class="wb"><h2 id="wlt">ยินดีต้อนรับสู่ระบบเติมใบเช็ครูป</h2><p>ใส่ Playlist ของวันนี้กับใบเช็ครูปของเมื่อวาน แล้วระบบจะเติมรายชื่อหนังลงใบเช็คให้ ไฟล์ทั้งหมดประมวลผลในเครื่องนี้ ไม่ถูกอัปโหลด</p><p>ใช้ครั้งแรก แนะนำให้ดูทัวร์สั้น ๆ ก่อน ใช้เวลาประมาณ 1 นาที</p><div class="dlgf"><button class="btn primary" data-a="wtour" data-focus>${IC.tour}เริ่มทัวร์แนะนำ</button><button class="btn secondary" data-a="whow">${IC.how}ระบบทำงานอย่างไร</button><button class="btn ghost" data-a="wskip">ข้าม เริ่มใช้งานเลย</button></div></div></div></div>`;
+  `<div class="ov"><div class="dlg welcome" role="dialog" aria-modal="true" aria-labelledby="wlt"><div class="wv" aria-hidden="true">${['l', 'l', 'l', '', 'l', 'l', 'l', '', 'l', 'a', 'l', ''].map(x => `<i class="${x}"></i>`).join('')}</div><div class="wb"><h2 id="wlt">ยินดีต้อนรับสู่ PHOTO CHECK STUDIO</h2><p>ใส่ Playlist ของวันนี้กับใบเช็ครูปของเมื่อวาน แล้วระบบจะเติมรายชื่อหนังลงใบเช็คให้ ไฟล์ทั้งหมดประมวลผลในเครื่องนี้ ไม่ถูกอัปโหลด</p><p>ใช้ครั้งแรก แนะนำให้ดูทัวร์สั้น ๆ ก่อน ใช้เวลาประมาณ 1 นาที</p><div class="dlgf"><button class="btn primary" data-a="wtour" data-focus>${IC.tour}เริ่มทัวร์แนะนำ</button><button class="btn secondary" data-a="whow">${IC.how}ระบบทำงานอย่างไร</button><button class="btn ghost" data-a="wskip">ข้าม เริ่มใช้งานเลย</button></div></div></div></div>`;
 const vPaste = () =>
   `<div class="ov"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="pst"><div class="dlgh"><h2 id="pst">วางรายชื่อหนัง</h2><button class="ib" data-a="pastecancel" aria-label="ปิด">${IC.x}</button></div><p class="hint" style="margin-bottom:10px">วางรายชื่อหนัง บรรทัดละ 1 เรื่อง (คัดลอกจาก Excel หรือ Notepad ได้) หนังจะต่อท้ายรายการออนแอร์ของจอนี้</p><textarea id="pastebox" class="pastebox" aria-label="รายชื่อหนัง บรรทัดละ 1 เรื่อง" data-focus></textarea><div class="dlgf"><button class="btn primary" data-a="pasteok">เพิ่มเข้าจอนี้</button><button class="btn ghost" data-a="pastecancel">ยกเลิก</button></div></div></div>`;
 function vHow() {
@@ -6009,8 +6229,8 @@ const TOURS = {
   dat: [
     {
       t: 'steps',
-      h: 'ทำงาน 4 ขั้น',
-      p: 'ไล่จากซ้ายไปขวา แถบนี้บอกว่าอยู่ขั้นไหน และแต่ละขั้นทำไปถึงไหนแล้ว กดที่ขั้นเพื่อย้อนกลับได้',
+      h: 'เมนูด้านซ้าย = ขั้นของงาน',
+      p: 'ไล่จากบนลงล่าง เมนูบอกว่าแต่ละขั้นทำไปถึงไหน (เช่น 11 จาก 11 แบบ) กดเพื่อไปขั้นนั้นได้ “หน้าหลัก” สรุปงานทั้งหมดของวันนี้',
     },
     {
       t: 'sect',
@@ -6039,8 +6259,8 @@ const TOURS = {
     },
     {
       t: 'hdr',
-      h: 'ตัวช่วยมุมขวาบน',
-      p: '“ระบบทำงานอย่างไร” อธิบายภาพรวมสำหรับคนที่ยังไม่รู้จักระบบ “แนะนำการใช้” เปิดทัวร์ของหน้าที่อยู่ “วิธีใช้” มีขั้นตอนและกฎทั้งหมด ปุ่มหน้ายิ้มเปิด / ปิดผู้ช่วย “น้องเช็ค” ปุ่มสุดท้ายสลับโหมดสว่างและมืด',
+      h: 'มุมขวาบน',
+      p: 'วันที่ของ Playlist และรอบที่ระบบใช้ • ปุ่มหน้ายิ้มเปิด / ปิดผู้ช่วย “น้องเช็ค” • ปุ่มสุดท้ายสลับโหมดสว่างและมืด • “ระบบทำงานอย่างไร” และ “แนะนำการใช้” อยู่ใต้เมนูด้านซ้าย',
     },
   ],
   pl: [
@@ -6109,6 +6329,40 @@ const TOURS = {
       h: 'งานโฟลเดอร์และรูป',
       p: 'เติมเสร็จแล้ว ถ้าจะสร้างโฟลเดอร์แยกรูปของหนังใหม่ ใส่วันที่ถ่าย หรือตรวจโฟลเดอร์เทียบจอ กดปุ่มนี้ ระบบใช้ใบเช็คที่เพิ่งเติมให้เลย',
     },
+  ],
+  home: [
+    {
+      t: 'sect',
+      h: 'แท็บด้านบน',
+      p: '“เติมใบเช็ครูป” = งานประจำวัน • “งานโฟลเดอร์และรูป” = สร้างโฟลเดอร์แยกรูป ใส่วันที่ถ่าย ตรวจเทียบจอ • “วิธีใช้” = ขั้นตอนและกฎทั้งหมด',
+    },
+    { t: 'steps', h: 'เมนูด้านซ้าย', p: 'ขั้นของงานประจำวัน บอกว่าแต่ละขั้นทำไปถึงไหน กดเพื่อไปขั้นนั้น' },
+    {
+      t: 'hhero',
+      h: 'หน้าหลัก',
+      p: 'ปุ่มใหญ่พาไปสิ่งที่ควรทำต่อ ลากไฟล์ Playlist และใบเช็คมาวางที่หน้านี้ได้เลย ระบบแยกให้เอง (.xlsm = ใบเช็ค)',
+    },
+    {
+      t: 'hflow',
+      h: 'ขั้นตอนและสถานะ',
+      p: '4 ขั้นของงานประจำวัน (เครื่องหมายถูก = ทำแล้ว) กดเพื่อไปขั้นนั้น • กล่อง “ตอนนี้” บอกว่าควรทำอะไรต่อ',
+    },
+    {
+      t: 'hkpi',
+      h: 'ตัวเลขของวันนี้',
+      p: 'จอใน Playlist • Playlist กี่แบบ (จาก 11) • ใบเช็คกี่ไฟล์ • ควรตรวจกี่รายการ (หลังเติม)',
+    },
+    {
+      t: 'htbl',
+      h: 'ใบเช็ครูปวันนี้',
+      p: 'แต่ละไฟล์พร้อมเติมไหม เติมแล้วกี่จอ ควรตรวจกี่รายการ กดแท็บเพื่อกรอง',
+    },
+    {
+      t: 'hside',
+      h: 'ไฟล์และผลการเติม',
+      p: 'ไฟล์ Playlist ที่ใส่แล้ว และผลการเติมล่าสุด (ดาวน์โหลด / บันทึกทับได้จากตรงนี้)',
+    },
+    { t: 'hdr', h: 'มุมขวาบน', p: 'วันที่ของ Playlist และรอบ • เปิด / ปิดน้องเช็ค • สลับโหมดสว่าง / มืด' },
   ],
   tools: [
     {
@@ -6261,10 +6515,13 @@ function view() {
     tbs = tb ? [tb.scrollTop, tb.scrollLeft] : null;
   $('#hnav').innerHTML = vNav();
   $('#sect').innerHTML = vSect();
+  $('#side').innerHTML = vSide();
   $('#steps').innerHTML = vSteps();
   $('#steps').style.display = tab === 'tools' ? 'none' : '';
   $('#ver').textContent = VERTXT;
-  $('#app').innerHTML = { dat: vData, pl: vPl, tl: vTl, fl: vFl, res: vRes, tools: vTools }[tab]();
+  $('#app').innerHTML = { home: vHome, dat: vData, pl: vPl, tl: vTl, fl: vFl, res: vRes, tools: vTools }[
+    tab
+  ]();
   if (tab === 'fl') {
     $('#o_media').value = OP.media;
     $('#o_sort').value = OP.sort;
@@ -7200,10 +7457,18 @@ const ACT = {
     }
   },
   fillsec: () => {
-    if (BUSY || FILLING || tab !== 'tools') return;
-    tab = FTAB === 'res' && !last ? 'fl' : FTAB || 'dat';
+    if (BUSY || FILLING) return;
+    if (tab !== 'tools') {
+      tab = 'home';
+    } else tab = FTAB === 'res' && !last ? 'fl' : FTAB || 'home';
     cs = null;
     window.scrollTo(0, 0);
+  },
+  tooltop: () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+  htab: k => {
+    HTAB = k;
   },
   tcuse: async k => {
     if (!(k === 'last' ? last : C.length) || !tcOk()) return;
@@ -7544,6 +7809,7 @@ const ACT = {
         MQN = _w ? 'warn' : 'done';
         note = `เติมเสร็จแล้ว ${_f} ไฟล์` + (_w ? ` • ควรตรวจ ${_w} รายการ` : '');
       }
+      last.csig = sigOf(C);
       tab = 'res';
       cs = null;
       RO.clear();
@@ -7731,11 +7997,21 @@ document.addEventListener('drop', e => {
   const fs = [...((e.dataTransfer && e.dataTransfer.files) || [])];
   if (!fs.length) return;
   const z = e.target.closest && e.target.closest('[data-dz]');
-  let k = z ? z.dataset.dz : tab === 'fl' ? 'ck' : tab === 'dat' ? 'pl' : tab === 'tools' ? 'tc' : null;
+  let k = z
+    ? z.dataset.dz
+    : tab === 'fl'
+      ? 'ck'
+      : tab === 'dat'
+        ? 'pl'
+        : tab === 'tools'
+          ? 'tc'
+          : tab === 'home'
+            ? 'any'
+            : null;
   if (!k) {
     if (fs.every(f => /\.json$/i.test(f.name))) k = 'pj';
     else {
-      say('ลากไฟล์ Playlist ไปวางในขั้นที่ 1 หรือใบเช็ครูปในขั้นที่ 3 / หน้างานโฟลเดอร์และรูป');
+      say('ลากไฟล์ไปวางที่หน้าหลัก ขั้นที่ 1 (Playlist) ขั้นที่ 3 (ใบเช็ครูป) หรือหน้างานโฟลเดอร์และรูป');
       return;
     }
   }
