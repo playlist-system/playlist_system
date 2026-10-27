@@ -2370,7 +2370,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  MQN=skip.length||emp.length?'warn':'done';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.2 (27 ต.ค. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.3 (27 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -2676,7 +2676,9 @@ const isWarn=x=>isFilled(x)?/ใช้รายการ/.test(x[2])&&!/จอ (
 let PICR='cur',PICU=0,PICX=null,PICD=null; /* PICX = รายชื่อหนังของใบเช็คในหน้างานโฟลเดอร์และรูป {W,res,bad,n,sig,pic,cmp} (3.13: ผลตรวจโฟลเดอร์เทียบจออยู่ใน cmp) • PICD = โฟลเดอร์แยกรูปที่เลือกล่าสุด */
 let TC=[],TCS='',TCK=null,TCL=null,TCN='',FTAB='home'; /* ใบเช็คของหน้างานโฟลเดอร์และรูป (3.13): TCS = last ใบที่เพิ่งเติม / c ใบในขั้นที่ 3 / dir เปิดทั้งโฟลเดอร์ / own เพิ่มเอง • TCK = ต้นทางตอนเลือก • TCL = ผลการเติมตอนเลือก • FTAB = ขั้นที่ค้างไว้ */
 const sigOf=A=>A.map(f=>f.name+':'+f.buf.byteLength).join('|'),picS=()=>PICX,ckSig=()=>sigOf(TC); /* โฟลเดอร์แยกรูป (3.10): PICR รอบ cur = รอบนี้ / 1 = รอบ 1–15 / both = ทั้ง 2 รอบ (เลือกได้เมื่อวันทำงานเป็นวันที่ 16 ขึ้นไป) • PICU เอาหนังที่เริ่มถึงวันที่ (0 = ทั้งหมด) */
-const picRe=async()=>{const L=picS();if(!L||!L.pic||!L.pic.d)return;note='กำลังตรวจโฟลเดอร์แยกรูป …';view();const P=await picPlan(L.pic.d,L.W,L.res,PICR,picUp());L.pic={d:L.pic.d,P,made:null};note=P.n?`ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์`:'โฟลเดอร์แยกรูปครบแล้ว'};
+/* 4.1.3: ระหว่างตรวจใหม่ตามตัวเลือก (รอบ / ถึงวันที่) ปุ่มสร้างกดไม่ได้ — เดิมกดได้ระหว่างนั้นและสร้างตามรายการเก่า (เช่น เลือกถึงวันที่ 26 แต่ได้หนังวันที่ 27 ด้วย) */
+const picSig=P=>P?P.plan.map(p=>p.s.path.join('/')+'|'+p.rnd+'|'+(p.mkMon?1:0)+(p.mkRnd?1:0)+'|'+p.need.map(q=>q[1]).join(',')).join('\n')+'|'+P.upto+'|'+(P.rounds||[]).join(','):'';
+const picRe=async()=>{const L=picS();if(!L||!L.pic||!L.pic.d)return;note='กำลังตรวจโฟลเดอร์แยกรูป …';const o=L.pic;o.busy=true;view();try{const P=await picPlan(o.d,L.W,L.res,PICR,picUp());L.pic={d:o.d,P,made:null};note=P.n?`ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์`:'โฟลเดอร์แยกรูปครบแล้ว'}finally{o.busy=false}};
 const picRng=()=>{const D=new Date(picS().W),wd=D.getUTCDate(),two=wd>=16,rs=two?PICR:'cur';return rs==='cur'&&two?[16,wd]:rs==='1'?[1,15]:[1,wd]},picUp=()=>{const[lo,hi]=picRng();return PICU>=lo&&PICU<=hi?PICU:0};
 const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))return'';
  const D=new Date(L.W),two=D.getUTCDate()>=16,ld=new Date(Date.UTC(D.getUTCFullYear(),D.getUTCMonth()+1,0)).getUTCDate(),rs=two?PICR:'cur',r2='16–'+ld,up=picUp(),[lo,hi]=picRng(),rn=(two?(rs==='1'?'1–15':rs==='both'&&!(up&&up<16)?'1–15 และ '+r2:rs==='both'?'1–15':r2):'1–15')+' '+TH[D.getUTCMonth()]+(up?' • หนังที่ขึ้นถึง '+up+' '+TH[D.getUTCMonth()]:''),p=L.pic,P=p&&p.P,
@@ -2685,7 +2687,7 @@ const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))retu
   mo=D.getUTCMonth(),TM=TH[mo],dc=new Map(),late=new Set(),
   _dc=(()=>{for(const r of L.res)for(const b of r.fold||[])for(const[n,g]of b.items||[]){if(!n)continue;const d=new Date(g),dd=d.getUTCDate();if(d.getUTCFullYear()!==D.getUTCFullYear()||d.getUTCMonth()!==mo||dd<lo||dd>hi)continue;const k=String(n).trim();if(!dc.has(dd))dc.set(dd,new Set());dc.get(dd).add(k);if(up&&dd>up)late.add(k)}})(),
   days=[...new Set([...dc.keys(),...(up?[up]:[])])].sort((a,b)=>a-b),ex=days.length>1?days[days.length-2]:0,exn=ex?days[days.length-1]:0,
-  uhelp=up?`สร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่ในใบเช็ค) ตั้งแต่ต้นรอบ<b>ถึงวันที่ ${up} ${TM}</b>${late.size?` • หนังที่ขึ้นหลังวันที่ ${up} อีก <b>${late.size} เรื่อง</b>ยังไม่สร้าง (เช่น ${esc([...late].slice(0,3).join(', '))}${late.size>3?' …':''})`:' • ไม่มีหนังที่ขึ้นหลังวันนี้'} • เลือก “ทุกเรื่องในรอบ” เมื่อจะสร้างให้ครบ`
+  uhelp=up?`สร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่ในใบเช็ค) ตั้งแต่ต้นรอบ<b>ถึงวันที่ ${up} ${TM}</b>${late.size?` • <b>ยังไม่สร้าง</b>หนังที่ขึ้นหลังวันที่ ${up} อีก ${late.size} เรื่อง (เช่น ${esc([...late].slice(0,3).join(', '))}${late.size>3?' …':''})`:' • ไม่มีหนังที่ขึ้นหลังวันนี้'} • เลือก “ทุกเรื่องในรอบ” เมื่อจะสร้างให้ครบ`
    :`<b>ค่าปกติ</b> = สร้างให้หนังทุกเรื่องของรอบที่เลือก • ถ้าเลือกวันที่ ระบบสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่ในใบเช็ค) ตั้งแต่ต้นรอบจนถึงวันนั้น${ex?` เช่น เลือก ${ex} ${TM} หนังที่ขึ้นวันที่ ${exn} ${TM} จะยังไม่สร้าง`:''} — ใช้ตอนที่หนังที่ขึ้นทีหลังยังไม่ได้ถ่ายรูป`,
   usel=FSA?`<label class="picr"><span>หนังที่ขึ้นจอถึงวันที่</span><select id="picupto" aria-label="หนังที่ขึ้นจอถึงวันที่" aria-describedby="picuh"><option value="0" ${up?'':'selected'}>ทุกเรื่องในรอบ (ค่าปกติ)</option>${days.map(d=>`<option value="${d}" ${up===d?'selected':''}>${d} ${TM}${dc.has(d)?(d===lo?` • ต้นรอบ ${dc.get(d).size} เรื่อง`:` • ขึ้น ${dc.get(d).size} เรื่อง`):''}</option>`).join('')}</select></label><small class="pich" id="picuh">${uhelp}</small>`:'',
   sel=two&&FSA?`<div class="picr"><span>สร้างโฟลเดอร์ของ</span><div class="seg" role="radiogroup" aria-label="รอบที่จะสร้างโฟลเดอร์">${[['cur','รอบ '+r2+' (รอบนี้)'],['1','รอบ 1–15'],['both','ทั้ง 2 รอบ']].map(([k,t])=>`<button role="radio" aria-checked="${rs===k}" class="${rs===k?'on':''}" data-a="picround" data-k="${k}">${t}</button>`).join('')}</div></div>`:'';
@@ -2699,7 +2701,7 @@ const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))retu
  ${W.length?`<details class="picd" open><summary>จะสร้างในจอเหล่านี้ (${nW} จอ)</summary><ul>${W.map(x=>`<li><b>${nm(x)}</b>${rt(x)} ${x.need.length?x.need.length+' โฟลเดอร์':''}${x.mkMon?` • โฟลเดอร์เดือน ${esc(x.mon)}`:''}${x.mkRnd?` • โฟลเดอร์รอบ ${esc(x.rnd)}`:''}<small>${esc(x.need.slice(0,6).map(q=>q[1]).join(', '))}${x.need.length>6?' …':''}</small></li>`).join('')}</ul></details>`:''}
  ${P.miss.length?`<details class="picd"><summary>หาโฟลเดอร์จอไม่เจอ ${P.miss.length} จอ (ระบบไม่สร้างโฟลเดอร์จอเอง)</summary><ul>${P.miss.map(x=>`<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>`:''}
  ${P.closed.length?`<p class="hint">จอปิดถาวร ข้าม: ${esc(P.closed.map(x=>x.id).join(', '))}</p>`:''}
- <div class="picb">${P.n?`<button class="btn primary" data-a="picmake">สร้าง ${P.n.toLocaleString()} โฟลเดอร์</button>`:''}<button class="btn secondary" data-a="picscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="picscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`}
+ <div class="picb">${P.n?`<button class="btn primary" data-a="picmake"${p.busy?' disabled':''}>${p.busy?'กำลังตรวจตามตัวเลือกใหม่ …':`สร้าง ${P.n.toLocaleString()} โฟลเดอร์`}</button>`:''}<button class="btn secondary" data-a="picscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="picscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`}
  const srcL=L.bad&&L.bad.length?`<p class="hint">อ่านไม่ได้ / ไม่พบจอ: ${esc(L.bad.join(', '))}</p>`:'';
  return`<section class="pic" data-tour="tpic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูป รอบ ${rn}</h3>${srcL}${b}</section>`};
 let SHOT=null; /* ใส่วันที่ถ่าย (3.12): {sig, d = โฟลเดอร์แยกรูป, R = ผลตรวจ, done = ไฟล์ที่ใส่แล้ว} */
@@ -3231,8 +3233,10 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
  tcclear:()=>{if(!tcOk())return;TC=[];TCS='';TCK=TCL=null;TCN='';PICX=null;SHOT=null;note='ล้างรายการใบเช็คของหน้านี้แล้ว'},
  picround:async k=>{if(!['cur','1','both'].includes(k)||k===PICR)return;PICR=k;PICU=0;await picRe()},
  picupto:async v=>{PICU=Math.max(0,parseInt(v,10)||0);await picRe()},
- picmake:async()=>{const L=picS();if(!L||!L.pic||!L.pic.P)return;note='กำลังสร้างโฟลเดอร์ …';view();
-  const r=await picMake(L.pic.P);L.pic.P=await picPlan(L.pic.d,L.W,L.res,PICR,picUp());L.pic.made=r;
+ picmake:async()=>{const L=picS();if(!L||!L.pic||!L.pic.P||L.pic.busy)return;note='กำลังสร้างโฟลเดอร์ …';view();
+  const F=await picPlan(L.pic.d,L.W,L.res,PICR,picUp()); /* 4.1.3: ตรวจตามตัวเลือกปัจจุบันอีกครั้งก่อนสร้าง ถ้ารายการไม่ตรงกับที่แสดง ไม่สร้าง ให้ดูรายการใหม่ก่อน */
+  if(picSig(F)!==picSig(L.pic.P)){L.pic={d:L.pic.d,P:F,made:null};MQN='warn';note='รายการเปลี่ยนตามตัวเลือกล่าสุด ยังไม่ได้สร้าง — ตรวจรายการแล้วกดสร้างอีกครั้ง';return}
+  const r=await picMake(F);L.pic.P=await picPlan(L.pic.d,L.W,L.res,PICR,picUp());L.pic.made=r;
   MQN=r.bad.length?'warn':'done';note=r.bad.length?`สร้างแล้ว ${r.n} โฟลเดอร์ สร้างไม่ได้ ${r.bad.length} โฟลเดอร์`:`สร้างแล้ว ${r.n} โฟลเดอร์`},
  savedir:async k=>{if(!last||!FSA)return;let d=k==='pick'?null:CKDIR;
   try{if(!d&&k!=='pick'){const x=await HDB.get('ck').catch(()=>null);if(x)d=x}
