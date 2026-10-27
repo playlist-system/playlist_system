@@ -77,6 +77,7 @@
  *   สร้างชีตใหม่ เรียงตามเลขจอ แก้ป้ายแพค และสูตร Analysis (arrangeWb, arrOn, vArr, arrTxt)
  *   เวอร์ชัน 4.1.1 เพิ่มในส่วน 12: ลากไฟล์ .zip ลงขั้นที่ 1 / 3 ได้เลย ระบบใช้ไฟล์ Excel ข้างใน (isZip, unzipFiles)
  *   เวอร์ชัน 4.1.2: จอที่ย้ายเข้าชีตมีเส้นตารางเหมือนจออื่น (arrangeWb) • งาน Freeze Screen ติ๊กให้ใส่ได้ (FRZIN, isFrz, frzOn, vFrz)
+ *   เวอร์ชัน 4.1.3: สร้างโฟลเดอร์แยกรูป — ปุ่มสร้างกดไม่ได้ระหว่างตรวจรายการใหม่ และตรวจซ้ำก่อนสร้าง (picRe, picSig, ACT.picmake)
  * ======================================================================
  */
 
@@ -5399,7 +5400,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.2 (27 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.3 (27 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -6381,14 +6382,41 @@ const sigOf = A => A.map(f => f.name + ':' + f.buf.byteLength).join('|'),
     sigOf(
       TC,
     ); /* โฟลเดอร์แยกรูป (3.10): PICR รอบ cur = รอบนี้ / 1 = รอบ 1–15 / both = ทั้ง 2 รอบ (เลือกได้เมื่อวันทำงานเป็นวันที่ 16 ขึ้นไป) • PICU เอาหนังที่เริ่มถึงวันที่ (0 = ทั้งหมด) */
+/* 4.1.3: ระหว่างตรวจใหม่ตามตัวเลือก (รอบ / ถึงวันที่) ปุ่มสร้างกดไม่ได้ — เดิมกดได้ระหว่างนั้นและสร้างตามรายการเก่า (เช่น เลือกถึงวันที่ 26 แต่ได้หนังวันที่ 27 ด้วย) */
+const picSig = P =>
+  P
+    ? P.plan
+        .map(
+          p =>
+            p.s.path.join('/') +
+            '|' +
+            p.rnd +
+            '|' +
+            (p.mkMon ? 1 : 0) +
+            (p.mkRnd ? 1 : 0) +
+            '|' +
+            p.need.map(q => q[1]).join(','),
+        )
+        .join('\n') +
+      '|' +
+      P.upto +
+      '|' +
+      (P.rounds || []).join(',')
+    : '';
 const picRe = async () => {
   const L = picS();
   if (!L || !L.pic || !L.pic.d) return;
   note = 'กำลังตรวจโฟลเดอร์แยกรูป …';
+  const o = L.pic;
+  o.busy = true;
   view();
-  const P = await picPlan(L.pic.d, L.W, L.res, PICR, picUp());
-  L.pic = { d: L.pic.d, P, made: null };
-  note = P.n ? `ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์` : 'โฟลเดอร์แยกรูปครบแล้ว';
+  try {
+    const P = await picPlan(o.d, L.W, L.res, PICR, picUp());
+    L.pic = { d: o.d, P, made: null };
+    note = P.n ? `ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์` : 'โฟลเดอร์แยกรูปครบแล้ว';
+  } finally {
+    o.busy = false;
+  }
 };
 const picRng = () => {
     const D = new Date(picS().W),
@@ -6462,7 +6490,7 @@ const vPic = () => {
     ex = days.length > 1 ? days[days.length - 2] : 0,
     exn = ex ? days[days.length - 1] : 0,
     uhelp = up
-      ? `สร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่ในใบเช็ค) ตั้งแต่ต้นรอบ<b>ถึงวันที่ ${up} ${TM}</b>${late.size ? ` • หนังที่ขึ้นหลังวันที่ ${up} อีก <b>${late.size} เรื่อง</b>ยังไม่สร้าง (เช่น ${esc([...late].slice(0, 3).join(', '))}${late.size > 3 ? ' …' : ''})` : ' • ไม่มีหนังที่ขึ้นหลังวันนี้'} • เลือก “ทุกเรื่องในรอบ” เมื่อจะสร้างให้ครบ`
+      ? `สร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่ในใบเช็ค) ตั้งแต่ต้นรอบ<b>ถึงวันที่ ${up} ${TM}</b>${late.size ? ` • <b>ยังไม่สร้าง</b>หนังที่ขึ้นหลังวันที่ ${up} อีก ${late.size} เรื่อง (เช่น ${esc([...late].slice(0, 3).join(', '))}${late.size > 3 ? ' …' : ''})` : ' • ไม่มีหนังที่ขึ้นหลังวันนี้'} • เลือก “ทุกเรื่องในรอบ” เมื่อจะสร้างให้ครบ`
       : `<b>ค่าปกติ</b> = สร้างให้หนังทุกเรื่องของรอบที่เลือก • ถ้าเลือกวันที่ ระบบสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่ในใบเช็ค) ตั้งแต่ต้นรอบจนถึงวันนั้น${ex ? ` เช่น เลือก ${ex} ${TM} หนังที่ขึ้นวันที่ ${exn} ${TM} จะยังไม่สร้าง` : ''} — ใช้ตอนที่หนังที่ขึ้นทีหลังยังไม่ได้ถ่ายรูป`,
     usel = FSA
       ? `<label class="picr"><span>หนังที่ขึ้นจอถึงวันที่</span><select id="picupto" aria-label="หนังที่ขึ้นจอถึงวันที่" aria-describedby="picuh"><option value="0" ${up ? '' : 'selected'}>ทุกเรื่องในรอบ (ค่าปกติ)</option>${days.map(d => `<option value="${d}" ${up === d ? 'selected' : ''}>${d} ${TM}${dc.has(d) ? (d === lo ? ` • ต้นรอบ ${dc.get(d).size} เรื่อง` : ` • ขึ้น ${dc.get(d).size} เรื่อง`) : ''}</option>`).join('')}</select></label><small class="pich" id="picuh">${uhelp}</small>`
@@ -6507,7 +6535,7 @@ const vPic = () => {
  }
  ${P.miss.length ? `<details class="picd"><summary>หาโฟลเดอร์จอไม่เจอ ${P.miss.length} จอ (ระบบไม่สร้างโฟลเดอร์จอเอง)</summary><ul>${P.miss.map(x => `<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>` : ''}
  ${P.closed.length ? `<p class="hint">จอปิดถาวร ข้าม: ${esc(P.closed.map(x => x.id).join(', '))}</p>` : ''}
- <div class="picb">${P.n ? `<button class="btn primary" data-a="picmake">สร้าง ${P.n.toLocaleString()} โฟลเดอร์</button>` : ''}<button class="btn secondary" data-a="picscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="picscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
+ <div class="picb">${P.n ? `<button class="btn primary" data-a="picmake"${p.busy ? ' disabled' : ''}>${p.busy ? 'กำลังตรวจตามตัวเลือกใหม่ …' : `สร้าง ${P.n.toLocaleString()} โฟลเดอร์`}</button>` : ''}<button class="btn secondary" data-a="picscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="picscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
   }
   const srcL =
     L.bad && L.bad.length ? `<p class="hint">อ่านไม่ได้ / ไม่พบจอ: ${esc(L.bad.join(', '))}</p>` : '';
@@ -8731,10 +8759,23 @@ const ACT = {
   },
   picmake: async () => {
     const L = picS();
-    if (!L || !L.pic || !L.pic.P) return;
+    if (!L || !L.pic || !L.pic.P || L.pic.busy) return;
     note = 'กำลังสร้างโฟลเดอร์ …';
     view();
-    const r = await picMake(L.pic.P);
+    const F = await picPlan(
+      L.pic.d,
+      L.W,
+      L.res,
+      PICR,
+      picUp(),
+    ); /* 4.1.3: ตรวจตามตัวเลือกปัจจุบันอีกครั้งก่อนสร้าง ถ้ารายการไม่ตรงกับที่แสดง ไม่สร้าง ให้ดูรายการใหม่ก่อน */
+    if (picSig(F) !== picSig(L.pic.P)) {
+      L.pic = { d: L.pic.d, P: F, made: null };
+      MQN = 'warn';
+      note = 'รายการเปลี่ยนตามตัวเลือกล่าสุด ยังไม่ได้สร้าง — ตรวจรายการแล้วกดสร้างอีกครั้ง';
+      return;
+    }
+    const r = await picMake(F);
     L.pic.P = await picPlan(L.pic.d, L.W, L.res, PICR, picUp());
     L.pic.made = r;
     MQN = r.bad.length ? 'warn' : 'done';
