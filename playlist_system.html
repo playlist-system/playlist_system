@@ -2327,7 +2327,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  MQN=skip.length||emp.length?'warn':'done';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1 (27 ต.ค. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.1 (27 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -2481,7 +2481,7 @@ const vSteps=()=>{const cur=stepIx();return STEPS.map(([k,t],i)=>{const dn=stepD
 const vNav=()=>{const tl=THEME==='dark'?'เปลี่ยนเป็นโหมดสว่าง':'เปลี่ยนเป็นโหมดมืด',t=tab==='tools',wd=DB.length?workDate():null,ml=mqOn()?'ปิดผู้ช่วยน้องเช็ค':'เปิดผู้ช่วยน้องเช็ค';
  return`<div class="tops" role="navigation" aria-label="ส่วนของระบบ" data-tour="sect"><button class="tp${t?'':' on'}" data-a="fillsec" ${t?'':'aria-current="page"'}>${IC.fillI}<span>เติมใบเช็ครูป</span></button><button class="tp${t?' on':''}" data-a="tools" ${t?'aria-current="page"':''}>${IC.folder}<span>งานโฟลเดอร์และรูป</span></button><button class="tp" data-a="help" aria-haspopup="dialog">${IC.book}<span>วิธีใช้</span></button></div><div class="hright" data-tour="hdr">${wd?`<span class="dchip">${IC.cal}<span><b>Playlist ${thd(wd)}</b><small>รอบ ${rndOf(+wd)}</small></span></span>`:''}<button class="rb${mqOn()?'':' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${ml}" title="${ml}">${IC.bot}</button><button class="rb" data-a="theme" aria-label="${tl}" title="${tl}">${THEME==='dark'?IC.sun:IC.moon}</button></div>`};
 const shead=(t,p,extra='')=>`<div class="shead"><div><h1>${t}</h1>${p?`<p>${p}</p>`:''}</div>${extra}</div>`;
-const PICK={pl:['.xlsx,.xlsm',true],ck:['.xlsx,.xlsm',true],tc:['.xlsx,.xlsm',true],pj:['.json',false]};
+const PICK={pl:['.xlsx,.xlsm,.zip',true],ck:['.xlsx,.xlsm,.zip',true],tc:['.xlsx,.xlsm',true],pj:['.json',false]};
 function openPicker(k){const p=$('#picker');if(!p||!PICK[k])return;p.dataset.k=k;p.accept=PICK[k][0];p.multiple=PICK[k][1];p.value='';p.click()}
 const drop=(k,t,s,acc,tour,sm)=>`<div class="drop${sm?' sm':''}" data-dz="${k}" data-a="pick" data-k="${k}" data-tour="${tour}" tabindex="0" role="button" aria-label="${esc(t)} (กด Enter เพื่อเลือกไฟล์)"><span class="dic">${k==='ck'?IC.sheet:IC.up}</span><span class="dt"><b>${t}</b><span class="ds">${s}</span></span>${!sm&&mqOn()?`<span class="dmq" aria-hidden="true"><span class="mq mq-i">${mqSVG('idle')}</span><span class="mq mq-c">${mqSVG('catch')}</span></span>`:''}</div>`;
 const alertHTML=(k,t,body)=>`<div class="alert ${k}" role="${k==='er'?'alert':'status'}">${k==='ok'?IC.okc:k==='info'?IC.info:IC.warn}<b>${t}</b><div>${body}</div></div>`;
@@ -2522,7 +2522,7 @@ function vData(){const has=DB.length>0,wd=has?workDate():null,sdc=KINDS.filter(K
  const isSdc=([f])=>DB.some(s=>s.pf===f&&sdc.some(K=>K.has(s))); /* Show DC / LA PlanB มีช่องบอกสถานะของตัวเอง ไม่นับเป็น “หลายวันปนกัน” */
  const ds=[...new Set(fl.filter(x=>!isSdc(x)).map(x=>x[1]).filter(Boolean))].sort((a,b)=>a-b);
  return`${shead('ใส่ Playlist ของวันนี้','ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว')}
- <div class="s1">${drop('pl',has?'เพิ่มหรือเปลี่ยนไฟล์ Playlist':'ลากไฟล์ Playlist มาวางที่นี่','หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม','.xlsx,.xls,.xlsm','drop-pl',has)}${vDateCard(wd,has)}</div>
+ <div class="s1">${drop('pl',has?'เพิ่มหรือเปลี่ยนไฟล์ Playlist':'ลากไฟล์ Playlist มาวางที่นี่','หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม','.xlsx,.xls,.xlsm','drop-pl',has)}${vDateCard(wd,has)}</div>
  ${vWall(wd)}
  <div class="stack">${PLX.length?alertHTML('er',`อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`,`<ul>${PLX.map(x=>`<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`):''}
  ${vPLI()}
@@ -2886,7 +2886,7 @@ const vArr=()=>{const F=last.res.filter(r=>r.blob&&arrHas(r.arr));if(!F.length)r
 const vHelp=()=>`<div class="ov"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="hlt"><div class="dlgh"><h2 id="hlt">วิธีใช้ประจำวัน</h2><button class="ib" data-a="help" aria-label="ปิด" data-focus>${IC.x}</button></div>
 <ol class="hs">
 <li><b>เตรียมไฟล์</b><span>Playlist ของวันนี้ 11 แบบ (สรุปรายการหนังแยกจอ 40Blue, 40Red, 80Blue, 80Red, CITY, Spare และ Signature Max, Show DC, BKJ1, BKJ2, Metro LED) กับใบเช็ครูปที่เติมแล้วของวันก่อนหน้า • ถ้ามีใบเช็ค CCTV / MRT ใส่ Playlist เพิ่มเติม Rama9 Connect, Digital MRT, Gateway X, Air Traveller, The 20 ด้วย (ไม่นับใน 11 แบบ)</span></li>
-<li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
+<li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง (ไฟล์ .zip เช่น จากหน้าเว็บ Playlist รายวัน หรือดาวน์โหลดทั้งโฟลเดอร์จาก Google Drive ลากลงได้เลย ไม่ต้องแตกไฟล์) ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
 <li><b>ขั้นที่ 2 ตรวจ / แก้ไข (ไม่บังคับ)</b><span>ใช้เมื่อต้องปลด เพิ่ม หรือเปลี่ยนชื่อหนังก่อนเติม</span></li>
 <li><b>ขั้นที่ 3 เติมใบเช็ครูป</b><span>ลากใบเช็ครูปลงกล่อง ดูว่าแต่ละไฟล์ขึ้น “พร้อมเติม” วันที่ทำงานและรอบถูกต้อง แล้วกด “เติมใบเช็ครูป”</span></li>
 <li><b>ขั้นที่ 4 ผลการเติม</b><span>เปิดดูรายการ “ควรตรวจ” ของแต่ละไฟล์ แล้วกด “ดาวน์โหลดทั้งหมด (.zip)” ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันพรุ่งนี้</span></li></ol>
@@ -3052,9 +3052,23 @@ async function loadProject(f){let o;try{o=JSON.parse(new TextDecoder().decode(aw
  for(const s of L)for(const r of s.rows){r.off=!!r.off;for(const k of['ty','st','s','e','note'])if(r[k]!=null&&typeof r[k]!=='string')r[k]=String(r[k]);for(const k of['len','cnt'])if(r[k]!=null&&typeof r[k]!=='number')r[k]=+r[k]||0}
  if(Array.isArray(o)){DB=L;PLD=null;PLM={}}else{DB=L;PLD=plDate()||(o.PLD?new Date(o.PLD):null)}   /* เหมือน addFiles('pj') ของเดิม แต่ใช้ข้อมูลที่ตรวจแล้ว */
  dirty=0;BASEERR='';OP.base='';cs=null;LIT=new Set(L.map(s=>kindOfS(s)));note='เปิดโปรเจกต์แล้ว';view()}
+/* 4.1.1: ไฟล์ .zip (ดาวน์โหลดจากหน้าเว็บ Playlist รายวัน หรือดาวน์โหลดทั้งโฟลเดอร์จาก Google Drive) → ใช้ไฟล์ Excel ข้างในได้เลย ไม่ต้องแตกไฟล์ก่อน */
+const isZip=f=>/\.zip$/i.test(f.name);
+const zipName=b=>{try{return new TextDecoder('utf-8',{fatal:true}).decode(b)}catch(_){try{return new TextDecoder('windows-874').decode(b)}catch(_2){return String.fromCharCode(...b)}}};
+async function unzipFiles(files){const out=[],bad=[];
+ for(const f of files){if(!isZip(f)){out.push(f);continue}
+  try{const z=await JSZip.loadAsync(await f.arrayBuffer(),{decodeFileName:zipName});
+   const es=Object.values(z.files).filter(e=>!e.dir&&!/(^|\/)(__MACOSX\/|\._|~\$)/.test(e.name)&&/\.(xlsx|xlsm|xls)$/i.test(e.name));
+   if(!es.length){bad.push(f.name);continue}
+   for(const e of es)out.push(new File([await e.async('uint8array')],e.name.split('/').pop().normalize('NFC'),{lastModified:e.date?+e.date:Date.now()}))}
+  catch(e){bad.push(f.name)}}
+ return{files:out,bad}}
 async function addAny(kind,files){files=[...files];if(!files.length)return;
  if(BUSY||FILLING){say('กำลังทำงานอยู่ รอให้เสร็จก่อน');return}
  if(TOUR)TOUR=null;
+ if(kind!=='tc'&&kind!=='pj'&&files.some(isZip)){const U=await unzipFiles(files);files=U.files;
+  if(U.bad.length)say(`เปิดไฟล์ .zip ไม่ได้ หรือในไฟล์ไม่มีไฟล์ Excel: ${U.bad.join(', ')}`);
+  if(!files.length)return}
  if(kind==='tc'){await tcAdd(files);return}
  const js=files.filter(f=>/\.json$/i.test(f.name)),rest=files.filter(f=>!/\.json$/i.test(f.name));
  if(kind==='pj'||(js.length&&!rest.length)){if(js[0]||files[0])await loadProject(js[0]||files[0]);return}
