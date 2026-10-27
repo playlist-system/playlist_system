@@ -73,6 +73,8 @@
  *   เวอร์ชัน 3.10 เพิ่มในส่วน 6, 9 และ 12: สร้างโฟลเดอร์แยกรูปเลือกรอบ 1–15 / ทั้ง 2 รอบ และเอาหนังที่เริ่มถึงวันที่ … (picPlan rs, upto / PICR, PICU)
  *   เวอร์ชัน 3.11 เพิ่มในส่วน 6, 9 และ 12: สร้างโฟลเดอร์แยกรูปจากใบเช็คอย่างเดียว ไม่ต้องใส่ Playlist (chkFold, vPicCk, PICX)
  *   เวอร์ชัน 3.12 เพิ่มในส่วน 6, 9 และ 12: ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป (chkRead, exifDay, shotScan, shotApply, vShot / picScreens, picTg)
+ *   เวอร์ชัน 4.1 เพิ่มในส่วน 6, 9 และ 12: จัดจอเข้าชีตตามแพค — จอที่ Playlist ย้ายแพค ย้ายบล็อกจอไปชีตของแพคนั้นก่อนเติม
+ *   สร้างชีตใหม่ เรียงตามเลขจอ แก้ป้ายแพค และสูตร Analysis (arrangeWb, arrOn, vArr, arrTxt)
  * ======================================================================
  */
 
@@ -2854,6 +2856,960 @@ async function cmpCheck(root, W, res) {
     txt: T.join('\n'),
   };
 }
+/* ---------- จัดจอเข้าชีตตามแพค (4.1): จอที่ Playlist ย้ายแพค → ย้ายบล็อกจอ (3 คอลัมน์) ไปชีตของแพคนั้น ---------- */
+const arrangeWb = (() => {
+  const XNS = 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
+  const PKG = ['40Blue', '40Red', '80Blue', '80Red', 'CITY', 'Spare'];
+  const CANON = {
+    '40Blue': 'PBTV 40 BLUE',
+    '40Red': 'PBTV 40 RED',
+    '80Blue': 'PBTV 80 BLUE',
+    '80Red': 'PBTV 80 RED',
+    CITY: 'CITY TV 25',
+    Spare: 'SPARE',
+  };
+  const SHEETNAME = { CITY: 'CITY TV 25', Spare: 'Spare' };
+  const nk = c => String(c).replace(/-/g, '').toUpperCase();
+  const qn = n => (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(n) ? n : "'" + n.replace(/'/g, "''") + "'");
+  const unq = s => (s.startsWith("'") ? s.slice(1, -1).replace(/''/g, "'") : s);
+  const parseRef = r => {
+    const m = /^([A-Z]+)(\d+)$/.exec(r);
+    return m ? [col2n(m[1]), +m[2]] : null;
+  };
+  const elts = (el, ln) => [...el.getElementsByTagNameNS(NS, ln)];
+  const kids = (el, ln) => [...el.children].filter(c => c.localName === ln);
+
+  /* ---------- formula translation ---------- */
+  const REF =
+    /(?<![A-Za-z0-9_.$฀-๿])((?:'(?:[^']|'')+'|[A-Za-z_฀-๿][A-Za-z0-9_.฀-๿]*)!)?(\$?)([A-Z]{1,3})(\$?)(\d+)(?::(\$?)([A-Z]{1,3})(\$?)(\d+))?(?![A-Za-z0-9_(!])/g;
+  /* map(sheetName, col) → [sheetName, col] | null ; ctxSheet = sheet the formula text refers to without prefix; dst = sheet the cell now lives in */
+  function trF(f, ctxSheet, dst, map, opt = {}) {
+    let bad = false;
+    const parts = f.split('"');
+    for (let i = 0; i < parts.length; i += 2)
+      parts[i] = parts[i].replace(REF, (all, pre, a1, c1, b1, r1, a2, c2, b2, r2) => {
+        const sh = pre ? unq(pre.slice(0, -1)) : ctxSheet;
+        const m1 = map(sh, col2n(c1)),
+          m2 = c2 ? map(sh, col2n(c2)) : m1;
+        if (!m1 || !m2) {
+          bad = true;
+          return all;
+        }
+        if (!pre && m1[0] !== dst && opt.local) bad = true;
+        let out = (m1[0] === dst ? '' : qn(m1[0]) + '!') + a1 + n2col(m1[1]) + b1 + r1;
+        if (c2) out += ':' + a2 + n2col(m2[1]) + b2 + r2;
+        return out;
+      });
+    return { f: parts.join('"'), bad };
+  }
+  /* shift relative refs of a shared-formula master by (dr, dc) */
+  function shiftRel(f, dr, dc) {
+    const parts = f.split('"');
+    for (let i = 0; i < parts.length; i += 2)
+      parts[i] = parts[i].replace(REF, (all, pre, a1, c1, b1, r1, a2, c2, b2, r2) => {
+        const s1 = (a1 ? c1 : n2col(col2n(c1) + dc)) + b1 + (b1 ? r1 : +r1 + dr);
+        let out = (pre || '') + a1 + s1;
+        if (c2) out += ':' + a2 + (a2 ? c2 : n2col(col2n(c2) + dc)) + b2 + (b2 ? r2 : +r2 + dr);
+        return out;
+      });
+    return parts.join('"');
+  }
+  function unshare(doc) {
+    const M = {};
+    for (const c of elts(doc, 'c')) {
+      const f = c.getElementsByTagNameNS(NS, 'f')[0];
+      if (f && f.getAttribute('t') === 'shared' && f.getAttribute('ref') && f.textContent)
+        M[f.getAttribute('si')] = [parseRef(c.getAttribute('r')), f.textContent];
+    }
+    let n = 0;
+    for (const c of elts(doc, 'c')) {
+      const f = c.getElementsByTagNameNS(NS, 'f')[0];
+      if (!f || f.getAttribute('t') !== 'shared') continue;
+      const m = M[f.getAttribute('si')];
+      if (!m) continue;
+      const [cc, rr] = parseRef(c.getAttribute('r'));
+      f.textContent = shiftRel(m[1], rr - m[0][1], cc - m[0][0]);
+      f.removeAttribute('t');
+      f.removeAttribute('si');
+      f.removeAttribute('ref');
+      n++;
+    }
+    return n;
+  }
+
+  /* ---------- read a check-sheet ---------- */
+  function readSheet(doc, wsv) {
+    const rows = new Map();
+    for (const r of kids(doc.getElementsByTagNameNS(NS, 'sheetData')[0], 'row')) {
+      const m = new Map();
+      for (const c of kids(r, 'c')) m.set(col2n(c.getAttribute('r').match(/[A-Z]+/)[0]), c);
+      rows.set(+r.getAttribute('r'), { el: r, cells: m });
+    }
+    const blocks = [];
+    const r11 = rows.get(11);
+    if (r11)
+      for (const [cn] of r11.cells) {
+        const x = wsv[n2col(cn) + '11'],
+          code = x ? codeOf(x.v) : '';
+        if (code) blocks.push({ code, cc: cn, s: cn - 2 });
+      }
+    blocks.sort((a, b) => a.s - b.s);
+    return { rows, blocks };
+  }
+  const hasVal = c =>
+    !!c && (c.getElementsByTagNameNS(NS, 'v').length > 0 || c.getElementsByTagNameNS(NS, 'is').length > 0);
+  const numV = (wsv, col, r) => {
+    const x = wsv[n2col(col) + r];
+    return x && typeof x.v === 'number' && x.v > 20000 && x.v < 80000 ? x.v : null;
+  };
+  const strV = (wsv, col, r) => {
+    const x = wsv[n2col(col) + r];
+    return x && x.v != null ? String(x.v).trim() : '';
+  };
+
+  async function arrangeWb(buf, on, opt = {}) {
+    opt = { mk: true, sort: true, ...opt };
+    const moves = [],
+      notes = [];
+    const wb = XLSX.read(buf, { type: 'array', cellFormula: true });
+    const zip = await JSZip.loadAsync(buf.slice(0));
+    const P = new DOMParser(),
+      S = new XMLSerializer();
+    const ser = d =>
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + S.serializeToString(d.documentElement);
+    const wx = P.parseFromString(await zip.file('xl/workbook.xml').async('string'), 'application/xml');
+    const relsX = P.parseFromString(
+      await zip.file('xl/_rels/workbook.xml.rels').async('string'),
+      'application/xml',
+    );
+    const rid = {};
+    for (const r of relsX.getElementsByTagName('Relationship'))
+      rid[r.getAttribute('Id')] = r.getAttribute('Target');
+    const sheetEls = [...wx.getElementsByTagNameNS(NS, 'sheet')];
+    const path = {};
+    for (const s of sheetEls) {
+      const t = rid[s.getAttributeNS(RNS, 'id')];
+      path[s.getAttribute('name')] = t.startsWith('/') ? t.slice(1) : 'xl/' + t;
+    }
+    const names = sheetEls.map(s => s.getAttribute('name'));
+    /* ชีตจอแยก: ชื่อชีตบอกแพค และมีรหัสจอในแถว 11 */
+    const info = {};
+    for (const sn of names) {
+      const media = !notChk(sn) && mediaOf(sn);
+      if (!media || !PKG.includes(media)) continue;
+      const xml = await zip.file(path[sn]).async('string');
+      const src = P.parseFromString(xml, 'application/xml');
+      const wsv = wb.Sheets[sn];
+      const R = readSheet(src, wsv);
+      if (!R.blocks.length) continue;
+      let ok = true;
+      R.blocks.forEach((b, i) => {
+        if (i && b.s !== R.blocks[i - 1].s + 3) ok = false;
+      });
+      const nc0 = R.blocks[0].s;
+      let hr = 0;
+      for (let r = 14; r <= 40 && !hr; r++) if (numV(wsv, nc0, r)) hr = r;
+      if (!ok || !hr) {
+        notes.push([sn, 'ไม่ได้จัด (รูปแบบชีตไม่ตรงแบบบล็อก 3 คอลัมน์)']);
+        continue;
+      }
+      info[sn] = { sn, media, xml, src, wsv, ...R, hr, base: nc0, end: R.blocks[R.blocks.length - 1].s + 2 };
+    }
+    /* แพคของแต่ละจอจาก Playlist */
+    const mediaOfCode = code => {
+      const ms = new Set();
+      for (const k of on.keys()) {
+        const [m, c] = k.split('|');
+        if (PKG.includes(m) && nk(c) === nk(code)) ms.add(m);
+      }
+      return ms.size === 1 ? [...ms][0] : ms.size ? 'many' : null;
+    };
+    const hasMedia = m => [...on.keys()].some(k => k.startsWith(m + '|'));
+    const plan = {}; /* sn → [{code, from, s(old start in from)}] */
+    for (const sn in info) plan[sn] = info[sn].blocks.map(b => ({ code: b.code, from: sn, s: b.s }));
+    const bySheetMedia = m =>
+      Object.keys(info).find(sn => info[sn].media === m) ||
+      names.find(sn => !notChk(sn) && mediaOf(sn) === m);
+    const created = {};
+    for (const sn in info)
+      for (const b of info[sn].blocks) {
+        const m = mediaOfCode(b.code);
+        if (!m) {
+          notes.push([sn, b.code + ' — ไม่พบใน Playlist ไม่ได้ย้าย']);
+          continue;
+        }
+        if (m === 'many') {
+          notes.push([sn, b.code + ' — อยู่หลายแพคใน Playlist ไม่ได้ย้าย']);
+          continue;
+        }
+        if (m === info[sn].media) continue;
+        if (!hasMedia(info[sn].media)) {
+          notes.push([sn, b.code + ' — ยังไม่ได้ใส่ Playlist แพค ' + info[sn].media + ' ไม่ได้ย้าย']);
+          continue;
+        }
+        let to = bySheetMedia(m);
+        if (to && !info[to]) {
+          notes.push([sn, b.code + ' → ' + m + ': ชีต ' + to + ' ไม่ใช่แบบบล็อกจอ ไม่ได้ย้าย']);
+          continue;
+        }
+        if (!to) {
+          if (!opt.mk) {
+            notes.push([sn, b.code + ' ควรอยู่แพค ' + m + ' แต่ไฟล์นี้ไม่มีชีตแพคนี้']);
+            continue;
+          }
+          to = created[m] || (created[m] = { m, from: sn, s: b.s, code: b.code });
+          to = '\u0000new:' + m;
+        }
+        plan[sn] = plan[sn].filter(x => x.code !== b.code);
+        (plan[to] = plan[to] || []).push({ code: b.code, from: sn, s: b.s });
+        moves.push({ code: b.code, from: sn, to, m, s: b.s });
+      }
+    /* ชื่อชีตใหม่ */
+    const newName = {};
+    for (const m in created) {
+      let nm = SHEETNAME[m];
+      if (!nm) {
+        const sib = Object.keys(info).find(sn => /40|80/.test(sn));
+        nm = sib
+          ? sib.replace(/40|80/, m.slice(0, 2)).replace(/blue|red/i, w => {
+              const t = m.slice(2).toUpperCase();
+              return w === w.toUpperCase()
+                ? t
+                : w[0] === w[0].toUpperCase()
+                  ? t[0] + t.slice(1).toLowerCase()
+                  : t.toLowerCase();
+            })
+          : CANON[m];
+      }
+      while (names.includes(nm)) nm += ' (2)';
+      newName['\u0000new:' + m] = nm;
+    }
+    for (const mv of moves) if (newName[mv.to]) ((mv.to = newName[mv.to]), (mv.created = true));
+    for (const k in newName) ((plan[newName[k]] = plan[k]), delete plan[k]);
+    /* เรียงตามเลขจอ */
+    for (const sn in plan) if (opt.sort) plan[sn].sort((a, b) => cmpN(a.code, b.code));
+    /* ชีตที่ต้องแก้ */
+    const touched = new Set();
+    for (const sn in plan) {
+      if (!info[sn]) {
+        touched.add(sn);
+        continue;
+      }
+      const old = info[sn].blocks.map(b => b.code).join('|'),
+        nw = plan[sn].map(x => x.code).join('|');
+      if (old !== nw) touched.add(sn);
+    }
+    /* แผนที่คอลัมน์: (sheet, col) → [sheet, col] */
+    const dstOf = {}; /* from|s → [sheet, newStart] */
+    for (const sn in plan) {
+      const base = info[sn]
+        ? info[sn].base
+        : info[created[Object.keys(created).find(m => newName['\u0000new:' + m] === sn)].from].base;
+      plan[sn].forEach((x, i) => (dstOf[x.from + '|' + x.s] = [sn, base + 3 * i]));
+    }
+    const tailShift = sn => (plan[sn].length - info[sn].blocks.length) * 3;
+    const map = (sh, c) => {
+      const I = info[sh];
+      if (!I || (!touched.has(sh) && !moves.some(m => m.from === sh))) return [sh, c];
+      if (c < I.base) return [sh, c];
+      if (c > I.end) return [sh, c + tailShift(sh)];
+      const s = I.base + Math.floor((c - I.base) / 3) * 3,
+        d = dstOf[sh + '|' + s];
+      return d ? [d[0], d[1] + (c - s)] : null;
+    };
+    /* ---------- ป้ายแพค ---------- */
+    const labelOf = {};
+    for (const sn in info) {
+      const I = info[sn];
+      for (const b of I.blocks) {
+        const t = strV(I.wsv, b.s + 1, 10);
+        if (t && mediaOf(t) === I.media) labelOf[I.media] = labelOf[I.media] || t;
+      }
+    }
+    const lab = m => labelOf[m] || CANON[m];
+    const badLab = Object.keys(info).some(sn =>
+      info[sn].blocks.some(b => {
+        const x = strV(info[sn].wsv, b.s + 1, 10);
+        return x && mediaOf(x) && mediaOf(x) !== info[sn].media;
+      }),
+    );
+    if (!touched.size && !badLab) return { buf, moves, notes, relabeled: [], sorted: [], ana: 0 };
+    /* ---------- เขียนชีต ---------- */
+    const out = {}; /* sn → { doc, isNew, baseSn, L, drawing } */
+    const relabeled = [];
+    const txtCell = (doc, c, text) => {
+      while (c.firstChild) c.removeChild(c.firstChild);
+      c.setAttribute('t', 'inlineStr');
+      const is = doc.createElementNS(NS, 'is'),
+        t = doc.createElementNS(NS, 't');
+      t.textContent = text;
+      is.appendChild(t);
+      c.appendChild(is);
+    };
+    const valCell = (doc, c, v) => {
+      while (c.firstChild) c.removeChild(c.firstChild);
+      c.removeAttribute('t');
+      if (v == null) return;
+      if (typeof v === 'number') {
+        const e = doc.createElementNS(NS, 'v');
+        e.textContent = String(v);
+        c.appendChild(e);
+      } else txtCell(doc, c, String(v));
+    };
+    const layoutOf = sn => {
+      const isNew = !info[sn];
+      const m0 = isNew ? Object.keys(created).find(m => newName['\u0000new:' + m] === sn) : null;
+      const baseSn = isNew ? created[m0].from : sn;
+      const I = info[baseSn];
+      const nNew = plan[sn].length,
+        tail = (nNew - I.blocks.length) * 3;
+      const colOwn = c => {
+        if (c < I.base) return c;
+        if (c > I.end) return c + tail;
+        const q = map(baseSn, c);
+        return q && q[0] === sn ? q[1] : null;
+      };
+      return {
+        sn,
+        isNew,
+        m0,
+        baseSn,
+        I,
+        nNew,
+        tail,
+        colOwn,
+        media: isNew ? m0 : I.media,
+        base: I.base,
+        end: I.end,
+        newEnd: I.base + nNew * 3 - 1,
+      };
+    };
+    const mapRangeL = (L, c1, c2, r1) => {
+      if (c2 < L.base || c1 > L.end) {
+        const a = L.colOwn(c1),
+          b = L.colOwn(c2);
+        return a != null && b != null ? [a, b] : null;
+      }
+      const bi = c => Math.floor((c - L.base) / 3);
+      if (r1 != null && r1 <= 5 && c2 === L.end && L.nNew) {
+        /* แถบหัวชีต (แถว 1–5) คลุมถึงจอสุดท้าย → ยาวตามจำนวนจอใหม่ */
+        const a = c1 < L.base ? c1 : L.base + ((c1 - L.base) % 3);
+        return [a, L.newEnd];
+      }
+      if (c1 >= L.base && c2 <= L.end && bi(c1) === bi(c2)) {
+        const a = L.colOwn(c1),
+          b = L.colOwn(c2);
+        return a != null && b != null ? [a, b] : null;
+      }
+      if (!L.nNew) return null;
+      const a = c1 < L.base ? c1 : L.base + ((c1 - L.base) % 3);
+      const b = c2 > L.end ? c2 + L.tail : L.newEnd - (2 - ((c2 - L.base) % 3));
+      return a <= b ? [a, b] : null;
+    };
+    const mapSqL = (L, sq, banner) =>
+      sq
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(rg => {
+          const m = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(rg);
+          if (!m) return rg;
+          const c1 = col2n(m[1]),
+            c2 = m[3] ? col2n(m[3]) : c1;
+          const R = mapRangeL(L, Math.min(c1, c2), Math.max(c1, c2), banner ? +m[2] : null);
+          if (!R) return null;
+          return m[3] ? n2col(R[0]) + m[2] + ':' + n2col(R[1]) + m[4] : n2col(R[0]) + m[2];
+        })
+        .filter(Boolean)
+        .join(' ');
+    for (const sn of Object.keys(plan)) {
+      if (!touched.has(sn)) continue;
+      const L = layoutOf(sn),
+        I = L.I,
+        baseSn = L.baseSn;
+      const doc = P.parseFromString(I.xml, 'application/xml');
+      unshare(doc);
+      const W = doc.documentElement;
+      const sd = doc.getElementsByTagNameNS(NS, 'sheetData')[0];
+      const grid = new Map(),
+        rowAttr = new Map();
+      const put = (r, c, el) => {
+        if (!grid.has(r)) grid.set(r, new Map());
+        el.setAttribute('r', n2col(c) + r);
+        grid.get(r).set(c, el);
+      };
+      /* refs in own cells: base sheet columns follow this sheet's layout; anything that ends up elsewhere → keep the cached value */
+      const refOwn = (sh, c) => {
+        if (sh === baseSn) {
+          const n = L.colOwn(c);
+          return n != null ? [sn, n] : map(sh, c) || [sh, c];
+        }
+        return map(sh, c);
+      };
+      for (const re of kids(sd, 'row')) {
+        const r = +re.getAttribute('r');
+        rowAttr.set(r, re);
+        for (const c of kids(re, 'c')) {
+          const n = L.colOwn(col2n(c.getAttribute('r').match(/[A-Z]+/)[0]));
+          if (n == null) continue;
+          const f = c.getElementsByTagNameNS(NS, 'f')[0];
+          if (f && f.textContent) {
+            const t = trF(f.textContent, baseSn, sn, refOwn, { local: true });
+            if (t.bad) valCell(doc, c, (I.wsv[c.getAttribute('r')] || {}).v);
+            else f.textContent = t.f;
+          }
+          put(r, n, c);
+        }
+      }
+      /* จอที่ย้ายเข้ามาจากชีตอื่น */
+      const incoming = plan[sn].filter(x => x.from !== baseSn);
+      if (incoming.length) {
+        const hrT = I.hr;
+        let lastV = hrT,
+          lastBar = hrT;
+        for (const [r, row] of I.rows)
+          if (r > hrT)
+            for (const [cn, el] of row.cells)
+              if (cn >= I.base && cn <= I.end + 3 && hasVal(el)) {
+                lastV = Math.max(lastV, r);
+                break;
+              }
+        for (const [r] of I.rows) if (r > lastBar && numV(I.wsv, I.base, r)) lastBar = r;
+        const trail = lastBar >= lastV;
+        let R0 = lastV + 3;
+        const b0 = L.base;
+        for (const x of incoming) {
+          const Sx = info[x.from],
+            dS = dstOf[x.from + '|' + x.s][1];
+          const cp = (r, c, nr, nc) => {
+            const row = Sx.rows.get(r),
+              el = row && row.cells.get(c);
+            if (!el) return null;
+            const k = doc.importNode(el, true);
+            const f = k.getElementsByTagNameNS(NS, 'f')[0];
+            if (f) {
+              const t = f.textContent ? trF(f.textContent, x.from, sn, map, { local: true }) : { bad: true };
+              if (t.bad) valCell(doc, k, (Sx.wsv[n2col(c) + r] || {}).v);
+              else f.textContent = t.f;
+            }
+            put(nr, nc, k);
+            return k;
+          };
+          for (let r = 1; r <= Sx.hr; r++) for (let i = 0; i < 3; i++) cp(r, x.s + i, r, dS + i);
+          /* หนังของจอนี้ตามแถบวันที่ของชีตเดิม → วางไว้ท้ายชีต พร้อมแถบวันที่ (ตอนเติม ระบบจัดแถวให้ตรงกับแถบของชีตนี้) */
+          const bars = [];
+          for (let r = Sx.hr; r <= Sx.hr + 1500; r++) {
+            const v = numV(Sx.wsv, Sx.base, r) || numV(Sx.wsv, x.s, r);
+            if (v) bars.push([r, v]);
+          }
+          let lastSrc = Sx.hr;
+          for (const [r, row] of Sx.rows)
+            if ([0, 1, 2].some(i => hasVal(row.cells.get(x.s + i)))) lastSrc = Math.max(lastSrc, r);
+          for (let i = 0; i < bars.length; i++) {
+            const [br, d] = bars[i],
+              nxt = i + 1 < bars.length ? bars[i + 1][0] : lastSrc + 1;
+            const ent = [];
+            for (let r = br + 1; r < nxt; r++)
+              if (strV(Sx.wsv, x.s + 1, r) || /^ออก/.test(strV(Sx.wsv, x.s, r))) ent.push(r);
+            if (!ent.length) continue;
+            const bc = doc.createElementNS(NS, 'c');
+            valCell(doc, bc, d);
+            put(R0, b0, bc);
+            if (dS !== b0) {
+              const xc = doc.createElementNS(NS, 'c'),
+                xf = doc.createElementNS(NS, 'f'),
+                xv = doc.createElementNS(NS, 'v');
+              xf.textContent = n2col(b0) + R0;
+              xv.textContent = String(d);
+              xc.appendChild(xf);
+              xc.appendChild(xv);
+              put(R0, dS, xc);
+            }
+            R0++;
+            for (const r of ent) {
+              for (let k = 0; k < 3; k++) cp(r, x.s + k, R0, dS + k);
+              R0++;
+            }
+          }
+          R0 += 2;
+        }
+        if (trail) {
+          const v = numV(I.wsv, I.base, lastBar);
+          if (v) {
+            const bc = doc.createElementNS(NS, 'c');
+            valCell(doc, bc, v);
+            put(R0, b0, bc);
+          }
+        }
+      }
+      /* ป้ายแพค (แถว 10 ช่องชื่อหนัง) ให้ตรงกับชีต */
+      plan[sn].forEach((x, i) => {
+        const col = L.base + 3 * i + 1,
+          c = grid.get(10) && grid.get(10).get(col);
+        if (!c) return;
+        const cur = strV(info[x.from].wsv, x.s + 1, 10);
+        if (cur && mediaOf(cur) === L.media) return;
+        txtCell(doc, c, lab(L.media));
+        if (!moves.some(m => m.code === x.code && m.from === x.from))
+          relabeled.push({ sheet: sn, code: x.code, from: cur, to: lab(L.media) });
+      });
+      /* sheetData ใหม่ */
+      while (sd.firstChild) sd.removeChild(sd.firstChild);
+      const rowsAll = new Set([...grid.keys()]);
+      for (const [r, old] of rowAttr) if (old.getAttribute('ht') || old.getAttribute('s')) rowsAll.add(r);
+      for (const r of [...rowsAll].sort((a, b) => a - b)) {
+        const old = rowAttr.get(r);
+        const re = old ? old.cloneNode(false) : doc.createElementNS(NS, 'row');
+        re.removeAttribute('spans');
+        re.setAttribute('r', r);
+        const row = grid.get(r);
+        if (row) for (const c of [...row.keys()].sort((a, b) => a - b)) re.appendChild(row.get(c));
+        sd.appendChild(re);
+      }
+      const kill = ln => {
+        for (const e of [...W.children]) if (e.localName === ln) W.removeChild(e);
+      };
+      kill('dimension');
+      kill('sortState');
+      /* merge */
+      const mcs = W.getElementsByTagNameNS(NS, 'mergeCells')[0];
+      if (mcs) {
+        for (const mc of kids(mcs, 'mergeCell')) {
+          const q = mapSqL(L, mc.getAttribute('ref'), true);
+          if (q && !/\s/.test(q) && q.includes(':')) mc.setAttribute('ref', q);
+          else mcs.removeChild(mc);
+        }
+        for (const x of incoming) {
+          const Sx = info[x.from],
+            dS = dstOf[x.from + '|' + x.s][1];
+          const sm = Sx.src.getElementsByTagNameNS(NS, 'mergeCells')[0];
+          if (sm)
+            for (const mc of kids(sm, 'mergeCell')) {
+              const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(mc.getAttribute('ref'));
+              if (!m) continue;
+              const c1 = col2n(m[1]),
+                c2 = col2n(m[3]);
+              if (c1 >= x.s && c2 <= x.s + 2 && +m[4] <= Sx.hr) {
+                const e = doc.createElementNS(NS, 'mergeCell');
+                e.setAttribute('ref', n2col(dS + c1 - x.s) + m[2] + ':' + n2col(dS + c2 - x.s) + m[4]);
+                mcs.appendChild(e);
+              }
+            }
+        }
+        mcs.setAttribute('count', kids(mcs, 'mergeCell').length);
+      }
+      /* conditional formatting */
+      for (const cf of kids(W, 'conditionalFormatting')) {
+        const q = mapSqL(L, cf.getAttribute('sqref'));
+        if (q) cf.setAttribute('sqref', q);
+        else W.removeChild(cf);
+      }
+      /* ความกว้างคอลัมน์ */
+      const cols = kids(W, 'cols')[0];
+      if (cols) {
+        const list = [];
+        for (const e of kids(cols, 'col')) {
+          const a = +e.getAttribute('min'),
+            b = +e.getAttribute('max');
+          if (a < L.base) list.push([a, Math.min(b, L.base - 1), e]);
+          if (b > L.end) {
+            const lo = Math.max(a, L.end + 1) + L.tail,
+              hi = Math.min(16384, b + L.tail);
+            if (lo <= hi) list.push([lo, hi, e]);
+          }
+          for (let c = Math.max(a, L.base); c <= Math.min(b, L.end); c++) {
+            const n = L.colOwn(c);
+            if (n != null) list.push([n, n, e]);
+          }
+        }
+        for (const x of incoming) {
+          const Sx = info[x.from],
+            dS = dstOf[x.from + '|' + x.s][1];
+          const sc = Sx.src.getElementsByTagNameNS(NS, 'col');
+          for (let i = 0; i < 3; i++) {
+            const e = [...sc].find(
+              z => +z.getAttribute('min') <= x.s + i && +z.getAttribute('max') >= x.s + i,
+            );
+            if (e) list.push([dS + i, dS + i, doc.importNode(e, true)]);
+          }
+        }
+        list.sort((p, q) => p[0] - q[0]);
+        while (cols.firstChild) cols.removeChild(cols.firstChild);
+        let last = 0;
+        for (const [a, b, e0] of list) {
+          const lo = Math.max(a, last + 1);
+          if (lo > b) continue;
+          const e = e0.cloneNode(true);
+          e.setAttribute('min', lo);
+          e.setAttribute('max', b);
+          cols.appendChild(e);
+          last = b;
+        }
+      }
+      /* ปุ่ม ActiveX ของจอที่ย้ายออก (ปุ่มอยู่กับโค้ดของชีตเดิม ย้ายไปชีตอื่นไม่ได้) */
+      const dead = new Set();
+      if (L.isNew) {
+        for (const ln of ['legacyDrawing', 'legacyDrawingHF', 'controls', 'picture', 'oleObjects']) kill(ln);
+        for (const e of [...W.children])
+          if (e.localName === 'AlternateContent' && e.getElementsByTagNameNS(NS, 'controls').length)
+            W.removeChild(e);
+        const sp = W.getElementsByTagNameNS(NS, 'sheetPr')[0];
+        if (sp) sp.removeAttribute('codeName');
+        for (const ln of ['tableParts', 'hyperlinks']) kill(ln);
+        for (const e of W.getElementsByTagName('*'))
+          if (e.hasAttributeNS(RNS, 'id'))
+            e.removeAttributeNS(RNS, 'id'); /* ชีตใหม่ไม่มีไฟล์ rels เดิม (เช่น printerSettings) */
+        for (const sv of W.getElementsByTagNameNS(NS, 'sheetView')) sv.removeAttribute('tabSelected');
+      } else {
+        for (const ctl of [...W.getElementsByTagNameNS(NS, 'control')]) {
+          const an = ctl.getElementsByTagNameNS(NS, 'anchor')[0];
+          if (!an) continue;
+          const cs = [...an.getElementsByTagNameNS(XNS, 'col')];
+          if (!cs.length) continue;
+          if (L.colOwn(+cs[0].textContent + 1) == null) {
+            dead.add(ctl.getAttribute('shapeId'));
+            dead.add(ctl.getAttribute('name'));
+            continue;
+          }
+          for (const e of cs) {
+            const n = L.colOwn(+e.textContent + 1);
+            if (n != null) e.textContent = n - 1;
+          }
+        }
+        for (const ac of [
+          ...W.getElementsByTagNameNS(
+            'http://schemas.openxmlformats.org/markup-compatibility/2006',
+            'AlternateContent',
+          ),
+        ]) {
+          const ctl = ac.getElementsByTagNameNS(NS, 'control')[0];
+          if (ctl && (dead.has(ctl.getAttribute('shapeId')) || dead.has(ctl.getAttribute('name'))))
+            ac.parentNode.removeChild(ac);
+        }
+      }
+      out[sn] = { doc, L, dead };
+    }
+    /* drawing / VML ของชีตที่จัดใหม่: เลื่อนตามคอลัมน์ ลบปุ่มของจอที่ย้ายออก — ชีตใหม่ได้สำเนารูปที่ไม่ใช่ปุ่ม */
+    const relOf = p => p.replace(/[^/]+$/, m => '_rels/' + m + '.rels');
+    const resolve = (base, t) => {
+      const a = base.split('/').slice(0, -1);
+      for (const s of t.split('/')) s === '..' ? a.pop() : a.push(s);
+      return a.join('/');
+    };
+    const ctype = P.parseFromString(await zip.file('[Content_Types].xml').async('string'), 'application/xml');
+    let nextDrawing = 1,
+      ctChanged = false;
+    for (const k of Object.keys(zip.files)) {
+      const m = k.match(/^xl\/drawings\/drawing(\d+)\.xml$/);
+      if (m) nextDrawing = Math.max(nextDrawing, +m[1] + 1);
+    }
+    const fixDrawing = (d, L, dead, isNew) => {
+      const anchors = [
+        ...d.documentElement.getElementsByTagNameNS(XNS, 'twoCellAnchor'),
+        ...d.documentElement.getElementsByTagNameNS(XNS, 'oneCellAnchor'),
+      ];
+      for (const a of anchors) {
+        const cnv = a.getElementsByTagNameNS(XNS, 'cNvPr')[0],
+          nm = cnv ? cnv.getAttribute('name') : '',
+          id = cnv ? cnv.getAttribute('id') : '';
+        const holder = a.parentNode && a.parentNode.localName === 'Choice' ? a.parentNode.parentNode : a;
+        const isCtl =
+          /^CommandButton|^ToggleButton|^CheckBox/i.test(nm) || (cnv && cnv.getAttribute('hidden') === '1');
+        if (dead.has(nm) || dead.has(id) || (isNew && isCtl)) {
+          if (holder.parentNode) holder.parentNode.removeChild(holder);
+          continue;
+        }
+        const cs = [...a.children]
+          .filter(e => e.localName === 'from' || e.localName === 'to')
+          .map(e => e.getElementsByTagNameNS(XNS, 'col')[0]);
+        if (!cs[0]) continue;
+        const n0 = L.colOwn(+cs[0].textContent + 1);
+        if (n0 == null) {
+          const w = cs[1] ? +cs[1].textContent - +cs[0].textContent : 0;
+          cs[0].textContent = L.base;
+          if (cs[1]) cs[1].textContent = L.base + w;
+          continue;
+        }
+        for (const e of cs) {
+          if (!e) continue;
+          const n = L.colOwn(+e.textContent + 1);
+          if (n != null) e.textContent = n - 1;
+        }
+      }
+    };
+    for (const sn in out) {
+      const O = out[sn],
+        L = O.L;
+      const rp = relOf(path[L.baseSn]),
+        rf = zip.file(rp);
+      if (!rf) continue;
+      const rels = P.parseFromString(await rf.async('string'), 'application/xml');
+      for (const r of [...rels.getElementsByTagName('Relationship')]) {
+        const ty = r.getAttribute('Type'),
+          tp = resolve(path[L.baseSn], r.getAttribute('Target'));
+        const f = zip.file(tp);
+        if (!f) continue;
+        if (/\/drawing$/.test(ty)) {
+          const d = P.parseFromString(await f.async('string'), 'application/xml');
+          fixDrawing(d, L, O.dead, L.isNew);
+          if (!L.isNew) zip.file(tp, ser(d));
+          else if ([...d.documentElement.children].length) {
+            const np = 'xl/drawings/drawing' + nextDrawing++ + '.xml';
+            zip.file(np, ser(d));
+            const dr = zip.file(relOf(tp));
+            if (dr) zip.file(relOf(np), await dr.async('string'));
+            const ov = ctype.createElementNS(ctype.documentElement.namespaceURI, 'Override');
+            ov.setAttribute('PartName', '/' + np);
+            ov.setAttribute('ContentType', 'application/vnd.openxmlformats-officedocument.drawing+xml');
+            ctype.documentElement.appendChild(ov);
+            ctChanged = true;
+            O.drawing = '../drawings/' + np.split('/').pop();
+          }
+        } else if (/\/vmlDrawing$/.test(ty) && !L.isNew) {
+          let v = await f.async('string');
+          v = v.replace(/<v:shape\b[\s\S]*?<\/v:shape>/g, sh => {
+            const id = (sh.match(/\bid="([^"]+)"/) || [])[1],
+              spid = (sh.match(/o:spid="_x0000_s(\d+)"/) || [])[1] || '';
+            if (O.dead.has(id) || O.dead.has(spid)) return '';
+            return sh.replace(/<x:Anchor>\s*([\d\s,]+)<\/x:Anchor>/, (all, a) => {
+              const n = a.split(',').map(s => +s.trim());
+              for (const k of [0, 4]) {
+                const q = L.colOwn(n[k] + 1);
+                if (q != null) n[k] = q - 1;
+              }
+              return '<x:Anchor>\n    ' + n.join(', ') + '</x:Anchor>';
+            });
+          });
+          zip.file(tp, v);
+        }
+      }
+      if (L.isNew) {
+        const W = O.doc.documentElement;
+        for (const e of [...W.children]) if (e.localName === 'drawing') W.removeChild(e);
+        if (O.drawing) {
+          const de = O.doc.createElementNS(NS, 'drawing');
+          de.setAttributeNS(RNS, 'r:id', 'rId1');
+          const after = [...W.children].find(e =>
+            [
+              'legacyDrawing',
+              'legacyDrawingHF',
+              'picture',
+              'oleObjects',
+              'controls',
+              'webPublishItems',
+              'tableParts',
+              'extLst',
+            ].includes(e.localName),
+          );
+          W.insertBefore(de, after || null);
+        }
+      }
+    }
+    if (ctChanged) zip.file('[Content_Types].xml', ser(ctype));
+    /* ชีตใหม่: ไฟล์ส่วนต่าง ๆ ของ workbook */
+    let nextSheet = 1;
+    for (const k of Object.keys(zip.files)) {
+      const m = k.match(/^xl\/worksheets\/sheet(\d+)\.xml$/);
+      if (m) nextSheet = Math.max(nextSheet, +m[1] + 1);
+    }
+    const ct = P.parseFromString(await zip.file('[Content_Types].xml').async('string'), 'application/xml');
+    const wbSheets = wx.getElementsByTagNameNS(NS, 'sheets')[0];
+    for (const sn in out) {
+      const O = out[sn];
+      if (!O.L.isNew) {
+        zip.file(path[sn], ser(O.doc));
+        continue;
+      }
+      const part = 'xl/worksheets/sheet' + nextSheet++ + '.xml';
+      zip.file(part, ser(O.doc));
+      if (O.drawing)
+        zip.file(
+          relOf(part),
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="' +
+            O.drawing +
+            '"/></Relationships>',
+        );
+      let id = 1;
+      for (const r of relsX.getElementsByTagName('Relationship'))
+        id = Math.max(id, +(r.getAttribute('Id').replace(/\D/g, '') || 0) + 1);
+      const rel = relsX.createElementNS(relsX.documentElement.namespaceURI, 'Relationship');
+      rel.setAttribute('Id', 'rId' + id);
+      rel.setAttribute(
+        'Type',
+        'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet',
+      );
+      rel.setAttribute('Target', part.replace(/^xl\//, ''));
+      relsX.documentElement.appendChild(rel);
+      const ov = ct.createElementNS(ct.documentElement.namespaceURI, 'Override');
+      ov.setAttribute('PartName', '/' + part);
+      ov.setAttribute(
+        'ContentType',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml',
+      );
+      ct.documentElement.appendChild(ov);
+      let sid = 1;
+      for (const s of wbSheets.children) sid = Math.max(sid, +s.getAttribute('sheetId') + 1);
+      const se = wx.createElementNS(NS, 'sheet');
+      se.setAttribute('name', sn);
+      se.setAttribute('sheetId', sid);
+      se.setAttributeNS(RNS, 'r:id', 'rId' + id);
+      /* ตำแหน่งแท็บ: ต่อจากชีตจอแยกที่อยู่ก่อนตามลำดับ 40B 40R 80B 80R CITY Spare */
+      const m = mediaOf(sn),
+        rank = x => PKG.indexOf(mediaOf(x) || ''),
+        list = [...wbSheets.children];
+      let pos = -1;
+      list.forEach((s, i) => {
+        const nm = s.getAttribute('name');
+        if (!notChk(nm) && PKG.includes(mediaOf(nm) || '') && rank(nm) <= PKG.indexOf(m)) pos = i;
+      });
+      if (pos < 0)
+        pos =
+          list.findIndex(
+            s => !notChk(s.getAttribute('name')) && PKG.includes(mediaOf(s.getAttribute('name')) || ''),
+          ) - 1;
+      const at = list[pos + 1] || null;
+      wbSheets.insertBefore(se, at);
+      const idx = pos + 1;
+      for (const dn of wx.getElementsByTagNameNS(NS, 'definedName')) {
+        const l = dn.getAttribute('localSheetId');
+        if (l != null && +l >= idx) dn.setAttribute('localSheetId', +l + 1);
+      }
+      for (const bv of wx.getElementsByTagNameNS(NS, 'workbookView')) {
+        const a = bv.getAttribute('activeTab');
+        if (a != null && +a >= idx) bv.setAttribute('activeTab', +a + 1);
+      }
+      const app = zip.file('docProps/app.xml');
+      if (app) {
+        let a = await app.async('string');
+        a = a.replace(
+          /(<vt:lpstr>Worksheets<\/vt:lpstr><\/vt:variant><vt:variant><vt:i4>)(\d+)/,
+          (x, p, n) => p + (+n + 1),
+        );
+        a = a.replace(/(<TitlesOfParts><vt:vector size=")(\d+)("[^>]*>)/, (x, p, n, q) => p + (+n + 1) + q);
+        const prev = idx > 0 ? list[idx - 1].getAttribute('name') : null;
+        const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        if (prev && a.includes('<vt:lpstr>' + esc(prev) + '</vt:lpstr>'))
+          a = a.replace(
+            '<vt:lpstr>' + esc(prev) + '</vt:lpstr>',
+            '<vt:lpstr>' + esc(prev) + '</vt:lpstr><vt:lpstr>' + esc(sn) + '</vt:lpstr>',
+          );
+        else a = a.replace(/(<TitlesOfParts><vt:vector[^>]*>)/, '$1<vt:lpstr>' + esc(sn) + '</vt:lpstr>');
+        zip.file('docProps/app.xml', a);
+      }
+    }
+    /* สูตรในชีตอื่น (เช่น Analysis) ที่ชี้ไปยังจอที่ย้าย/เลื่อน + ชื่อแพคในคอลัมน์ PACK */
+    const ANY = new Set(Object.keys(out));
+    let ana = 0;
+    for (const sn of names) {
+      if (ANY.has(sn)) continue;
+      const f = zip.file(path[sn]);
+      if (!f) continue;
+      const xml = await f.async('string');
+      if (!/<f[ >]/.test(xml) || !xml.includes('!')) continue;
+      const d = P.parseFromString(xml, 'application/xml');
+      let ch = 0;
+      const packCol = (() => {
+        for (const c of elts(d, 'c')) {
+          const x = wb.Sheets[sn][c.getAttribute('r')];
+          if (x && typeof x.v === 'string' && /^PACK$/i.test(x.v.trim()))
+            return col2n(c.getAttribute('r').match(/[A-Z]+/)[0]);
+        }
+        return 0;
+      })();
+      const packRow = {};
+      for (const c of elts(d, 'c')) {
+        const fe = c.getElementsByTagNameNS(NS, 'f')[0];
+        if (!fe || !fe.textContent.includes('!')) continue;
+        const t = trF(fe.textContent, sn, sn, (sh, cc) => map(sh, cc));
+        if (!t.bad && t.f !== fe.textContent) {
+          const r = +c.getAttribute('r').match(/\d+/)[0];
+          let mv = null;
+          for (const mm of fe.textContent
+            .split('"')
+            .filter((_, i) => i % 2 === 0)
+            .join(' ')
+            .matchAll(REF)) {
+            if (!mm[1]) continue;
+            const sh = unq(mm[1].slice(0, -1)),
+              I2 = info[sh],
+              cc = col2n(mm[3]);
+            if (!I2 || cc < I2.base || cc > I2.end) continue;
+            const s0 = I2.base + Math.floor((cc - I2.base) / 3) * 3;
+            mv = moves.find(q => q.from === sh && q.s === s0) || mv;
+          }
+          if (mv) packRow[r] = mv;
+          fe.textContent = t.f;
+          const v = c.getElementsByTagNameNS(NS, 'v')[0];
+          if (v) c.removeChild(v);
+          ch++;
+        }
+      }
+      if (packCol)
+        for (const r in packRow) {
+          const mv = packRow[r];
+          const want = lab(mv.m);
+          const cell = elts(d, 'c').find(c => c.getAttribute('r') === n2col(packCol) + r);
+          if (!cell) continue;
+          const cur = (wb.Sheets[sn][n2col(packCol) + r] || {}).v;
+          if (cur && mediaOf(String(cur)) === mv.m) continue;
+          while (cell.firstChild) cell.removeChild(cell.firstChild);
+          cell.setAttribute('t', 'inlineStr');
+          const is = d.createElementNS(NS, 'is'),
+            tt = d.createElementNS(NS, 't');
+          tt.textContent = want;
+          is.appendChild(tt);
+          cell.appendChild(is);
+        }
+      if (ch) {
+        zip.file(path[sn], ser(d));
+        ana += ch;
+      }
+    }
+    /* ป้ายแพคผิดในชีตที่ไม่ได้ย้าย */
+    for (const sn in info) {
+      if (out[sn]) continue;
+      const I = info[sn];
+      const bad = I.blocks.filter(b => {
+        const t = strV(I.wsv, b.s + 1, 10);
+        return t && mediaOf(t) && mediaOf(t) !== I.media;
+      });
+      if (!bad.length) continue;
+      const d = P.parseFromString(I.xml, 'application/xml');
+      for (const b of bad) {
+        const c = elts(d, 'c').find(e => e.getAttribute('r') === n2col(b.s + 1) + '10');
+        if (!c) continue;
+        const from = strV(I.wsv, b.s + 1, 10);
+        while (c.firstChild) c.removeChild(c.firstChild);
+        c.setAttribute('t', 'inlineStr');
+        const is = d.createElementNS(NS, 'is'),
+          t = d.createElementNS(NS, 't');
+        t.textContent = lab(I.media);
+        is.appendChild(t);
+        c.appendChild(is);
+        relabeled.push({ sheet: sn, code: b.code, from, to: lab(I.media) });
+      }
+      zip.file(path[sn], ser(d));
+    }
+    if (Object.keys(created).length) {
+      zip.file('xl/workbook.xml', ser(wx));
+      zip.file('xl/_rels/workbook.xml.rels', ser(relsX));
+      zip.file('[Content_Types].xml', ser(ct));
+    }
+    /* calcChain ไม่ตรงแล้ว → ลบ (Excel สร้างใหม่เอง) */
+    if (zip.file('xl/calcChain.xml')) {
+      zip.remove('xl/calcChain.xml');
+      for (const r of [...relsX.getElementsByTagName('Relationship')])
+        if (/calcChain/.test(r.getAttribute('Type'))) r.parentNode.removeChild(r);
+      for (const o of [...ct.getElementsByTagName('Override')])
+        if (/calcChain/.test(o.getAttribute('PartName'))) o.parentNode.removeChild(o);
+      zip.file('xl/_rels/workbook.xml.rels', ser(relsX));
+      zip.file('[Content_Types].xml', ser(ct));
+    }
+    const nb = await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
+    const sorted = [...touched].filter(sn => info[sn] && !moves.some(m => m.from === sn || m.to === sn));
+    return { buf: nb, moves, notes, relabeled, sorted, ana };
+  }
+  return arrangeWb;
+})();
 async function fillWb(f, on, metro, o) {
   const rep = [],
     FOLD = [];
@@ -3273,6 +4229,9 @@ const OP = {
   hand: true,
   base: '',
   r2: 'cont',
+  arr: true,
+  arrMk: true,
+  arrSort: true,
 };
 let DB = [],
   tab = 'home',
@@ -4349,7 +5308,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.0.4 (26 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1 (27 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -4460,12 +5419,15 @@ function say(t) {
 const esc2 = v => esc(v ?? '');
 const OPDEF = {
   hand: true,
+  arr: true,
   media: 'ทั้งหมด',
   sort: 'orig',
   newOnly: false,
   dedupe: true,
   off: false,
   r2: 'cont',
+  arrMk: true,
+  arrSort: true,
 };
 const OPNAME = {
   hand: 'จัดรูปแบบตามใบเช็คจริง',
@@ -4475,12 +5437,21 @@ const OPNAME = {
   dedupe: 'ตัดชื่อซ้ำในจอเดียวกัน',
   off: 'รวมรายการปลดต่อท้าย',
   r2: 'วันที่ 16 เป็นต้นไป',
+  arr: 'จัดจอเข้าชีตตามแพค',
+  arrMk: 'สร้างชีตใหม่ถ้าไม่มีชีตของแพคนั้น',
+  arrSort: 'เรียงจอในชีตตามเลขจอ',
 };
-const advChg = () => optChanged().filter(k => k !== 'hand').length;
+const advChg = () => optChanged().filter(k => k !== 'hand' && k !== 'arr').length;
 const optChanged = () =>
   Object.keys(OPDEF)
-    .filter(k => (k !== 'sort' || !OP.hand) && (k !== 'r2' || OP.hand))
+    .filter(k => (k !== 'sort' || !OP.hand) && (k !== 'r2' || OP.hand) && (!/^arr./.test(k) || OP.arr))
     .filter(k => OP[k] !== OPDEF[k]);
+const arrOn = o =>
+  !!(
+    o.arr &&
+    o.hand &&
+    o.media === 'ทั้งหมด'
+  ); /* จัดจอได้เมื่อจัดรูปแบบตามใบเช็คจริง และเติมทุกสื่อ (ระบบจัดแถวของจอที่ย้ายตอนเติม) */
 /* ----- สีแถบวันที่: ค่ากลาง (OP.col1/col2) และแยกรายไฟล์ (จำไว้ในเครื่องตามชื่อไฟล์) ----- */
 const COLS = [
   ['', 'ตามชีต'],
@@ -5272,6 +6243,7 @@ function vFl() {
  <label class="date"><span>วันที่ทำงาน (วันของ Playlist)</span><input id="o_base" class="${BASEERR ? 'bad' : ''}" placeholder="${end(ab) || 'เช่น 12-Oct-26'}" autocomplete="off" aria-invalid="${!!BASEERR}">${dmsg}${wd && !BASEERR ? rndHTML(wd) + (wd.getUTCDate() === 1 ? '<small>วันที่ 1 ยังไม่ใส่ “ออกวันที่”</small>' : '') : ''}</label>
  <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายวันที่ถ่าย (ช่องหลังชื่อหนัง ทุกจอ) ตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
  ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และวันที่ถ่าย (ช่องหลังชื่อหนัง) จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
+ <label class="tgl"><span>จัดจอเข้าชีตตามแพค <em class="rec">แนะนำ: เปิด</em><small>จอที่ Playlist วันนี้ย้ายแพค (เช่น Spare → 40 RED) ระบบย้ายจอไปชีตของแพคนั้นให้ หนัง วันที่ถ่าย และ “ออกวันที่” ไปด้วยครบ • ป้ายแพคที่เขียนผิดแก้ให้ • บอกในผลการเติมว่าย้ายอะไรไปไหน</small>${OP.arr && !arrOn(OP) ? `<small class="wrn">ตอนนี้ยังไม่จัดจอ — ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง” และเลือกสื่อ “ทั้งหมด”</small>` : ''}</span><span class="sw"><input type="checkbox" id="o_arr"><span></span></span></label>
  <div class="cols"><p class="cl">สีแถบวันที่</p><div class="crow"><span>รอบ 1–15</span>${vColPick(1)}</div><div class="crow"><span>รอบ 16–สิ้นเดือน</span>${vColPick(2)}</div><small>“ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ (รอบ 16 ถ้าชีตยังไม่มีแถบรอบ 2 ใช้สีฟ้า) เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <div class="cols"><p class="cl">สีช่องว่างเหนือแถบวันที่</p><div class="crow">${vPadPick()}</div><small>แถบสีในช่องว่างใต้รายการของจอที่หนังน้อยกว่า ก่อนถึงแถบวันที่ถัดไป (ปกติสีฟ้าอ่อน) “ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <button class="adv" data-a="adv" aria-expanded="${adv}"><span>ตัวเลือกเพิ่มเติม${advChg() ? ` <em class="chg">เปลี่ยนจากค่าแนะนำ ${advChg()} ข้อ</em>` : ''}</span>${IC.chev}</button>
@@ -5281,6 +6253,8 @@ function vFl() {
  <div class="opt"><label class="cb"><input type="checkbox" id="o_new" aria-describedby="d_new"> เฉพาะหนัง “ขึ้นใหม่”</label><small id="d_new">ใส่เฉพาะหนังที่สถานะมีคำว่า “ขึ้นใหม่” หนังที่ออนต่อเนื่องจะถูกข้าม ใช้ดูว่าวันนี้มีหนังใหม่เรื่องไหน ไม่ใช่สำหรับไฟล์ส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
  <div class="opt"><label class="cb"><input type="checkbox" id="o_dd" aria-describedby="d_dd"> ตัดชื่อซ้ำในจอเดียวกัน</label><small id="d_dd">หนังชื่อเดียวกันที่อยู่ใน Playlist 2 แถวในจอเดียว (เช่น ออน 2 ช่วงเวลา) ลงใบเช็คแถวเดียว ถ้าไม่ติ๊กจะลง 2 แถวซ้ำกัน <b>แนะนำ: ติ๊ก</b></small></div>
  <div class="opt"><label class="fld"><span>วันที่ 16 เป็นต้นไป</span><select id="o_r2" aria-describedby="d_r2" ${OP.hand ? '' : 'disabled'}><option value="cont">ทำต่อในรายการเดิม</option><option value="new">เริ่มรายการใหม่ใต้แถบ 16</option></select></label><small id="d_r2"><b>ทำต่อในรายการเดิม</b> = แบบที่ทีมทำ: หนังเดิมอยู่ที่เดิม หนังที่ต่อสัญญา / ขึ้นใหม่วันที่ 16 ลงแถวใหม่ใต้แถบ 16 และแถวเดิมใส่ “ออกวันที่ 16” พอหนังถอดจริง ใส่วันถอดทั้งสองแถว <b>เริ่มรายการใหม่</b> = แบบเวอร์ชัน 2.3: ลงหนังที่ออนอยู่ทั้งหมดใหม่ใต้แถบ 16 ต่อท้ายรอบ 1–15 <b>แนะนำ: ทำต่อในรายการเดิม</b></small></div>
+ <div class="opt"><label class="cb"><input type="checkbox" id="o_arrmk" aria-describedby="d_arrmk" ${OP.arr ? '' : 'disabled'}> สร้างชีตใหม่ถ้าไม่มีชีตของแพคนั้น</label><small id="d_arrmk">จัดจอเข้าชีตตามแพค: ถ้าไฟล์ไม่มีชีตของแพคใหม่ (เช่น ไม่มีชีต CITY) ระบบสร้างชีตให้จากหน้าตาของชีตเดิม ถ้าไม่ติ๊ก จอนั้นอยู่ที่เดิมและขึ้นในรายการ “ไม่ได้ย้าย” <b>แนะนำ: ติ๊ก</b></small></div>
+ <div class="opt"><label class="cb"><input type="checkbox" id="o_arrsort" aria-describedby="d_arrsort" ${OP.arr ? '' : 'disabled'}> เรียงจอในชีตตามเลขจอ</label><small id="d_arrsort">จัดจอเข้าชีตตามแพค: จอที่ย้ายเข้ามาวางตามลำดับเลขจอ (ชีตที่จอยังไม่เรียงจะถูกเรียงให้ด้วย) ถ้าไม่ติ๊ก จอที่ย้ายเข้ามาต่อท้ายทางขวา <b>แนะนำ: ติ๊ก</b></small></div>
  <div class="opt"><label class="cb"><input type="checkbox" id="o_off" aria-describedby="d_off"> รวมรายการปลดต่อท้าย</label><small id="d_off">เขียนรายชื่อหนังที่ปลด/ถอดแล้วต่อท้ายตาราง ใช้ตรวจว่าเรื่องไหนถอดไปแล้ว อย่าใช้กับไฟล์ที่จะส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
  <button class="btn quiet" data-a="optreset" ${optChanged().length ? '' : 'disabled'}>คืนค่าแนะนำทั้งหมด</button></div></aside></div>
  <div class="fillbar">${lines.join('')}<button class="btn primary big" data-a="fill" data-tour="fill" ${can ? '' : 'disabled'}>เติมใบเช็ครูป${C.length ? ` ${C.length} ไฟล์` : ''}</button>${BASEERR ? '<p class="hint">แก้วันที่ทำงานให้ถูกต้องก่อน แล้วปุ่มนี้จะกดได้</p>' : DB.length && !C.length ? '<p class="hint">ใส่ใบเช็ครูปอย่างน้อย 1 ไฟล์ แล้วปุ่มนี้จะกดได้</p>' : ''}</div>`;
@@ -6119,11 +7093,12 @@ function vRes() {
  <div class="stack">${last.sv ? (last.sv.bad.length ? alertHTML('er', `บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`, `<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`) : alertHTML('ok', `บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`, `<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu ? ` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่` : ''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)) : ''}
  ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}
  ${nb ? alertHTML('wr', '“ควรตรวจ” คืออะไร', '<p>จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน หรือหนังที่ระบบตั้งใจไม่ใส่ เปิดดูในแต่ละไฟล์แล้วตรวจในใบเช็คก่อนใช้งาน ความหมายของข้อความที่พบบ่อยอยู่ในปุ่ม “วิธีใช้”</p>') : alertHTML('ok', 'ไม่มีรายการที่ต้องตรวจเพิ่ม', '<p>ดาวน์โหลดแล้วเปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p>')}</div>
- <div class="rlist" data-tour="rlist">${last.res
+ ${vArr()}<div class="rlist" data-tour="rlist">${last.res
    .map((r, i) => {
      const o = R[i],
-       open = RO.has(i);
-     return `<div class="rfile"><div class="rhead"><span class="fn"><b>${esc(r.name)}</b><small>${r.blob ? o.sh + ' ชีต' : 'ไม่ได้เติม'}</small></span>${r.blob ? `<span class="pill ok">เติมแล้ว ${o.ok} จอ</span>` : '<span class="pill er">ไม่ได้เติม</span>'}${o.bad.length ? `<span class="pill wr">ควรตรวจ ${o.bad.length}</span>` : ''}
+       open = RO.has(i),
+       am = r.arr && r.arr.moves ? r.arr.moves.length : 0;
+     return `<div class="rfile"><div class="rhead"><span class="fn"><b>${esc(r.name)}</b><small>${r.blob ? o.sh + ' ชีต' : 'ไม่ได้เติม'}</small></span>${r.blob ? `<span class="pill ok">เติมแล้ว ${o.ok} จอ</span>` : '<span class="pill er">ไม่ได้เติม</span>'}${am ? `<span class="pill ac">ย้ายจอ ${am}</span>` : ''}${o.bad.length ? `<span class="pill wr">ควรตรวจ ${o.bad.length}</span>` : ''}
  <button class="ib" data-a="dlf" data-k="${i}" aria-label="ดาวน์โหลด ${esc(r.name)}" title="ดาวน์โหลดไฟล์นี้" ${r.blob ? '' : 'disabled'}>${IC.dl}</button><button class="ib tog" data-a="rx" data-k="${i}" aria-expanded="${open}" aria-label="ดูรายละเอียด ${esc(r.name)}" title="ดูรายละเอียด">${IC.chev}</button></div>
  ${
    open
@@ -6157,6 +7132,86 @@ function vRes() {
  ${FSA ? tlinkHTML('last', 'งานโฟลเดอร์และรูป', 'สร้างโฟลเดอร์แยกรูปของหนังใหม่ • ใส่วันที่ถ่าย • ตรวจโฟลเดอร์เทียบจอ — ใช้ใบเช็คที่เพิ่งเติมนี้ได้เลย', 'secondary') : ''}<div class="nextday"><p>${FSA ? '“บันทึกทับไฟล์เดิม” เขียนใบเช็คที่เติมแล้วทับไฟล์ในโฟลเดอร์เดิม (เลือกโฟลเดอร์ครั้งแรกครั้งเดียว) และเก็บไฟล์ก่อนเติมไว้ใน สำรองก่อนเติม ส่วน zip มีใบเช็คทุกไฟล์และ รายงาน.txt' : 'ไฟล์ zip มีใบเช็ครูปทุกไฟล์ที่เติมได้ (ชื่อเดิม) และ รายงาน.txt'} ใบเช็คที่ได้วันนี้คือไฟล์ตั้งต้นของวันพรุ่งนี้</p><button class="btn secondary" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button></div>`;
 }
 
+/* ----- จัดจอเข้าชีตตามแพค (4.1): สรุปในผลการเติม และในรายงาน.txt ----- */
+const arrHas = a =>
+  !!a &&
+  (a.err ||
+    a.moves.length ||
+    a.relabeled.length ||
+    a.sorted.length ||
+    a.notes.some(x => !/ไม่พบใน Playlist/.test(x[1])));
+const arrLab = a => {
+  const g = new Map();
+  for (const x of a.relabeled) {
+    const k = x.sheet + '|' + x.from + '|' + x.to;
+    if (!g.has(k)) g.set(k, { ...x, codes: [] });
+    g.get(k).codes.push(x.code);
+  }
+  return [...g.values()];
+};
+const arrTxt = a => {
+  if (!arrHas(a)) return [];
+  const L = ['  จัดจอเข้าชีตตามแพค:'];
+  if (a.err) L.push('    จัดจอไม่สำเร็จ — เติมแบบเดิม ไม่ได้ย้ายจอ');
+  for (const m of a.moves) L.push(`    ย้าย ${m.code}: ${m.from} → ${m.to}${m.created ? ' (ชีตใหม่)' : ''}`);
+  for (const x of arrLab(a))
+    L.push(`    แก้ป้ายแพค ${x.codes.join(', ')} (ชีต ${x.sheet}): ${x.from} → ${x.to}`);
+  for (const s of a.sorted) L.push(`    เรียงจอในชีต ${s} ตามเลขจอ`);
+  for (const x of a.notes) L.push(`    ไม่ได้ย้าย ${x[0]}: ${x[1]}`);
+  return L;
+};
+const vArr = () => {
+  const F = last.res.filter(r => r.blob && arrHas(r.arr));
+  if (!F.length) return '';
+  const all = F.flatMap(r => r.arr.moves),
+    nm = all.length,
+    ns = new Set(F.flatMap(r => r.arr.moves.filter(m => m.created).map(m => r.name + '|' + m.to))).size,
+    nl = F.reduce((t, r) => t + r.arr.relabeled.length, 0),
+    nso = F.reduce((t, r) => t + r.arr.sorted.length, 0),
+    ana = F.reduce((t, r) => t + (r.arr.ana || 0), 0),
+    nt = F.flatMap(r => r.arr.notes.map(x => ({ sn: x[0], t: x[1], f: r.name })));
+  const k = (n, t) => (n ? `<span><b>${n}</b>${t}</span>` : '');
+  const grp = F.map(r => {
+    const a = r.arr,
+      rows = [
+        ...a.moves.map(
+          m =>
+            `<li><b class="cd">${esc(m.code)}</b><span class="mv"><span>${esc(m.from)}</span><i aria-label="ไป">→</i><span>${esc(m.to)}</span>${m.created ? '<em>ชีตใหม่</em>' : ''}</span></li>`,
+        ),
+        ...arrLab(a).map(
+          x =>
+            `<li class="lb"><b class="cd">${esc(x.codes.join(', '))}</b><span class="mv">ป้ายแพคในชีต ${esc(x.sheet)}<s>${esc(x.from || '(ว่าง)')}</s><i aria-label="เป็น">→</i><span>${esc(x.to)}</span></span></li>`,
+        ),
+        ...a.sorted.map(
+          s => `<li class="so"><b class="cd">${esc(s)}</b><span class="mv">เรียงจอในชีตตามเลขจอ</span></li>`,
+        ),
+        ...(a.err
+          ? [
+              '<li class="er"><b class="cd">ไม่ได้จัดจอ</b><span class="mv">จัดจอไฟล์นี้ไม่ได้ ระบบเติมแบบเดิมให้ (ไม่ได้ย้ายจอ ไม่แก้ป้ายแพค)</span></li>',
+            ]
+          : []),
+      ];
+    return rows.length
+      ? `<div class="arf"><p class="arfn">${esc(r.name)}</p><ul class="arl">${rows.join('')}</ul></div>`
+      : '';
+  }).join('');
+  const notes = [
+    ana
+      ? `หนัง วันที่ถ่าย และ “ออกวันที่” ย้ายตามจอครบ • ชีต Analysis แก้สูตรให้ชี้ตำแหน่งใหม่ ${ana} ช่อง`
+      : nm
+        ? 'หนัง วันที่ถ่าย และ “ออกวันที่” ย้ายตามจอครบ'
+        : '',
+    nm
+      ? 'ปุ่มในใบเช็ค (คัดลอกชื่อหนัง / สร้างโฟลเดอร์) ของจอที่ย้ายไม่ได้ย้ายตาม เพราะปุ่มผูกกับโค้ดของชีตเดิม'
+      : '',
+    'ปิดได้ที่ “จัดจอเข้าชีตตามแพค” ในขั้นที่ 3',
+  ].filter(Boolean);
+  return `<section class="panel arr" aria-labelledby="arrt"><h3 class="sec-t" id="arrt">จัดจอเข้าชีตตามแพค<small>ตาม Playlist วันนี้</small></h3>
+ <div class="arrk">${k(nm, 'จอย้ายชีต')}${k(ns, 'ชีตใหม่')}${k(nl, 'แก้ป้ายแพค')}${k(nso, 'ชีตที่เรียงใหม่')}${!nm && !nl && !nso && !grp ? '<span>ไม่มีจอที่ต้องย้าย</span>' : ''}</div>
+ ${grp ? `<div class="arg">${grp}</div>` : ''}
+ ${nt.length ? `<details class="arrd"><summary>ไม่ได้ย้าย ${nt.length} จอ</summary><ul>${nt.map(x => `<li>${esc(x.f)} • ชีต ${esc(x.sn)} • ${esc(x.t)}</li>`).join('')}</ul></details>` : ''}
+ <ul class="arn">${notes.map(x => `<li>${x}</li>`).join('')}</ul></section>`;
+};
 /* ----- หน้าต่าง: วิธีใช้ / ต้อนรับ / วางรายชื่อ / ระบบทำงานอย่างไร ----- */
 const vHelp =
   () => `<div class="ov"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="hlt"><div class="dlgh"><h2 id="hlt">วิธีใช้ประจำวัน</h2><button class="ib" data-a="help" aria-label="ปิด" data-focus>${IC.x}</button></div>
@@ -6170,6 +7225,7 @@ const vHelp =
 <h3>งานโฟลเดอร์และรูป (หน้าแยก, Chrome / Edge)</h3><ul class="hr2"><li>กดปุ่ม “งานโฟลเดอร์และรูป” ด้านบน (กลับมาเติมใบเช็ค กด “เติมใบเช็ครูป” งานที่ค้างไว้ไม่หาย) • กล่อง “ใบเช็คที่ใช้” คือชุดที่ทุกเครื่องมือในหน้านี้อ่าน: ถ้าเพิ่งเติม ระบบใช้ใบที่เพิ่งเติมให้เลย ถ้ายังไม่เติม ใช้ใบในขั้นที่ 3 หรือกด “เปิดใบเช็คทั้งโฟลเดอร์” / ลากไฟล์มาวาง ไม่ต้องใส่ Playlist • การ์ด 3 ใบบอกสถานะของแต่ละเครื่องมือ (เหลือง = รอทำ เขียว = เรียบร้อย แดง = ต้องแก้) กด “เปิด” เพื่อทำงานนั้นด้านล่าง</li><li>สร้างโฟลเดอร์แยกรูป: เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • ตั้งแต่วันที่ 16 เลือกได้ว่าจะสร้างรอบนี้ / รอบ 1–15 (จอที่ยังไม่ได้สร้างรอบแรก) / ทั้ง 2 รอบ • ช่อง “หนังที่ขึ้นจอถึงวันที่” = ทุกเรื่องในรอบ (ค่าปกติ) หรือเลือกวันที่ เพื่อสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่) ไม่เกินวันนั้น • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>ใส่วันที่ถ่าย: ใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ และบอกเรื่องที่น่าจะลืมหรือใส่ผิด ดูรายการก่อนกดใส่ แล้วดาวน์โหลด หรือบันทึกทับในโฟลเดอร์ใบเช็ค (ไฟล์เดิมเก็บไว้ใน สำรองก่อนใส่วันที่ถ่าย) • ง่ายที่สุด: “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์ใบเช็คจริงก่อน ระบบบันทึกกลับโฟลเดอร์เดิม</li><li>ตรวจโฟลเดอร์เทียบจอ: กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ที่ใส่ไว้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>หน้าแบบเดิม (3.12.3) ยังเปิดได้ชั่วคราวจากลิงก์ “เปิดหน้าเดิม (3.12.3)” ท้ายหน้า (เปิดจากลิงก์ระบบ)</li></ul>
 <h3>ระบบจัดให้อย่างไร</h3><ul class="hr2">
 <li>วันที่ 1 ลงหนังที่ออนอยู่ทั้งหมด หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z</li>
+<li>จัดจอเข้าชีตตามแพค (4.1): จอที่ Playlist วันนี้ย้ายแพค (เช่น อยู่ชีต Spare แต่ Playlist บอกว่า 40 RED) ระบบย้ายบล็อกจอไปชีตของแพคนั้นก่อนเติม หนัง วันที่ถ่าย และ “ออกวันที่” ไปด้วยครบ ไม่มีชีตของแพคนั้น = สร้างชีตใหม่ เรียงจอตามเลขจอ แก้ป้ายแพคที่เขียนผิด และแก้สูตรในชีต Analysis — ย้ายเฉพาะเมื่อใส่ Playlist ของแพคเดิมแล้วและจอไม่อยู่ในแพคเดิม แต่อยู่ในแพคใหม่แพคเดียว ปุ่มคัดลอก / สร้างโฟลเดอร์ของจอที่ย้ายไม่ย้ายตาม ปิดได้ในขั้นที่ 3</li>
 <li>ด่านตรวจ Playlist: ระบบอ่านคอลัมน์ตามชื่อหัวตาราง ถ้าเจอสิ่งที่ไม่รู้จัก (หาคอลัมน์ไม่เจอ สถานะใหม่ วันที่อ่านไม่ได้ สื่อใหม่) จะเตือนในขั้นที่ 1 และถามยืนยันก่อนเติม หมายเหตุที่พูดถึงจอที่กำลังเติมแต่ระบบอ่านไม่ออกจะขึ้นใน “ควรตรวจ”</li>
 <li>วันถัดไป หนังที่ยังไม่มีในใบเช็คและสถานะ “ขึ้นใหม่” จะลงใต้แถบวันที่ของวันนั้น หนังที่มีอยู่แล้วอยู่ที่เดิม ไม่ซ้ำ</li>
 <li>หนังที่ยังอยู่ใน Playlist ถือว่ายังออนอยู่ “ออกวันที่ N” ใส่เมื่อหนังย้ายไปอยู่ในรายการถอด (วันที่ 1 ยังไม่ใส่) ไฟล์เดิม / ต่อสัญญากลางรอบ ใช้แถวเดิม ไม่เพิ่มแถวซ้ำ</li>
@@ -6531,6 +7587,9 @@ function view() {
     $('#o_off').checked = OP.off;
     $('#o_hand').checked = OP.hand;
     $('#o_r2').value = OP.r2;
+    $('#o_arr').checked = OP.arr;
+    $('#o_arrmk').checked = OP.arrMk;
+    $('#o_arrsort').checked = OP.arrSort;
     $('#o_base').value = BASEERR || OP.base;
   }
   for (const id in kv) {
@@ -7765,17 +8824,47 @@ const ACT = {
             ],
             blob: null,
           };
-        else
+        else {
+          const fo = {
+            ...o,
+            col1: effCol(1, f),
+            col2: effCol(2, f),
+            k16: !!fcol(f.name).k16,
+            padc: effPad(f),
+            padh: padHist(),
+          };
+          let A = null,
+            g = f;
+          if (arrOn(o))
+            try {
+              A = await arrangeWb(f.buf, on, { mk: o.arrMk, sort: o.arrSort });
+              if (A.buf !== f.buf) g = { ...f, buf: A.buf };
+            } catch (e) {
+              A = { err: 1, moves: [], notes: [], relabeled: [], sorted: [], ana: 0 };
+            } /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม */
           try {
-            r = await fillWb(f, on, metro, {
-              ...o,
-              col1: effCol(1, f),
-              col2: effCol(2, f),
-              k16: !!fcol(f.name).k16,
-              padc: effPad(f),
-              padh: padHist(),
-            });
+            r = await fillWb(g, on, metro, fo);
           } catch (e) {
+            r = null;
+          }
+          if (
+            r &&
+            g !== f &&
+            A.moves.length &&
+            ![...new Set(A.moves.map(m => m.to))].every(sn =>
+              r.rep.some(x => x[0] === sn && x[1] === 'รูปแบบ' && !/^ตรวจ/.test(x[2])),
+            )
+          )
+            r = null; /* ชีตที่รับจอต้องจัดแถวได้ตอนเติม ไม่อย่างนั้นไม่ย้าย */
+          if (!r && g !== f) {
+            A = { err: 1, moves: [], notes: [], relabeled: [], sorted: [], ana: 0 };
+            try {
+              r = await fillWb(f, on, metro, fo);
+            } catch (e) {
+              r = null;
+            }
+          } /* จัดจอแล้วเติมไม่ได้ → เติมไฟล์เดิมแบบไม่ย้ายจอ */
+          if (!r)
             r = {
               rep: [
                 [
@@ -7787,12 +8876,14 @@ const ACT = {
               ],
               blob: null,
             };
-          }
+          if (r.blob) r.arr = A;
+        }
         if (r.blob) out.file(f.name, r.blob, { createFolders: false });
-        res.push({ name: f.name, rep: r.rep, blob: r.blob, fold: r.fold || [] });
+        res.push({ name: f.name, rep: r.rep, blob: r.blob, fold: r.fold || [], arr: r.arr || null });
         L.push(
           '',
           f.name,
+          ...arrTxt(r.arr),
           ...r.rep.map(x => `  ${x[0]} | ${x[1]} | ${x[2]}${x[3] ? ' (' + x[3] + ')' : ''}`),
         );
       }
@@ -7884,6 +8975,9 @@ document.addEventListener('change', e => {
     OP.off = $('#o_off').checked;
     OP.hand = $('#o_hand').checked;
     OP.r2 = $('#o_r2').value;
+    OP.arr = $('#o_arr').checked;
+    OP.arrMk = $('#o_arrmk').checked;
+    OP.arrSort = $('#o_arrsort').checked;
     softView();
     return;
   }
