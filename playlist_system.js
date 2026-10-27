@@ -76,6 +76,7 @@
  *   เวอร์ชัน 4.1 เพิ่มในส่วน 6, 9 และ 12: จัดจอเข้าชีตตามแพค — จอที่ Playlist ย้ายแพค ย้ายบล็อกจอไปชีตของแพคนั้นก่อนเติม
  *   สร้างชีตใหม่ เรียงตามเลขจอ แก้ป้ายแพค และสูตร Analysis (arrangeWb, arrOn, vArr, arrTxt)
  *   เวอร์ชัน 4.1.1 เพิ่มในส่วน 12: ลากไฟล์ .zip ลงขั้นที่ 1 / 3 ได้เลย ระบบใช้ไฟล์ Excel ข้างใน (isZip, unzipFiles)
+ *   เวอร์ชัน 4.1.2: จอที่ย้ายเข้าชีตมีเส้นตารางเหมือนจออื่น (arrangeWb) • งาน Freeze Screen ติ๊กให้ใส่ได้ (FRZIN, isFrz, frzOn, vFrz)
  * ======================================================================
  */
 
@@ -3278,6 +3279,24 @@ const arrangeWb = (() => {
         const trail = lastBar >= lastV;
         let R0 = lastV + 3;
         const b0 = L.base;
+        /* 4.1.2: แบบช่องว่างของแต่ละคอลัมน์ในจอเดิมของชีตนี้ (ช่องที่ไม่มีค่า ไม่ใช่แถบวันที่) — ใช้ทำเส้นตารางให้จอที่ย้ายเข้ามา */
+        const GS = [0, 1, 2].map(i => {
+          const m = new Map();
+          for (const [r, row] of I.rows) {
+            if (r <= hrT || numV(I.wsv, I.base, r)) continue;
+            const el = row.cells.get(I.base + i),
+              s = el && !hasVal(el) ? el.getAttribute('s') : null;
+            if (s) m.set(s, (m.get(s) || 0) + 1);
+          }
+          let b = null,
+            n = 0;
+          for (const [s, c] of m)
+            if (c > n) {
+              n = c;
+              b = s;
+            }
+          return b;
+        });
         for (const x of incoming) {
           const Sx = info[x.from],
             dS = dstOf[x.from + '|' + x.s][1];
@@ -3296,6 +3315,23 @@ const arrangeWb = (() => {
             return k;
           };
           for (let r = 1; r <= Sx.hr; r++) for (let i = 0; i < 3; i++) cp(r, x.s + i, r, dS + i);
+          /* 4.1.2: แถวข้อมูลของจอที่ย้ายเข้ามามีเส้นตารางเหมือนจอเดิมของชีตนี้ ตลอดความยาวตาราง (เดิมช่องว่างไม่มีเส้น เหลือเส้นเฉพาะช่องที่มีค่า) */
+          for (const [r, row] of I.rows) {
+            if (r <= hrT || r > hrT + 3000) continue;
+            const bar = !!numV(
+              I.wsv,
+              I.base,
+              r,
+            ); /* แถบวันที่ของชีตนี้ → ใช้สีแถบแบบจอเดิม (ตอนเติมระบบจัดแถบใหม่ แถบที่เลื่อนไปกลายเป็นแถวหนังตามปกติ) */
+            for (let i = 0; i < 3; i++) {
+              const ref = row.cells.get(I.base + i),
+                st = ref && ref.getAttribute('s');
+              if (!st || (!bar && GS[i] == null) || (grid.get(r) && grid.get(r).has(dS + i))) continue;
+              const e = doc.createElementNS(NS, 'c');
+              e.setAttribute('s', bar ? st : GS[i]);
+              put(r, dS + i, e);
+            }
+          }
           /* หนังของจอนี้ตามแถบวันที่ของชีตเดิม → วางไว้ท้ายชีต พร้อมแถบวันที่ (ตอนเติม ระบบจัดแถวให้ตรงกับแถบของชีตนี้) */
           const bars = [];
           for (let r = Sx.hr; r <= Sx.hr + 1500; r++) {
@@ -4122,7 +4158,14 @@ async function fillWb(f, on, metro, o) {
             (L.keep
               ? ' • คงรายการเดิมของ ' + L.keep + ' (ไม่มีใน Playlist ที่ใส่มา) แถบวันที่ยังตรงกันทั้งชีต'
               : '') +
-            (L.fdrop ? ' • ลบแถว #FAST_ADS ' + L.fdrop + ' แถว (ไม่ใช่หนังโฆษณา)' : ''),
+            (L.fdrop ? ' • ลบแถว #FAST_ADS ' + L.fdrop + ' แถว (ไม่ใช่หนังโฆษณา)' : '') +
+            (n => (n ? ' • ใส่งาน Freeze Screen ตามที่เลือก ' + n + ' เรื่อง' : ''))(
+              new Set(
+                by[sn].flatMap(j =>
+                  SIGAL[j[3].c] ? [] : j[3].rows.filter(r => !r.off && frzOn(r)).map(r => r.ad.trim()),
+                ),
+              ).size,
+            ),
           0,
         ]);
         for (const [c, l] of L.laterL || [])
@@ -4160,7 +4203,11 @@ async function fillWb(f, on, metro, o) {
               j[3].c,
               (sig
                 ? 'ตรวจ: ไม่ใส่ตามหมายเหตุ “ไม่ออน/ออนเฉพาะ/ยกเว้น” → '
-                : 'ตรวจ: ไม่ใส่เพราะจำนวนครั้ง = 0 → ') + z.join(', '),
+                : 'ตรวจ: ไม่ใส่เพราะจำนวนครั้ง = 0 → ') +
+                z.join(', ') +
+                (!sig && j[3].rows.some(r => !r.off && isFrz(r) && z.includes(r.ad))
+                  ? ' (งาน Freeze Screen ติ๊กให้ใส่ได้ในขั้นที่ 3)'
+                  : ''),
               0,
             ]);
         }
@@ -4408,7 +4455,12 @@ function noteSkip(scr, r) {
   return false;
 }
 const ALLAL = new Set(Object.values(SIGAL).flat());
-const skipRow = (scr, r) => (SIGAL[scr.c] ? noteSkip(scr, r) : r.cnt === 0 && !MTP.test(r.ad.trim()));
+/* 4.1.2: งาน Freeze Screen = จำนวนครั้ง 0 และหมายเหตุ/ชื่อมีคำว่า Freeze (ขึ้นจอเฉพาะช่วงเวลา) — ปกติไม่ใส่ ใส่เฉพาะเรื่องที่ผู้ใช้ติ๊กไว้ (FRZIN) */
+let FRZIN = new Set();
+const isFrz = r => r.cnt === 0 && /freeze/i.test(String(r.note || '') + ' ' + String(r.ad || ''));
+const frzOn = r => isFrz(r) && FRZIN.has(String(r.ad).trim());
+const skipRow = (scr, r) =>
+  SIGAL[scr.c] ? noteSkip(scr, r) : r.cnt === 0 && !MTP.test(r.ad.trim()) && !frzOn(r);
 /* ไฟล์ Playlist แบบ Signature Max: 1 ชีต = 1 จอ หัวตารางมีคำว่า หนังโฆษณา และ “รายการปลด” แยกส่วนที่ถอดแล้ว */
 const SIGCODE = { 'Exchange Tower': 'Exchange Tower (SM)', 'Exchange Tower (2)': 'Exchange Tower (SM) 2' };
 /* ไฟล์แบบ Signature Max / Show DC / BKJ: 1 ชีต = 1 จอ หัวตารางมีคำว่า หนังโฆษณา และ “รายการปลด” แยกส่วนที่ถอดแล้ว */
@@ -5111,6 +5163,44 @@ function plCheck(p, I) {
     });
   }
 }
+/* 4.1.2: งาน Freeze Screen ใน Playlist วันนี้ (จำนวนครั้ง = 0) — ผู้ใช้ติ๊กเรื่องที่จะใส่ ระบบจำไว้ในเครื่อง (ps_frz) */
+const frzList = () => {
+  const M = new Map();
+  for (const s of DB) {
+    if (SIGAL[s.c]) continue;
+    for (const r of s.rows) {
+      if (r.off || !isFrz(r)) continue;
+      const k = String(r.ad).trim();
+      let x = M.get(k);
+      if (!x) M.set(k, (x = { ad: k, n: new Set(), t: '' }));
+      x.n.add(s.m + '|' + s.c);
+      if (!x.t) {
+        const m = String(r.note || '').match(/(\d{1,2}[.:]\d{2})\s*[-–]\s*(\d{1,2}[.:]\d{2})/);
+        if (m) x.t = m[1] + ' – ' + m[2] + ' น.';
+      }
+    }
+  }
+  return [...M.values()].sort((a, b) => cmpN(a.ad, b.ad));
+};
+const frzSave = () => store.set('ps_frz', JSON.stringify([...FRZIN].slice(-300)));
+const frzRep = () => {
+  const L = frzList();
+  return L.length
+    ? [
+        '',
+        'งาน Freeze Screen (จำนวนครั้ง = 0)',
+        ...L.map(
+          x => `  ${FRZIN.has(x.ad) ? 'ใส่' : 'ไม่ใส่'} | ${x.ad}${x.t ? ' | ' + x.t : ''} | ${x.n.size} จอ`,
+        ),
+      ]
+    : [];
+};
+const vFrz = () => {
+  const L = frzList();
+  if (!L.length) return '';
+  const on = L.filter(x => FRZIN.has(x.ad)).length;
+  return `<div class="cols frz"><p class="cl">งาน Freeze Screen <span class="frzn">${on ? `ใส่ ${on} จาก ${L.length} เรื่อง` : `${L.length} เรื่อง ยังไม่ใส่`}</span></p><small>หนังที่ขึ้นจอเฉพาะช่วงเวลา (Playlist ใส่จำนวนครั้ง = 0 และหมายเหตุ Freeze Screen) ปกติระบบไม่ใส่ลงใบเช็ค ติ๊กเรื่องที่ต้องการให้ใส่ ระบบจำไว้ใช้วันต่อไป</small>${L.map(x => `<label class="cb frzi"><input type="checkbox" data-frz="${esc(x.ad)}"${FRZIN.has(x.ad) ? ' checked' : ''}><span>${esc(x.ad)}<small>${x.t ? esc(x.t) + ' • ' : ''}${x.n.size} จอ</small></span></label>`).join('')}</div>`;
+};
 const plRep = () =>
   PLI.length
     ? [
@@ -5309,7 +5399,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.1 (27 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.2 (27 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -5366,6 +5456,11 @@ const setTheme = t => {
 OP.col1 = store.get('ps_col1') || '';
 OP.col2 = store.get('ps_col2') || '';
 OP.padc = store.get('ps_padc') || '';
+try {
+  FRZIN = new Set(JSON.parse(store.get('ps_frz') || '[]'));
+} catch (_) {
+  FRZIN = new Set();
+}
 let adv = false,
   HELP = false,
   HOW = false,
@@ -6245,6 +6340,7 @@ function vFl() {
  <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายวันที่ถ่าย (ช่องหลังชื่อหนัง ทุกจอ) ตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
  ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และวันที่ถ่าย (ช่องหลังชื่อหนัง) จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
  <label class="tgl"><span>จัดจอเข้าชีตตามแพค <em class="rec">แนะนำ: เปิด</em><small>จอที่ Playlist วันนี้ย้ายแพค (เช่น Spare → 40 RED) ระบบย้ายจอไปชีตของแพคนั้นให้ หนัง วันที่ถ่าย และ “ออกวันที่” ไปด้วยครบ • ป้ายแพคที่เขียนผิดแก้ให้ • บอกในผลการเติมว่าย้ายอะไรไปไหน</small>${OP.arr && !arrOn(OP) ? `<small class="wrn">ตอนนี้ยังไม่จัดจอ — ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง” และเลือกสื่อ “ทั้งหมด”</small>` : ''}</span><span class="sw"><input type="checkbox" id="o_arr"><span></span></span></label>
+ ${vFrz()}
  <div class="cols"><p class="cl">สีแถบวันที่</p><div class="crow"><span>รอบ 1–15</span>${vColPick(1)}</div><div class="crow"><span>รอบ 16–สิ้นเดือน</span>${vColPick(2)}</div><small>“ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ (รอบ 16 ถ้าชีตยังไม่มีแถบรอบ 2 ใช้สีฟ้า) เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <div class="cols"><p class="cl">สีช่องว่างเหนือแถบวันที่</p><div class="crow">${vPadPick()}</div><small>แถบสีในช่องว่างใต้รายการของจอที่หนังน้อยกว่า ก่อนถึงแถบวันที่ถัดไป (ปกติสีฟ้าอ่อน) “ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <button class="adv" data-a="adv" aria-expanded="${adv}"><span>ตัวเลือกเพิ่มเติม${advChg() ? ` <em class="chg">เปลี่ยนจากค่าแนะนำ ${advChg()} ข้อ</em>` : ''}</span>${IC.chev}</button>
@@ -7239,7 +7335,7 @@ const vHelp =
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
 <li><b>รหัสนี้อยู่ในหลายสื่อ</b> ตั้งชื่อชีตในใบเช็คให้มี 40/80 + Blue/Red, CITY หรือ Spare แล้วเติมใหม่</li>
-<li><b>ไม่ใส่ตามหมายเหตุ / จำนวนครั้ง = 0</b> บอกหนังที่ระบบตั้งใจไม่ใส่ ดูว่าตรงกับ Playlist</li>
+<li><b>ไม่ใส่ตามหมายเหตุ / จำนวนครั้ง = 0</b> บอกหนังที่ระบบตั้งใจไม่ใส่ ดูว่าตรงกับ Playlist • งาน Freeze Screen (จำนวนครั้ง = 0) ติ๊กให้ใส่ได้ที่ขั้นที่ 3 ในการตั้งค่า</li>
 <li><b>ยังไม่ใส่ เพราะวันเริ่มในไฟล์ยังไม่ถึง</b> หนังที่เริ่มหลังวันที่ทำงาน ระบบจะใส่ให้เองเมื่อถึงวันเริ่ม</li>
 
 <li><b>มีรอบ 16–สิ้นเดือนแล้ว แต่วันที่ทำงานอยู่ในรอบ 1–15</b> วันที่ทำงานน่าจะผิด แก้ในขั้นที่ 3 แล้วเติมใหม่</li>
@@ -8854,7 +8950,7 @@ const ACT = {
         metro = ms ? listOf(ms, o) : [],
         out = new JSZip(),
         res = [],
-        L = ['รายงานการเติมใบเช็ครูป', ...plRep()];
+        L = ['รายงานการเติมใบเช็ครูป', ...plRep(), ...frzRep()];
       let i = 0;
       for (const f of list) {
         i++;
@@ -9013,6 +9109,14 @@ document.addEventListener('change', e => {
         OP.base = '';
       }
     }
+    softView();
+    return;
+  }
+  if (t.dataset.frz != null) {
+    const k = t.dataset.frz;
+    if (t.checked) FRZIN.add(k);
+    else FRZIN.delete(k);
+    frzSave();
     softView();
     return;
   }
