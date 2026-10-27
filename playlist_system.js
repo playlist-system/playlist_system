@@ -78,6 +78,7 @@
  *   เวอร์ชัน 4.1.1 เพิ่มในส่วน 12: ลากไฟล์ .zip ลงขั้นที่ 1 / 3 ได้เลย ระบบใช้ไฟล์ Excel ข้างใน (isZip, unzipFiles)
  *   เวอร์ชัน 4.1.2: จอที่ย้ายเข้าชีตมีเส้นตารางเหมือนจออื่น (arrangeWb) • งาน Freeze Screen ติ๊กให้ใส่ได้ (FRZIN, isFrz, frzOn, vFrz)
  *   เวอร์ชัน 4.1.3: สร้างโฟลเดอร์แยกรูป — ปุ่มสร้างกดไม่ได้ระหว่างตรวจรายการใหม่ และตรวจซ้ำก่อนสร้าง (picRe, picSig, ACT.picmake)
+ *   เวอร์ชัน 4.2: สร้างโฟลเดอร์แยกรูปแบบ Gallary แพค → รอบ → จอ → หนัง (rndF, rndName, reTag, picScreens, picPlan, picMake) ใส่วันที่ถ่ายอ่านได้ 2 แบบ
  * ======================================================================
  */
 
@@ -1564,7 +1565,7 @@ function screen10(ws, sn, cn) {
   if (k === 'The 20' || k === 'Rama9 Connect' || k === 'Gateway X' || k === 'LA PlanB') return one(k);
   return null;
 }
-/* ----- โฟลเดอร์แยกรูป (ขั้นที่ 4): แยกรูป\Pic @ สื่อ\จอ\10 OCT 26\1-15 หรือ 16-31\ชื่อหนัง
+/* ----- โฟลเดอร์แยกรูป (ขั้นที่ 4) 4.2: แบบ Gallary แยกรูป\Pic @ สื่อ\10 Oct 2026 16-31\จอ\ชื่อหนัง (แบบเดิม แยกรูป\Pic @ สื่อ\จอ\10 OCT 26\16-31\ชื่อหนัง ยังอ่านได้ และสร้างต่อเฉพาะรอบที่เริ่มแบบเดิมไว้แล้ว)
    รอบ 1–15 = หนังใต้แถบวันที่ 1–15 ของใบเช็ค • รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป (แบบที่ทีมทำ) • สร้างเฉพาะที่ยังไม่มี ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ
    ช่วงวันที่ 16 ขึ้นไปเลือกได้ (3.10): rs = 'cur' รอบ 16–สิ้นเดือน (ค่าเริ่มต้น) / '1' รอบ 1–15 / 'both' ทั้ง 2 รอบ — รอบ 1–15 ข้ามจอที่ไม่มีหนังรอบนั้น
    upto = เอาหนังที่เริ่ม (แถบวันที่) ไม่เกินวันนี้ของเดือน 0 = ทั้งหมด • upto ก่อนวันที่ 16 ไม่สร้างรอบ 16
@@ -1631,12 +1632,76 @@ const picDirs = async h => {
   for await (const [n, x] of h.entries()) if (x.kind === 'directory') o.push([n, x]);
   return o;
 };
-/* โฟลเดอร์จอในโฟลเดอร์แยกรูป (ลึกไม่เกิน 3 ชั้น) และจอปิดถาวร */
+/* 4.2: แบบโฟลเดอร์ Gallary — แพค → รอบ (“10 Oct 2026 16-31” = เดือน ปี ช่วงวันในชื่อเดียว) → จอ → หนัง
+   แบบเดิม — แพค → จอ → 10 OCT 26 → 16-31 → หนัง (ยังอ่านได้ และสร้างต่อแบบเดิมเฉพาะรอบที่เริ่มแบบเดิมไว้แล้ว) */
+const rndF = n => {
+  const q = String(n)
+    .trim()
+    .match(/^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4}|\d{2})\s+(\d{1,2})\s*-\s*(\d{1,2})$/);
+  if (!q) return null;
+  const mi = PMON.indexOf(q[2].slice(0, 3).toUpperCase()),
+    a = +q[4],
+    b = +q[5];
+  if (mi < 0 || !((a === 1 && b === 15) || (a === 16 && b >= 28 && b <= 31))) return null;
+  return { y: q[3].length === 2 ? 2000 + +q[3] : +q[3], m: mi, hf: a === 16 ? 2 : 1, mon: q[2], yy: q[3] };
+};
+const rndK = (y, m, h) => y + '-' + m + '-' + h;
+/* ชื่อโฟลเดอร์รอบใหม่ตามแบบที่โฟลเดอร์รอบอื่นใช้อยู่ (ตัวพิมพ์ของเดือน ปี 2 / 4 หลัก) ค่าเริ่มต้น “10 Oct 2026 16-31” */
+const rndName = (y, m, h, smp) => {
+  const M = PMON[m],
+    ld = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(),
+    mon =
+      smp && /^[A-Z]+$/.test(smp.mon)
+        ? M
+        : smp && /^[a-z]+$/.test(smp.mon)
+          ? M.toLowerCase()
+          : M[0] + M.slice(1).toLowerCase(),
+    yy = smp && smp.yy.length === 2 ? String(y).slice(-2) : String(y);
+  return p2(m + 1) + ' ' + mon + ' ' + yy + ' ' + (h === 2 ? '16-' + ld : '1-15');
+};
+/* ป้ายแพคในชื่อโฟลเดอร์จอ (40B) (40R) (80B) (80R) ให้ตรงกับแพคที่จะสร้าง • แพคอื่น (CITY / Other) ไม่มีป้าย */
+const pkTag = n => {
+  const s = nrm(n);
+  return /40BLUE/.test(s)
+    ? '40B'
+    : /40RED/.test(s)
+      ? '40R'
+      : /80BLUE/.test(s)
+        ? '80B'
+        : /80RED/.test(s)
+          ? '80R'
+          : '';
+};
+const reTag = (name, pk) => {
+  const t = pkTag(pk),
+    n = String(name);
+  if (/\((?:40|80)\s*[BR]\)/i.test(n))
+    return n
+      .replace(/\s*\((?:40|80)\s*[BR]\)/i, t ? ' (' + t + ')' : '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  if (!t) return n;
+  const m = n.match(
+    /^(.*?)((?:\s*\([^()]*\))+)\s*$/,
+  ); /* ไม่มีป้ายแพค → ใส่ก่อนวงเล็บท้ายชื่อ เช่น “… (16-9)” → “… (40R) (16-9)” */
+  return m ? m[1].trim() + ' (' + t + ')' + m[2] : n.trim() + ' (' + t + ')';
+};
+const sameK = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/* โฟลเดอร์จอในโฟลเดอร์แยกรูป (ลึกไม่เกิน 3 ชั้น) จอปิดถาวร และโฟลเดอร์รอบแบบ Gallary
+   S = จอ: แบบเดิม {path, h, k, hm, kids, ph, pp} • แบบ Gallary {g: true, path, k, ph, pp, rounds: รอบ → โฟลเดอร์จอในรอบนั้น, name = ชื่อล่าสุด} */
 async function picScreens(root) {
   const S = [],
-    shut = [];
+    shut = [],
+    RF = [],
+    tops = [];
   const walk = async (h, path, dep) => {
     for (const [n, x] of await picDirs(h)) {
+      if (dep === 0) tops.push([n, x]);
+      const rf = rndF(n);
+      if (rf) {
+        RF.push({ ...rf, name: n, h: x, ph: h, pp: path });
+        continue;
+      }
       if (isMonD(n)) continue;
       if (dep === 0 && /ปิดถาวร/.test(n)) {
         for (const [c] of await picDirs(x)) shut.push(picKey(c));
@@ -1645,18 +1710,54 @@ async function picScreens(root) {
       const k = picKey(n),
         kids = await picDirs(x),
         hm = kids.some(([c]) => isMonD(c));
-      if (k.code || k.jam || k.metro != null || hm) S.push({ path: [...path, n], h: x, k, hm, kids });
+      if (k.code || k.jam || k.metro != null || hm)
+        S.push({ path: [...path, n], h: x, k, hm, kids, ph: h, pp: path });
       else if (dep < 2) await walk(x, [...path, n], dep + 1);
     }
   };
-  await walk(root, [], 0);
-  return { S, shut };
+  const rr = rndF(root.name); /* เลือกโฟลเดอร์รอบ (เช่น 10 Oct 2026 16-31) มาเลย → จอข้างในเป็นจอของรอบนั้น */
+  if (rr) RF.push({ ...rr, name: root.name, h: root, ph: null, pp: [] });
+  else await walk(root, [], 0);
+  const G = new Map();
+  for (const r of RF)
+    for (const [n, x] of await picDirs(r.h)) {
+      if (/^#/.test(n) || isMonD(n) || rndF(n)) continue;
+      const k = picKey(n),
+        gk = r.pp.join('/') + '|' + JSON.stringify(k),
+        o = r.y * 24 + r.m * 2 + r.hf;
+      let e = G.get(gk);
+      if (!e)
+        G.set(
+          gk,
+          (e = {
+            g: true,
+            path: [...r.pp, n],
+            h: null,
+            k,
+            hm: false,
+            kids: [],
+            ph: r.ph,
+            pp: r.pp,
+            rounds: new Map(),
+            name: n,
+            last: -1,
+          }),
+        );
+      e.rounds.set(rndK(r.y, r.m, r.hf), { h: x, name: n, rf: r });
+      if (o > e.last) {
+        e.last = o;
+        e.name = n;
+        e.path = [...r.pp, n];
+      }
+    }
+  for (const e of G.values()) S.push(e);
+  return { S, shut, RF, tops };
 }
 /* จอของบล็อกในใบเช็ค → โฟลเดอร์จอ: [ชื่อที่แสดง, คีย์, โฟลเดอร์ (null = ไม่เจอ)] */
 function picTg(b, S) {
   const best = (L, media) => {
     if (!L.length) return null;
-    const w = L.filter(s => s.hm),
+    const w = L.filter(s => s.hm || s.g),
       C = w.length ? w : L;
     return C.find(s => media && nrm(s.path.join(' ')).includes(nrm(media))) || C[0];
   };
@@ -1700,6 +1801,15 @@ function picTg(b, S) {
   );
   return [[b.labels[0] || b.sn, null, best(L, '')]];
 }
+/* แพคตามสื่อของชีต (จอแยก) → โฟลเดอร์แพคชั้นบนสุด เช่น 40Blue → “Pic @ Plan B TV 40 BLUE”, Spare → “Pic @ Other” */
+const PKM = {
+  '40Blue': /40BLUE/,
+  '40Red': /40RED/,
+  '80Blue': /80BLUE/,
+  '80Red': /80RED/,
+  CITY: /CITY/,
+  Spare: /OTHER|SPARE/,
+};
 async function picPlan(root, W, res, rs, upto) {
   const D = new Date(W),
     y = D.getUTCFullYear(),
@@ -1712,6 +1822,7 @@ async function picPlan(root, W, res, rs, upto) {
     RS = (two ? (rs === '1' ? [false] : rs === 'both' ? [false, true] : [true]) : [false])
       .map(t => ({
         t,
+        h: t ? 2 : 1,
         cur: t === two,
         rndN: t ? '16-' + ld : '1-15',
         isRnd: n =>
@@ -1721,8 +1832,8 @@ async function picPlan(root, W, res, rs, upto) {
     capT = upto > 0 ? Date.UTC(y, m, upto + 1) : Infinity,
     m0 = Date.UTC(y, m, 1),
     m1 = Date.UTC(y, m + 1, 1); /* เฉพาะหนังของเดือนนี้ */
-  const { S, shut } = await picScreens(root),
-    same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const { S, shut, RF, tops } = await picScreens(root);
+  const smp = RF.slice().sort((a, b) => b.y * 24 + b.m * 2 + b.hf - (a.y * 24 + a.m * 2 + a.hf))[0] || null;
   const T = new Map(),
     miss = [],
     closed = [];
@@ -1736,42 +1847,168 @@ async function picPlan(root, W, res, rs, upto) {
             .filter(Boolean),
         ),
       ]);
-      const tg = picTg(b, S);
-      for (const [id, k, s] of tg) {
+      for (const [id, k, s] of picTg(b, S)) {
         if (!s) {
-          (k && shut.some(x => same(x, k)) ? closed : miss).push({ f: r.name, sn: b.sn, id });
+          (k && shut.some(x => sameK(x, k)) ? closed : miss).push({ f: r.name, sn: b.sn, id });
           continue;
         }
-        const key = s.path.join('/'),
-          e = T.get(key) || { s, films: RS.map(() => new Set()), src: new Set() };
+        const key = JSON.stringify(s.k) + '|' + (PKM[b.media] ? b.media : ''),
+          e = T.get(key) || {
+            s,
+            media: PKM[b.media] ? b.media : '',
+            films: RS.map(() => new Set()),
+            src: new Set(),
+          };
         fs.forEach((L, i) => L.forEach(f => e.films[i].add(f)));
         e.src.add(r.name + ' • ' + b.sn);
         T.set(key, e);
       }
     }
-  const plan = [];
-  for (const e of T.values()) {
-    const mon = e.s.kids.find(([n]) => {
+  const oldR = new Map();
+  const oldRound = async (z, R) => {
+    const ck = z.path.join('/') + '|' + R.h;
+    if (oldR.has(ck)) return oldR.get(ck);
+    const mon = z.kids.find(([n]) => {
       const q = String(n)
         .trim()
         .match(/^(\d{1,2})\s*([A-Za-z]{3})[A-Za-z]*\s*(\d{2,4})$/);
       return q && PMON.indexOf(q[2].toUpperCase()) === m && +q[3] % 100 === y % 100;
     });
-    const md = mon ? mon[1] : null;
-    let mk = !md; /* โฟลเดอร์เดือนนับครั้งเดียวต่อจอ */
+    const v = { mon, md: mon ? mon[1] : null, rd: null };
+    if (v.md)
+      for (const [n, x] of await picDirs(v.md))
+        if (R.isRnd(n)) {
+          v.rd = x;
+          break;
+        }
+    oldR.set(ck, v);
+    return v;
+  };
+  const pkOld =
+    new Map(); /* แพคที่รอบนี้เริ่มแบบเดิมไว้แล้ว (มีจอที่มีโฟลเดอร์รอบนี้แบบเดิม) → สร้างต่อแบบเดิมจนจบรอบ */
+  const oldPkg = async (pp, R) => {
+    const ck = pp.join('/') + '|' + R.h;
+    if (pkOld.has(ck)) return pkOld.get(ck);
+    let v = false;
+    for (const z of S)
+      if (!z.g && z.pp.join('/') === pp.join('/') && (await oldRound(z, R)).rd) {
+        v = true;
+        break;
+      }
+    pkOld.set(ck, v);
+    return v;
+  };
+  const rfOf = (pp, R) =>
+    RF.find(r => r.pp.join('/') === pp.join('/') && r.y === y && r.m === m && r.hf === R.h) || null;
+  const plan = [];
+  for (const e of T.values()) {
+    const all = S.filter(z => sameK(z.k, e.s.k)),
+      gs = all.filter(z => z.g),
+      os = all.filter(z => !z.g);
+    const pkMedia = e.media ? tops.find(([n]) => PKM[e.media].test(nrm(n))) : null;
+    const prefer = L => (pkMedia && L.find(z => z.pp[0] === pkMedia[0])) || (L.includes(e.s) ? e.s : L[0]);
+    let mkMonDone = false;
     for (let i = 0; i < RS.length; i++) {
-      const R = RS[i];
+      const R = RS[i],
+        rk = rndK(y, m, R.h);
       if (!R.cur && !e.films[i].size) continue; /* รอบ 1–15 ที่จอนี้ไม่มีหนัง ไม่สร้าง */
-      let rd = null;
-      const have = new Set();
-      if (md) {
-        for (const [n, x] of await picDirs(md))
-          if (R.isRnd(n)) {
-            rd = x;
+      let P = null;
+      const gHave = gs.filter(z => z.rounds.has(rk));
+      if (gHave.length) {
+        const z = prefer(gHave),
+          q = z.rounds.get(rk);
+        P = {
+          lay: 'B',
+          base: z.ph,
+          pp: z.pp,
+          chain: [
+            [q.rf.name, q.rf.h, 'rnd'],
+            [q.name, q.h, 'scr'],
+          ],
+          fin: q.h,
+          label: q.name,
+        };
+      } else {
+        let oz = null,
+          oq = null;
+        for (const z of [prefer(os), ...os].filter(Boolean)) {
+          const q = await oldRound(z, R);
+          if (q.rd) {
+            oz = z;
+            oq = q;
             break;
           }
-        if (rd) for await (const [n] of rd.entries()) have.add(n.toLowerCase());
+        }
+        if (!oz)
+          for (const z of [prefer(os), ...os].filter(Boolean))
+            if (await oldPkg(z.pp, R)) {
+              oz = z;
+              oq = await oldRound(z, R);
+              break;
+            }
+        if (oz) {
+          P = {
+            lay: 'A',
+            base: oz.h,
+            pp: oz.path,
+            chain: [
+              [oq.mon ? oq.mon[0] : monN, oq.md, 'mon'],
+              [oq.rd ? oq.rd.name : R.rndN, oq.rd, 'rnd'],
+            ],
+            fin: oq.rd,
+            label: oz.path[oz.path.length - 1],
+            mkMonOnce: !oq.md && !mkMonDone,
+          };
+          if (!oq.md) mkMonDone = true;
+        } else {
+          /* แบบ Gallary: แพค = ตามสื่อของชีต (จอแยก) หรือแพคที่จอนี้อยู่ล่าสุด • ชื่อโฟลเดอร์จอ = ชื่อในรอบก่อนของแพคนั้น หรือชื่อที่มีอยู่ (แก้ป้ายแพคให้ตรง) */
+          const gz = gs.slice().sort((a, b) => b.last - a.last);
+          let pp, ph;
+          if (pkMedia) {
+            pp = [pkMedia[0]];
+            ph = pkMedia[1];
+          } else {
+            const z = gz[0] || prefer(os) || e.s;
+            pp = z.pp;
+            ph = z.ph;
+          }
+          const inG = gz.find(z => z.pp.join('/') === pp.join('/')),
+            inO = os.find(z => z.pp.join('/') === pp.join('/')),
+            name = inG
+              ? inG.name
+              : inO
+                ? inO.path[inO.path.length - 1]
+                : reTag(
+                    (gz[0] && gz[0].name) || e.s.path[e.s.path.length - 1],
+                    pp[pp.length - 1] || root.name,
+                  ),
+            rf = rfOf(pp, R);
+          P = {
+            lay: 'B',
+            base: ph,
+            pp,
+            chain: [
+              [rf ? rf.name : rndName(y, m, R.h, smp), rf ? rf.h : null, 'rnd'],
+              [fsafe(name), null, 'scr'],
+            ],
+            fin: null,
+            label: name,
+          };
+        }
       }
+      if (!P.base && !P.chain[0][1]) {
+        miss.push({
+          f: [...e.src][0] || '',
+          sn:
+            'เลือกโฟลเดอร์รอบ “' +
+            root.name +
+            '” ไว้ — สร้างรอบอื่นไม่ได้ ให้เลือกโฟลเดอร์ชั้นบน (ที่มี Pic @ …)',
+          id: P.label,
+        });
+        continue;
+      }
+      const have = new Set();
+      if (P.fin) for await (const [n] of P.fin.entries()) have.add(n.toLowerCase());
       const need = [],
         nn = new Set();
       for (const n of [...PMOD, ...[...e.films[i]].sort((a, b) => a.localeCompare(b, 'th'))]) {
@@ -1781,27 +2018,38 @@ async function picPlan(root, W, res, rs, upto) {
         nn.add(l);
         need.push([n, f]);
       }
+      const ch = P.chain;
       plan.push({
         s: e.s,
         src: [...e.src],
-        md,
-        rd,
-        mon: mon ? mon[0] : monN,
-        rnd: rd ? rd.name : R.rndN,
-        mkMon: mk,
-        mkRnd: !rd,
+        lay: P.lay,
+        base: P.base,
+        bk: P.pp.join('/'),
+        chain: ch.map(([n, h]) => [n, h]),
+        label: P.label,
+        disp: [...P.pp, ...ch.map(c => c[0])].join(' › '),
+        mk: ch.filter(c => !c[1] && (c[2] !== 'mon' || P.mkMonOnce)).map(c => [c[2], c[0]]),
+        mon: P.lay === 'A' ? ch[0][0] : '',
+        rnd: ch[P.lay === 'A' ? 1 : 0][0],
+        mkMon: P.lay === 'A' && !ch[0][1],
+        mkRnd: !ch[P.lay === 'A' ? 1 : 0][1],
+        mkScr: P.lay === 'B' && !ch[1][1],
         need,
         films: e.films[i].size,
         r: R.rndN,
         cur: R.cur,
       });
-      mk = false;
     }
   }
-  plan.sort(
-    (a, b) =>
-      a.s.path.join('/').localeCompare(b.s.path.join('/'), 'th') || (a.r < b.r ? -1 : a.r > b.r ? 1 : 0),
-  );
+  plan.sort((a, b) => a.disp.localeCompare(b.disp, 'th') || (a.r < b.r ? -1 : a.r > b.r ? 1 : 0));
+  const mk = new Set();
+  for (const p of plan) {
+    let k = p.bk;
+    for (const [n, h] of p.chain) {
+      k += '/' + n;
+      if (!h) mk.add(k.toLowerCase());
+    }
+  }
   return {
     plan,
     miss,
@@ -1813,29 +2061,44 @@ async function picPlan(root, W, res, rs, upto) {
     upto: capT < Infinity ? upto : 0,
     scr: T.size,
     dir: root.name,
-    n: plan.reduce((t, p) => t + p.need.length + (p.mkMon ? 1 : 0) + (p.mkRnd ? 1 : 0), 0),
+    lay: { A: plan.filter(p => p.lay === 'A').length, B: plan.filter(p => p.lay === 'B').length },
+    n: plan.reduce((t, p) => t + p.need.length, 0) + mk.size,
   };
 }
+/* สร้างตามแผน: โฟลเดอร์ที่ยังไม่มีตามลำดับชั้น (รอบ / จอ / เดือน) แล้วโฟลเดอร์หนัง — ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ */
 async function picMake(P) {
   let n = 0;
-  const bad = [];
+  const bad = [],
+    C = new Map();
   for (const p of P.plan) {
-    if (!p.need.length && !p.mkMon && !p.mkRnd) continue;
+    if (!p.need.length && !p.chain.some(c => !c[1])) continue;
     try {
-      const md = p.md || (await p.s.h.getDirectoryHandle(p.mon, { create: true }));
-      if (!p.md && p.mkMon) n++;
-      const rd = p.rd || (await md.getDirectoryHandle(p.rnd, { create: true }));
-      if (!p.rd) n++;
+      let h = p.base,
+        k = p.bk;
+      for (const [nm, hh] of p.chain) {
+        k += '/' + nm;
+        if (hh) {
+          h = hh;
+          continue;
+        }
+        const kk = k.toLowerCase();
+        if (C.has(kk)) h = C.get(kk);
+        else {
+          h = await h.getDirectoryHandle(nm, { create: true });
+          C.set(kk, h);
+          n++;
+        }
+      }
       for (const [, f] of p.need) {
         try {
-          await rd.getDirectoryHandle(f, { create: true });
+          await h.getDirectoryHandle(f, { create: true });
           n++;
         } catch (_) {
-          bad.push(p.s.path[p.s.path.length - 1] + ' / ' + f);
+          bad.push(p.label + ' / ' + f);
         }
       }
     } catch (_) {
-      bad.push(p.s.path.join(' / '));
+      bad.push(p.disp);
     }
   }
   return { n, bad };
@@ -2067,23 +2330,35 @@ async function shotScan(root, files, prog) {
   };
   const CM = new Map(),
     CF = new Map();
+  /* 4.2: โฟลเดอร์หนังของจอในรอบนั้น — แบบเดิม (จอ → เดือน → รอบ) และแบบ Gallary (แพค → รอบ → จอ) ของจอเดียวกัน รวมกัน (โฟลเดอร์ของจอที่จับคู่ได้มาก่อน) */
   const rdir = async (s, y, m, two) => {
     const k = s.path.join('/') + '|' + y + '|' + m + '|' + two;
     if (CM.has(k)) return CM.get(k);
     let v = null;
-    const mon = s.kids.find(([n]) => {
-      const q = String(n)
-        .trim()
-        .match(/^(\d{1,2})\s*([A-Za-z]{3})[A-Za-z]*\s*(\d{2,4})$/);
-      return q && PMON.indexOf(q[2].toUpperCase()) === m && +q[3] % 100 === y % 100;
-    });
-    if (mon)
-      for (const [n, x] of await picDirs(mon[1]))
-        if (two ? RND2(n) : RND1(n)) {
-          v = new Map();
-          for (const [f, z] of await picDirs(x)) v.set(f.toLowerCase(), z);
-          break;
-        }
+    for (const z of [s, ...S.filter(q => q !== s && (q.g || s.g) && sameK(q.k, s.k))]) {
+      let rd = null;
+      if (z.g) {
+        const q = z.rounds.get(rndK(y, m, two ? 2 : 1));
+        if (q) rd = q.h;
+      } else {
+        const mon = z.kids.find(([n]) => {
+          const q = String(n)
+            .trim()
+            .match(/^(\d{1,2})\s*([A-Za-z]{3})[A-Za-z]*\s*(\d{2,4})$/);
+          return q && PMON.indexOf(q[2].toUpperCase()) === m && +q[3] % 100 === y % 100;
+        });
+        if (mon)
+          for (const [n, x] of await picDirs(mon[1]))
+            if (two ? RND2(n) : RND1(n)) {
+              rd = x;
+              break;
+            }
+      }
+      if (rd) {
+        if (!v) v = new Map();
+        for (const [f, zz] of await picDirs(rd)) if (!v.has(f.toLowerCase())) v.set(f.toLowerCase(), zz);
+      }
+    }
     CM.set(k, v);
     return v;
   };
@@ -5400,7 +5675,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.1.3 (27 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.2 (27 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -6386,17 +6661,7 @@ const sigOf = A => A.map(f => f.name + ':' + f.buf.byteLength).join('|'),
 const picSig = P =>
   P
     ? P.plan
-        .map(
-          p =>
-            p.s.path.join('/') +
-            '|' +
-            p.rnd +
-            '|' +
-            (p.mkMon ? 1 : 0) +
-            (p.mkRnd ? 1 : 0) +
-            '|' +
-            p.need.map(q => q[1]).join(','),
-        )
+        .map(p => p.disp + '|' + p.mk.map(q => q.join(':')).join(',') + '|' + p.need.map(q => q[1]).join(','))
         .join('\n') +
       '|' +
       P.upto +
@@ -6511,20 +6776,32 @@ const vPic = () => {
   let b = '';
   if (!FSA) b = '<p class="hint">ปุ่มนี้ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์</p>';
   else if (!P)
-    b = `${sel}${usel}<p class="hint">สร้างโฟลเดอร์ที่ยังไม่มีในโฟลเดอร์แยกรูป ตามรายชื่อหนังในใบเช็คที่เติมแล้ว: เดือน → ${dsc} ระบบไม่ลบ ไม่ย้าย และไม่เปลี่ยนชื่อโฟลเดอร์หรือรูปที่มีอยู่ ก่อนสร้างจะให้ดูก่อนว่าจะสร้างอะไรบ้าง</p><div><button class="btn secondary" data-a="picscan">${IC.folder}เลือกโฟลเดอร์แยกรูปแล้วตรวจ</button></div>`;
+    b = `${sel}${usel}<p class="hint">สร้างโฟลเดอร์ที่ยังไม่มีในโฟลเดอร์แยกรูป ตามรายชื่อหนังในใบเช็คที่เติมแล้ว <b>แบบ Gallary: แพค → รอบ (เช่น ${esc(rndName(D.getUTCFullYear(), D.getUTCMonth(), two ? 2 : 1, null))}) → จอ</b> → ${dsc} • ถ้ารอบนี้เริ่มแบบเดิมไว้แล้ว (จอ → เดือน → รอบ) ระบบสร้างต่อแบบเดิมจนจบรอบ รอบหน้าเริ่มแบบ Gallary เอง • ระบบไม่ลบ ไม่ย้าย และไม่เปลี่ยนชื่อโฟลเดอร์หรือรูปที่มีอยู่ ก่อนสร้างจะให้ดูก่อนว่าจะสร้างอะไรบ้าง</p><div><button class="btn secondary" data-a="picscan">${IC.folder}เลือกโฟลเดอร์แยกรูปแล้วตรวจ</button></div>`;
   else {
-    const W = P.plan.filter(x => x.need.length || x.mkMon || x.mkRnd),
-      nm = x => esc(x.s.path[x.s.path.length - 1]),
-      nW = new Set(W.map(x => x.s.path.join('/'))).size,
+    const W = P.plan.filter(x => x.need.length || x.mk.length),
+      nm = x => esc(x.label),
+      nW = new Set(W.map(x => x.bk + '|' + x.label)).size,
+      lay = P.lay || { A: 0, B: 0 },
+      mkT = x =>
+        x.mk
+          .map(([k, n]) =>
+            k === 'rnd'
+              ? ` • โฟลเดอร์รอบ ${esc(n)}`
+              : k === 'scr'
+                ? ' • โฟลเดอร์จอในรอบนี้'
+                : ` • โฟลเดอร์เดือน ${esc(n)}`,
+          )
+          .join(''),
       tg = (P.rounds || []).length > 1 || (P.rounds || [P.rndN])[0] !== P.rndN,
       rt = x => (tg ? `<span class="rtag">รอบ ${esc(x.r)}</span>` : '');
     b = `${p.made ? (p.made.bad.length ? alertHTML('er', `สร้างแล้ว ${p.made.n.toLocaleString()} โฟลเดอร์ สร้างไม่ได้ ${p.made.bad.length} โฟลเดอร์`, `<p>${esc(p.made.bad.slice(0, 8).join(', '))}${p.made.bad.length > 8 ? ' …' : ''}</p>`) : alertHTML('ok', `สร้างแล้ว ${p.made.n.toLocaleString()} โฟลเดอร์`, '<p>เปิดโฟลเดอร์แยกรูปดูได้เลย ถ้ามีหนังเพิ่มวันพรุ่งนี้ เติมใบเช็คแล้วกดตรวจอีกครั้ง ระบบจะสร้างเฉพาะเรื่องที่ยังไม่มี</p>')) : ''}
  ${sel}${usel}<p class="hint">โฟลเดอร์ “${esc(P.dir)}” • พบโฟลเดอร์จอ ${P.scr != null ? P.scr : P.plan.length} จอ${P.n ? ` • จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์ใน ${nW} จอ` : ' • ครบแล้ว ไม่มีโฟลเดอร์ที่ต้องสร้าง'}</p>
+ ${lay.A || lay.B ? `<p class="hint piclay">${lay.B ? `<b>แบบ Gallary</b> (แพค → รอบ → จอ → หนัง) ${lay.B} จอ` : ''}${lay.A && lay.B ? ' • ' : ''}${lay.A ? `<b>แบบเดิม</b> (จอ → เดือน → รอบ → หนัง) ${lay.A} จอ — รอบนี้เริ่มแบบเดิมไว้แล้ว สร้างต่อแบบเดิมจนจบรอบ รอบหน้าเริ่มแบบ Gallary` : ''}</p>` : ''}
  ${
    W.length
      ? `<details class="picd" open><summary>จะสร้างในจอเหล่านี้ (${nW} จอ)</summary><ul>${W.map(
          x =>
-           `<li><b>${nm(x)}</b>${rt(x)} ${x.need.length ? x.need.length + ' โฟลเดอร์' : ''}${x.mkMon ? ` • โฟลเดอร์เดือน ${esc(x.mon)}` : ''}${x.mkRnd ? ` • โฟลเดอร์รอบ ${esc(x.rnd)}` : ''}<small>${esc(
+           `<li><b>${nm(x)}</b>${rt(x)} ${x.need.length ? x.need.length + ' โฟลเดอร์' : ''}${mkT(x)}<small class="pth">${esc(x.disp)}</small><small>${esc(
              x.need
                .slice(0, 6)
                .map(q => q[1])
@@ -6533,7 +6810,7 @@ const vPic = () => {
        ).join('')}</ul></details>`
      : ''
  }
- ${P.miss.length ? `<details class="picd"><summary>หาโฟลเดอร์จอไม่เจอ ${P.miss.length} จอ (ระบบไม่สร้างโฟลเดอร์จอเอง)</summary><ul>${P.miss.map(x => `<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>` : ''}
+ ${P.miss.length ? `<details class="picd"><summary>หาโฟลเดอร์จอไม่เจอ ${P.miss.length} จอ (ยังไม่มีโฟลเดอร์ของจอนี้เลย ระบบไม่รู้ชื่อโฟลเดอร์ — สร้างโฟลเดอร์จอเองครั้งแรก แล้วกดตรวจอีกครั้ง)</summary><ul>${P.miss.map(x => `<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>` : ''}
  ${P.closed.length ? `<p class="hint">จอปิดถาวร ข้าม: ${esc(P.closed.map(x => x.id).join(', '))}</p>` : ''}
  <div class="picb">${P.n ? `<button class="btn primary" data-a="picmake"${p.busy ? ' disabled' : ''}>${p.busy ? 'กำลังตรวจตามตัวเลือกใหม่ …' : `สร้าง ${P.n.toLocaleString()} โฟลเดอร์`}</button>` : ''}<button class="btn secondary" data-a="picscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="picscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
   }
@@ -7347,7 +7624,7 @@ const vHelp =
 <li><b>ขั้นที่ 3 เติมใบเช็ครูป</b><span>ลากใบเช็ครูปลงกล่อง ดูว่าแต่ละไฟล์ขึ้น “พร้อมเติม” วันที่ทำงานและรอบถูกต้อง แล้วกด “เติมใบเช็ครูป”</span></li>
 <li><b>ขั้นที่ 4 ผลการเติม</b><span>เปิดดูรายการ “ควรตรวจ” ของแต่ละไฟล์ แล้วกด “ดาวน์โหลดทั้งหมด (.zip)” ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันพรุ่งนี้</span></li></ol>
 <h3>หน้าตาและผู้ช่วย</h3><ul class="hr2"><li>PHOTO CHECK STUDIO: แท็บด้านบนสลับ “เติมใบเช็ครูป” / “งานโฟลเดอร์และรูป” / “วิธีใช้” • เมนูด้านซ้ายคือขั้นของส่วนนั้น • “หน้าหลัก” สรุปงานของวันนี้และพาไปสิ่งที่ควรทำต่อ (ลากไฟล์ Playlist และใบเช็คมาวางที่หน้าหลักได้ ระบบแยกให้เอง)</li><li>โหมดมืดเป็นค่าเริ่มต้น สลับเป็นโหมดสว่างได้ที่ปุ่มมุมขวาบน (ระบบจำไว้ในเครื่อง)</li><li>“น้องเช็ค” ผู้ช่วยตัวการ์ตูน โผล่มุมขวาล่างตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู แล้วหายไปเอง (กด “ปิด” ให้หายทันทีได้) และอยู่ในกล่องรอระหว่างทำงาน • ปิด / เปิดได้ที่ปุ่มหน้ายิ้มมุมขวาบน • เครื่องที่ตั้งค่าลดการเคลื่อนไหวไว้ ตัวการ์ตูนจะไม่ขยับ</li></ul>
-<h3>งานโฟลเดอร์และรูป (หน้าแยก, Chrome / Edge)</h3><ul class="hr2"><li>กดปุ่ม “งานโฟลเดอร์และรูป” ด้านบน (กลับมาเติมใบเช็ค กด “เติมใบเช็ครูป” งานที่ค้างไว้ไม่หาย) • กล่อง “ใบเช็คที่ใช้” คือชุดที่ทุกเครื่องมือในหน้านี้อ่าน: ถ้าเพิ่งเติม ระบบใช้ใบที่เพิ่งเติมให้เลย ถ้ายังไม่เติม ใช้ใบในขั้นที่ 3 หรือกด “เปิดใบเช็คทั้งโฟลเดอร์” / ลากไฟล์มาวาง ไม่ต้องใส่ Playlist • การ์ด 3 ใบบอกสถานะของแต่ละเครื่องมือ (เหลือง = รอทำ เขียว = เรียบร้อย แดง = ต้องแก้) กด “เปิด” เพื่อทำงานนั้นด้านล่าง</li><li>สร้างโฟลเดอร์แยกรูป: เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — เดือน (เช่น 10 OCT 26) → รอบ 1-15 หรือ 16-30 / 16-31 → #Module ขาว / ดำ / สี และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • ตั้งแต่วันที่ 16 เลือกได้ว่าจะสร้างรอบนี้ / รอบ 1–15 (จอที่ยังไม่ได้สร้างรอบแรก) / ทั้ง 2 รอบ • ช่อง “หนังที่ขึ้นจอถึงวันที่” = ทุกเรื่องในรอบ (ค่าปกติ) หรือเลือกวันที่ เพื่อสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่) ไม่เกินวันนั้น • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>ใส่วันที่ถ่าย: ใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ และบอกเรื่องที่น่าจะลืมหรือใส่ผิด ดูรายการก่อนกดใส่ แล้วดาวน์โหลด หรือบันทึกทับในโฟลเดอร์ใบเช็ค (ไฟล์เดิมเก็บไว้ใน สำรองก่อนใส่วันที่ถ่าย) • ง่ายที่สุด: “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์ใบเช็คจริงก่อน ระบบบันทึกกลับโฟลเดอร์เดิม</li><li>ตรวจโฟลเดอร์เทียบจอ: กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ที่ใส่ไว้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>หน้าแบบเดิม (3.12.3) ยังเปิดได้ชั่วคราวจากลิงก์ “เปิดหน้าเดิม (3.12.3)” ท้ายหน้า (เปิดจากลิงก์ระบบ)</li></ul>
+<h3>งานโฟลเดอร์และรูป (หน้าแยก, Chrome / Edge)</h3><ul class="hr2"><li>กดปุ่ม “งานโฟลเดอร์และรูป” ด้านบน (กลับมาเติมใบเช็ค กด “เติมใบเช็ครูป” งานที่ค้างไว้ไม่หาย) • กล่อง “ใบเช็คที่ใช้” คือชุดที่ทุกเครื่องมือในหน้านี้อ่าน: ถ้าเพิ่งเติม ระบบใช้ใบที่เพิ่งเติมให้เลย ถ้ายังไม่เติม ใช้ใบในขั้นที่ 3 หรือกด “เปิดใบเช็คทั้งโฟลเดอร์” / ลากไฟล์มาวาง ไม่ต้องใส่ Playlist • การ์ด 3 ใบบอกสถานะของแต่ละเครื่องมือ (เหลือง = รอทำ เขียว = เรียบร้อย แดง = ต้องแก้) กด “เปิด” เพื่อทำงานนั้นด้านล่าง</li><li>สร้างโฟลเดอร์แยกรูป (4.2 แบบ Gallary): เลือกโฟลเดอร์แยกรูปครั้งแรกครั้งเดียว ระบบสร้างโฟลเดอร์ที่ยังไม่มีของรอบปัจจุบัน — แพค (Pic @ …) → รอบ (เช่น 10 Oct 2026 16-31) → จอ (ชื่อตามรอบก่อน) → #Module ขาว / ดำ / สี • รอบที่เริ่มแบบเดิมไว้แล้ว (จอ → 10 OCT 26 → 16-31) สร้างต่อแบบเดิมจนจบรอบ และหนังทุกเรื่องของรอบนั้นตามใบเช็ค (รอบ 16–สิ้นเดือน = หนังใต้แถบ 16 ขึ้นไป) • ตั้งแต่วันที่ 16 เลือกได้ว่าจะสร้างรอบนี้ / รอบ 1–15 (จอที่ยังไม่ได้สร้างรอบแรก) / ทั้ง 2 รอบ • ช่อง “หนังที่ขึ้นจอถึงวันที่” = ทุกเรื่องในรอบ (ค่าปกติ) หรือเลือกวันที่ เพื่อสร้างเฉพาะหนังที่ขึ้นจอ (อยู่ใต้แถบวันที่) ไม่เกินวันนั้น • จับคู่จอจากรหัส DGT / ID, เลขจอ BKJ / METRO หรือชื่อจอ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ และไม่แตะจอปิดถาวร</li><li>ใส่วันที่ถ่าย: ใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ และบอกเรื่องที่น่าจะลืมหรือใส่ผิด ดูรายการก่อนกดใส่ แล้วดาวน์โหลด หรือบันทึกทับในโฟลเดอร์ใบเช็ค (ไฟล์เดิมเก็บไว้ใน สำรองก่อนใส่วันที่ถ่าย) • ง่ายที่สุด: “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์ใบเช็คจริงก่อน ระบบบันทึกกลับโฟลเดอร์เดิม</li><li>ตรวจโฟลเดอร์เทียบจอ: กด “เลือกโฟลเดอร์เทียบจอแล้วตรวจ” ระบบหาโฟลเดอร์รอบ (เช่น 10 Oct 16-31) แล้วเทียบว่าจอในชีต 40 BLUE / 40 RED / 80 BLUE / 80 RED / CITY / Spare ของใบเช็ค อยู่ในโฟลเดอร์แพคเดียวกันไหม จอไหนไม่มีโฟลเดอร์ จอไหนมีโฟลเดอร์หลายแพค และชื่อจอในโฟลเดอร์รวม Plan B TV 240 ตรงกับชื่อในโฟลเดอร์แพคไหม • ผลแยกเป็น “ต้องแก้ในใบเช็ค” / “ต้องแก้ในโฟลเดอร์” / “ให้ตรวจเอง” แต่ละจอบอกสิ่งที่ต้องทำ (ใช้ Playlist วันนี้ที่ใส่ไว้ตัดสินว่าฝั่งไหนผิด) • ยังไม่มีโฟลเดอร์รอบใหม่ ระบบตรวจรอบล่าสุดแทน • อ่านอย่างเดียว ไม่ย้าย ไม่สร้าง ไม่เปลี่ยนชื่อ</li><li>หน้าแบบเดิม (3.12.3) ยังเปิดได้ชั่วคราวจากลิงก์ “เปิดหน้าเดิม (3.12.3)” ท้ายหน้า (เปิดจากลิงก์ระบบ)</li></ul>
 <h3>ระบบจัดให้อย่างไร</h3><ul class="hr2">
 <li>วันที่ 1 ลงหนังที่ออนอยู่ทั้งหมด หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z</li>
 <li>จัดจอเข้าชีตตามแพค (4.1): จอที่ Playlist วันนี้ย้ายแพค (เช่น อยู่ชีต Spare แต่ Playlist บอกว่า 40 RED) ระบบย้ายบล็อกจอไปชีตของแพคนั้นก่อนเติม หนัง วันที่ถ่าย และ “ออกวันที่” ไปด้วยครบ ไม่มีชีตของแพคนั้น = สร้างชีตใหม่ เรียงจอตามเลขจอ แก้ป้ายแพคที่เขียนผิด และแก้สูตรในชีต Analysis — ย้ายเฉพาะเมื่อใส่ Playlist ของแพคเดิมแล้วและจอไม่อยู่ในแพคเดิม แต่อยู่ในแพคใหม่แพคเดียว ปุ่มคัดลอก / สร้างโฟลเดอร์ของจอที่ย้ายไม่ย้ายตาม ปิดได้ในขั้นที่ 3</li>
