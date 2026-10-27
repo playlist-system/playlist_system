@@ -297,6 +297,7 @@ p.hint.tsafe{margin:18px 0 0}
 .iss{display:grid;grid-template-columns:minmax(64px,auto) 1fr;gap:4px 14px;padding:10px 14px;background:var(--wrsoft);border-radius:10px;font-size:14px}
 .iss b{color:var(--wr);word-break:break-all}.iss span{color:var(--tx2);overflow-wrap:anywhere;min-width:0}
 .iss.inf{background:var(--sf2)}.iss.inf b{color:var(--tx2)}
+.infx{display:block;margin-top:6px;font-size:13px;color:var(--mu)}.infx b{color:var(--tx2)}
 .pill.ac{background:var(--acsoft);color:var(--ac)}
 .arr{margin-top:16px}
 .arrk{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
@@ -832,7 +833,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
    else if(NEWST.test(r.st||'')&&g!==dd){if(g>dd)g=Math.max(dd,+P);else if(hb0&&g>+P&&!b.hist.some(h=>h.g===g&&fam(h.nm)===fam(r.ad)))g=dd} /* “ขึ้นใหม่” = ขึ้นวันนี้ */
    if(g>lim){if(!b.hist.some(h=>fam(h.nm)===fam(r.ad)))b.later.push(r);continue}
    const rnw=CONTM&&dd===+P2&&(NEWST.test(r.st||'')||CONT.test(r.st||''))&&(r.sd&&+r.sd===+P2||stl); /* วันที่ 16: ต่อสัญญา/ขึ้นใหม่ที่เริ่ม 16 → แถวใหม่ใต้ 16 แถวเดิมใส่ “ออก 16” */
-   pl.push({nm:(r.hash?'#':'')+r.ad,hash:r.hash,g,ed:r.ed&&+r.ed>=dd?+r.ed:Infinity,st:r.st||'',rnw,note:r.note||''})}
+   pl.push({nm:(r.hash?'#':'')+r.ad,hash:r.hash,g,ed:r.ed&&+r.ed>=dd?+r.ed:Infinity,st:r.st||'',rnw,note:r.note||'',sd:r.sd?+r.sd:0})}
   pl.sort((x,y)=>x.g-y.g);
   for(const h of b.hist){let x=h.ned||offEd.get(h.nm)||(!h.nm.startsWith('#')&&!offEd.has(h.nm)&&offEd.get('#'+h.nm))||0;if(!h.ned&&x&&h.g>=+P2&&x<h.g)x=Math.max(h.g,(b.scr.pd||dd)-864e5); /* ถอดแล้วแต่วันหมดยังเป็นของสัญญาเดิม (ก่อนแถบนี้) → ออกวันที่ของ Playlist ที่ถอด */
    ent.push({nm:h.nm,hash:h.nm.startsWith('#'),g:h.g,ed:x,raw:h.raw,h:true,m:false})}
@@ -852,8 +853,8 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
    t=c.find(e=>e.h&&!e.m&&e.g>dd);                       /* เคยวางล่วงหน้าไว้ แต่วันเริ่มเปลี่ยน → ย้ายตาม Playlist */
    if(t){t.g=tg;t.ed=p.ed;t.m=true;continue}
    t=c.filter(e=>e.g<=tg).pop();                         /* ไฟล์เดิมต่อเนื่อง หรือยังออนอยู่ → แถวเดิม ไม่เพิ่มซ้ำ */
-   if(t&&(CONT.test(p.st)||!t.ed||t.ed>=p.g||(t.g>=+P2)===(tg>=+P2))){t.ed=t.ed&&t.ed<p.g?p.ed:Math.max(t.ed||0,p.ed);t.m=true;merged++;continue} /* ครึ่งเดือนเดียวกัน: หนังที่ออกไปแล้วกลับมาขึ้นอีก ใช้แถวเดิม (แบบที่ทีมทำ — ใบเช็คมือ ก.ย. ไม่มีหนังซ้ำ 2 แถวในครึ่งเดือนเดียวกัน) */
-   if(gate&&!NEWST.test(p.st)&&p.g===+P){nost++;continue} /* สัญญาเริ่มก่อนรอบนี้ แต่ไม่เคยลงและไม่ได้ “ขึ้นใหม่” → ไม่เพิ่ม; ถ้าเริ่มในรอบนี้ ลงตามวันเริ่ม (กันพลาดเมื่อข้ามวัน) */
+   if(t&&(CONT.test(p.st)||!t.ed||t.ed>=p.g||(t.g>=+P2)===(tg>=+P2))){t.ed=t.ed&&t.ed<p.g?p.ed:Math.max(t.ed||0,p.ed);t.m=true;merged++;(b.mergedL||(b.mergedL=[])).push(p.nm+(p.st?' ('+p.st+')':''));continue} /* ครึ่งเดือนเดียวกัน: หนังที่ออกไปแล้วกลับมาขึ้นอีก ใช้แถวเดิม (แบบที่ทีมทำ — ใบเช็คมือ ก.ย. ไม่มีหนังซ้ำ 2 แถวในครึ่งเดือนเดียวกัน) */
+   if(gate&&!NEWST.test(p.st)&&p.g===+P){nost++;(b.nostL||(b.nostL=[])).push(p.nm+(p.sd?' (เริ่ม '+new Date(p.sd).getUTCDate()+'/'+(new Date(p.sd).getUTCMonth()+1)+')':''));continue} /* สัญญาเริ่มก่อนรอบนี้ แต่ไม่เคยลงและไม่ได้ “ขึ้นใหม่” → ไม่เพิ่ม; ถ้าเริ่มในรอบนี้ ลงตามวันเริ่ม (กันพลาดเมื่อข้ามวัน) */
    if(tg!==p.g)today++;
    ent.push({nm:p.nm,hash:p.hash,g:tg,ed:p.ed,m:true})}
   b.ent=b.kind==='keep'?ent:ent.filter(e=>{if(e.m)return true;if(e.g>dd){gone++;return false}kept++;return true})}
@@ -892,7 +893,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  if(TRAIL)hdr(cur,addD(new Date(Math.max(dates.length?dates[dates.length-1]:+P,dd)),1)); /* แถบว่างท้ายตาราง = วันถัดจากวันที่เติม (เติมวันที่ 2 → แถบ 3) */ /* ปิดท้ายด้วยแถบวันถัดไปเสมอ ไว้ใส่หนังของวันพรุ่งนี้ */
  if(o.off){let row=cur+2;for(const b of B){let q=row;for(const r of b.rows.filter(x=>x.off))sh.setText(b.lc,q++,r.ad)}}
  for(const b of B)for(const q of b.cnt.values())for(const t of q)dropped+=t.filter(Boolean).length;
- return{hr,S,H,P,E,two,contm:CONTM,trail:TRAIL,bval:BVAL,fold:B.map(b=>({lc:b.lc,items:(b.ent||[]).map(e=>[e.nm,e.g])})),fdrop,keep:KB.map(b=>b.scr.c).join(', '),renew,back,frozen,noNotes,hist,dates:dates.length,later:B.reduce((n,b)=>n+b.later.length,0),laterL:B.map(b=>[b.scr.c,b.later.map(r=>r.ad+(r.s?' (เริ่ม '+r.s+')':''))]).filter(x=>x[1].length),ratioL:B.map(b=>[b.scr.c,b.ratio]).filter(x=>x[1].length),moved,dropped,cleared,kept,merged,gone,today,nost,W:dd,end:cur}}
+ return{hr,S,H,P,E,two,contm:CONTM,trail:TRAIL,bval:BVAL,fold:B.map(b=>({lc:b.lc,items:(b.ent||[]).map(e=>[e.nm,e.g])})),fdrop,keep:KB.map(b=>b.scr.c).join(', '),renew,back,frozen,noNotes,hist,dates:dates.length,later:B.reduce((n,b)=>n+b.later.length,0),laterL:B.map(b=>[b.scr.c,b.later.map(r=>r.ad+(r.s?' (เริ่ม '+r.s+')':''))]).filter(x=>x[1].length),ratioL:B.map(b=>[b.scr.c,b.ratio]).filter(x=>x[1].length),nostL:B.map(b=>[b.scr.c,[...new Set(b.nostL||[])]]).filter(x=>x[1].length),mergedL:B.map(b=>[b.scr.c,[...new Set(b.mergedL||[])]]).filter(x=>x[1].length),moved,dropped,cleared,kept,merged,gone,today,nost,W:dd,end:cur}}
 
 /* ใบเช็คแบบใหม่ (3.4): แถวสูตรวิเคราะห์ (AVERAGE) แบบเดิมอยู่แถว 9 • แบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20) อยู่แถว 10 และตารางเริ่มแถว 17 หรือ 23
    ช่องสรุปรวมของสถานี MRT (=AVERAGE(E10:F10)) ไม่ใช่คอลัมน์ของจอ */
@@ -1122,7 +1123,8 @@ async function picPlan(root, W, res, rs, upto) {
       }
       const ch = P.chain;
       plan.push({
-        s: e.s, src: [...e.src], lay: P.lay, base: P.base, bk: P.pp.join('/'), chain: ch.map(([n, h]) => [n, h]), label: P.label,
+        s: e.s, src: [...e.src], lay: P.lay, base: P.base, bk: P.pp.join('/'), chain: ch.map(([n, h, t]) => [n, h, t]), label: P.label,
+        have: [...new Set([...PMOD, ...e.films[i]].map(n => fsafe(n).toLowerCase()))].filter(l => have.has(l)).length,
         disp: [...P.pp, ...ch.map(c => c[0])].join(' › '),
         mk: ch.filter(c => !c[1] && (c[2] !== 'mon' || P.mkMonOnce)).map(c => [c[2], c[0]]),
         mon: P.lay === 'A' ? ch[0][0] : '', rnd: ch[P.lay === 'A' ? 1 : 0][0],
@@ -1144,17 +1146,18 @@ async function picPlan(root, W, res, rs, upto) {
     plan, miss, closed, two, monN, rndN, rounds: RS.map(R => R.rndN), upto: capT < Infinity ? upto : 0, scr: T.size, dir: root.name,
     lay: { A: plan.filter(p => p.lay === 'A').length, B: plan.filter(p => p.lay === 'B').length },
     n: plan.reduce((t, p) => t + p.need.length, 0) + mk.size,
+    have: plan.reduce((t, p) => t + p.have, 0),
   };
 }
 /* สร้างตามแผน: โฟลเดอร์ที่ยังไม่มีตามลำดับชั้น (รอบ / จอ / เดือน) แล้วโฟลเดอร์หนัง — ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อ */
 async function picMake(P) {
   let n = 0;
-  const bad = [], C = new Map();
+  const bad = [], C = new Map(), c = { rnd: 0, scr: 0, mon: 0, film: 0, mod: 0 }; /* 4.2.1: นับแยกชนิด */
   for (const p of P.plan) {
     if (!p.need.length && !p.chain.some(c => !c[1])) continue;
     try {
       let h = p.base, k = p.bk;
-      for (const [nm, hh] of p.chain) {
+      for (const [nm, hh, ty] of p.chain) {
         k += '/' + nm;
         if (hh) { h = hh; continue; }
         const kk = k.toLowerCase();
@@ -1163,12 +1166,14 @@ async function picMake(P) {
           h = await h.getDirectoryHandle(nm, { create: true });
           C.set(kk, h);
           n++;
+          if (ty in c) c[ty]++;
         }
       }
-      for (const [, f] of p.need) {
+      for (const [q, f] of p.need) {
         try {
           await h.getDirectoryHandle(f, { create: true });
           n++;
+          c[PMOD.includes(q) ? 'mod' : 'film']++;
         } catch (_) {
           bad.push(p.label + ' / ' + f);
         }
@@ -1177,7 +1182,7 @@ async function picMake(P) {
       bad.push(p.disp);
     }
   }
-  return { n, bad };
+  return { n, bad, c };
 }
 /* ----- อ่านรายชื่อหนังจากใบเช็คที่เติมแล้ว ไม่ต้องใช้ Playlist (3.11) — ใช้สร้างโฟลเดอร์แยกรูปจากใบเช็คอย่างเดียว อ่านอย่างเดียว ไม่เขียนลงใบเช็ค
    จอ = คอลัมน์ก่อนรหัสจอ DGT / ID (แถว 10–12) และก่อนคอลัมน์ผลวิเคราะห์แรกของแต่ละช่วง (BKJ / Metro / จอที่ไม่มีรหัส) แบบเดียวกับตอนเติม
@@ -2341,6 +2346,8 @@ async function fillWb(f,on,metro,o){const rep=[],FOLD=[];const buf=f.buf.slice(0
    const rd=d=>new Date(d).getUTCDate();
    rep.push([sn,'รูปแบบ',(L.contm?'ทั้งเดือน (วันที่ 16 เป็นต้นไปทำต่อในรายการเดิม แถบวันที่สีรอบ 2) หัววันที่แถว '+L.hr+(L.renew?' • ต่อสัญญา/ขึ้นใหม่วันที่ 16 '+L.renew+' เรื่อง ลงใหม่ใต้แถบ 16 '+(o.k16?'(แถวเดิมไม่ใส่ออก ตามที่ตั้งไว้ของไฟล์นี้)':'(แถวเดิมใส่ออกวันที่ 16)'):''):L.two?'รอบ 16–'+rd(L.E)+' (แถบวันที่รอบ 2) เริ่มแถว '+L.S+(L.frozen?' ต่อท้ายรอบ 1–15 (รอบแรกไม่ถูกแก้)':''):'รอบ 1–15 หัววันที่แถว '+L.hr)+(L.noNotes?' • วันที่ 1 ยังไม่ใส่ “ออกวันที่”':'')+(L.moved?' • ย้ายวันที่ถ่ายตามชื่อหนัง '+L.moved+' ช่อง (ทุกจอ)':'')+(L.today?' • หนังใหม่ของวันนี้ '+L.today+' เรื่อง ลงใต้แถบวันที่ '+rd(L.W):'')+(L.nost?' • ไม่เพิ่ม '+L.nost+' เรื่องที่ยังไม่มีในใบเช็คแต่สถานะไม่ใช่ “ขึ้นใหม่”':'')+(L.dates?' • แยกวันเริ่ม '+L.dates+' กลุ่ม':'')+(L.trail?'':' • ไม่ใส่แถบวันถัดไปท้ายตาราง (ตามแบบของชีตนี้)')+(L.bval?' • วันที่ในแถบของจอที่ 2 เป็นต้นไปใส่เป็นตัวเลข (ตามแบบของชีตนี้)':'')+(L.merged?' • ไฟล์เดิม/ต่อสัญญา '+L.merged+' แถว ใช้แถวเดิม ไม่ใส่ออกวันที่':'')+(L.kept?' • เก็บหนังที่ลงไว้แล้วแต่ไม่มีใน Playlist วันนี้ '+L.kept+' แถว':'')+(L.cleared?' • ขึ้นรอบใหม่ ล้างวันที่ถ่ายของรอบก่อน '+L.cleared+' ช่อง (ทุกจอ)':'')+(L.back?' • หนังที่เคยออกแล้วกลับมาขึ้นใหม่ '+L.back+' เรื่อง ลงแถวใหม่ใต้แถบวันที่ '+new Date(L.W).getUTCDate():'')+(L.later?' • ยังไม่ใส่ '+L.later+' เรื่องที่เริ่มหลัง '+fd(new Date(L.H)):'')+(L.keep?' • คงรายการเดิมของ '+L.keep+' (ไม่มีใน Playlist ที่ใส่มา) แถบวันที่ยังตรงกันทั้งชีต':'')+(L.fdrop?' • ลบแถว #FAST_ADS '+L.fdrop+' แถว (ไม่ใช่หนังโฆษณา)':'')+((n=>n?' • ใส่งาน Freeze Screen ตามที่เลือก '+n+' เรื่อง':'')(new Set(by[sn].flatMap(j=>SIGAL[j[3].c]?[]:j[3].rows.filter(r=>!r.off&&frzOn(r)).map(r=>r.ad.trim()))).size)),0]);
    for(const[c,l]of L.laterL||[])rep.push([sn,c,'ตรวจ: ยังไม่ใส่ เพราะวันเริ่มในไฟล์ยังไม่ถึง → '+l.join(', '),0]);
+   for(const[c,l]of L.nostL||[])rep.push([sn,c,'ตรวจ: กันตกหล่น — มีใน Playlist แต่ยังไม่เคยลงใบเช็ค และวันนี้ไม่ได้ “ขึ้นใหม่” ระบบจึงไม่เพิ่ม (ถ้าต้องมี ลงเองในใบเช็ค) → '+l.join(', '),0]); /* 4.2.1 */
+   for(const[c,l]of L.mergedL||[])rep.push([sn,c,'ข้อมูล: ขึ้นซ้ำ / ต่อสัญญา — มีในใบเช็คแล้ว ใช้แถวเดิม ไม่เพิ่มแถวใหม่ → '+l.join(', '),0]); /* 4.2.1: บอกเฉย ๆ ไม่นับเป็นควรตรวจ */
    for(const[c,l]of L.ratioL||[])rep.push([sn,c,'ตรวจ: หนังใหม่วันนี้มีหมายเหตุระบุชนิดจอ (16:9 / 4:3) ระบบไม่รู้ว่าจอนี้เป็นแบบไหน จึงใส่ไว้ก่อน → '+l.join(', '),0]);
    for(const j of by[sn]){const sig=!!SIGAL[j[3].c],z=[...new Set(j[3].rows.filter(r=>!r.off&&skipRow(j[3],r)&&r.ad&&r.ad!==j[3].c&&!/เมื่อมีไฟล์/.test(r.ad)&&!JUNK.test(r.ad.trim())&&!MTP.test(r.ad.trim())&&!FASTN.test(r.ad)).map(r=>r.ad))];if(z.length)rep.push([sn,j[3].c,(sig?'ตรวจ: ไม่ใส่ตามหมายเหตุ “ไม่ออน/ออนเฉพาะ/ยกเว้น” → ':'ตรวจ: ไม่ใส่เพราะจำนวนครั้ง = 0 → ')+z.join(', ')+(!sig&&j[3].rows.some(r=>!r.off&&isFrz(r)&&z.includes(r.ad))?' (งาน Freeze Screen ติ๊กให้ใส่ได้ในขั้นที่ 3)':''),0])}}}
   else for(const[,col,ads]of by[sn]){for(let r=FIRST;r<FIRST+300;r++)sh.clear(col,r);ads.forEach((a,i)=>sh.setText(col,FIRST+i,a))}
@@ -2573,7 +2580,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  MQN=skip.length||emp.length?'warn':'done';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.2 (27 ต.ค. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.2.1 (27 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -2875,11 +2882,17 @@ function vFl(){const ms=['ทั้งหมด',...new Set(DB.filter(s=>/^(40|8
 
 /* ----- ขั้นที่ 4 ----- */
 const isFilled=x=>x[2].startsWith('เติมแล้ว');
-const isWarn=x=>isFilled(x)?/ใช้รายการ/.test(x[2])&&!/จอ (Spare|CITY) ใช้รายการ/.test(x[2]):(x[1]!=='รูปแบบ'||/^ตรวจ/.test(x[2]));
+const isInfo=x=>/^ข้อมูล:/.test(x[2]);
+/* 4.2.1: สรุปท้าย รายงาน.txt — ไฟล์ จอ ควรตรวจ กันตกหล่น ขึ้นซ้ำ เวลา */
+const fillSum=(res,n,sec)=>{const A=res.flatMap(r=>r.rep),c=re=>A.filter(x=>re.test(x[2])),nl=L=>L.reduce((t,x)=>t+(x[2].split(' → ')[1]||'').split(', ').filter(Boolean).length,0),g=c(/^ตรวจ: กันตกหล่น/),m=c(/^ข้อมูล: ขึ้นซ้ำ/);
+ return['','สรุป',`  เติมแล้ว ${res.filter(r=>r.blob).length} จาก ${n} ไฟล์ • ${A.filter(isFilled).length.toLocaleString()} จอ • ควรตรวจ ${A.filter(isWarn).length} รายการ`,`  กันตกหล่น ${g.length} จอ (${nl(g)} เรื่อง) • ขึ้นซ้ำ / ต่อสัญญา ใช้แถวเดิม ${m.length} จอ (${nl(m)} เรื่อง)`,`  ⏱ ใช้เวลารวม ${sec} วินาที`]}; /* 4.2.1: บรรทัดบอกข้อมูล (เช่น ขึ้นซ้ำ ใช้แถวเดิม) ไม่ใช่ควรตรวจ */
+const isWarn=x=>isFilled(x)?/ใช้รายการ/.test(x[2])&&!/จอ (Spare|CITY) ใช้รายการ/.test(x[2]):!isInfo(x)&&(x[1]!=='รูปแบบ'||/^ตรวจ/.test(x[2]));
 let PICR='cur',PICU=0,PICX=null,PICD=null; /* PICX = รายชื่อหนังของใบเช็คในหน้างานโฟลเดอร์และรูป {W,res,bad,n,sig,pic,cmp} (3.13: ผลตรวจโฟลเดอร์เทียบจออยู่ใน cmp) • PICD = โฟลเดอร์แยกรูปที่เลือกล่าสุด */
 let TC=[],TCS='',TCK=null,TCL=null,TCN='',FTAB='home'; /* ใบเช็คของหน้างานโฟลเดอร์และรูป (3.13): TCS = last ใบที่เพิ่งเติม / c ใบในขั้นที่ 3 / dir เปิดทั้งโฟลเดอร์ / own เพิ่มเอง • TCK = ต้นทางตอนเลือก • TCL = ผลการเติมตอนเลือก • FTAB = ขั้นที่ค้างไว้ */
 const sigOf=A=>A.map(f=>f.name+':'+f.buf.byteLength).join('|'),picS=()=>PICX,ckSig=()=>sigOf(TC); /* โฟลเดอร์แยกรูป (3.10): PICR รอบ cur = รอบนี้ / 1 = รอบ 1–15 / both = ทั้ง 2 รอบ (เลือกได้เมื่อวันทำงานเป็นวันที่ 16 ขึ้นไป) • PICU เอาหนังที่เริ่มถึงวันที่ (0 = ทั้งหมด) */
 /* 4.1.3: ระหว่างตรวจใหม่ตามตัวเลือก (รอบ / ถึงวันที่) ปุ่มสร้างกดไม่ได้ — เดิมกดได้ระหว่างนั้นและสร้างตามรายการเก่า (เช่น เลือกถึงวันที่ 26 แต่ได้หนังวันที่ 27 ด้วย) */
+/* 4.2.1: สรุปหลังสร้างโฟลเดอร์ แยกชนิด + เวลา */
+const picMadeTxt=r=>{const c=r.c||{},a=[c.rnd?`รอบ ${c.rnd}`:'',c.mon?`เดือน ${c.mon}`:'',c.scr?`จอ ${c.scr}`:'',c.film?`หนัง ${c.film.toLocaleString()}`:'',c.mod?`#Module ${c.mod}`:''].filter(Boolean);return`<p>${a.length?'สร้าง: '+a.join(' • '):''}${r.miss?` • หาจอไม่เจอ ${r.miss} จอ (ไม่ได้สร้าง)`:''}${r.bad&&r.bad.length?` • สร้างไม่ได้ ${r.bad.length}`:''}${r.sec!=null?` • ใช้เวลา ${r.sec} วินาที`:''}</p>`};
 const picSig=P=>P?P.plan.map(p=>p.disp+'|'+p.mk.map(q=>q.join(':')).join(',')+'|'+p.need.map(q=>q[1]).join(',')).join('\n')+'|'+P.upto+'|'+(P.rounds||[]).join(','):'';
 const picRe=async()=>{const L=picS();if(!L||!L.pic||!L.pic.d)return;note='กำลังตรวจโฟลเดอร์แยกรูป …';const o=L.pic;o.busy=true;view();try{const P=await picPlan(o.d,L.W,L.res,PICR,picUp());L.pic={d:o.d,P,made:null};note=P.n?`ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์`:'โฟลเดอร์แยกรูปครบแล้ว'}finally{o.busy=false}};
 const picRng=()=>{const D=new Date(picS().W),wd=D.getUTCDate(),two=wd>=16,rs=two?PICR:'cur';return rs==='cur'&&two?[16,wd]:rs==='1'?[1,15]:[1,wd]},picUp=()=>{const[lo,hi]=picRng();return PICU>=lo&&PICU<=hi?PICU:0};
@@ -2900,8 +2913,8 @@ const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))retu
  else{const W=P.plan.filter(x=>x.need.length||x.mk.length),nm=x=>esc(x.label),nW=new Set(W.map(x=>x.bk+'|'+x.label)).size,lay=P.lay||{A:0,B:0},
   mkT=x=>x.mk.map(([k,n])=>k==='rnd'?` • โฟลเดอร์รอบ ${esc(n)}`:k==='scr'?' • โฟลเดอร์จอในรอบนี้':` • โฟลเดอร์เดือน ${esc(n)}`).join(''),
   tg=(P.rounds||[]).length>1||(P.rounds||[P.rndN])[0]!==P.rndN,rt=x=>tg?`<span class="rtag">รอบ ${esc(x.r)}</span>`:'';
-  b=`${p.made?(p.made.bad.length?alertHTML('er',`สร้างแล้ว ${p.made.n.toLocaleString()} โฟลเดอร์ สร้างไม่ได้ ${p.made.bad.length} โฟลเดอร์`,`<p>${esc(p.made.bad.slice(0,8).join(', '))}${p.made.bad.length>8?' …':''}</p>`):alertHTML('ok',`สร้างแล้ว ${p.made.n.toLocaleString()} โฟลเดอร์`,'<p>เปิดโฟลเดอร์แยกรูปดูได้เลย ถ้ามีหนังเพิ่มวันพรุ่งนี้ เติมใบเช็คแล้วกดตรวจอีกครั้ง ระบบจะสร้างเฉพาะเรื่องที่ยังไม่มี</p>')):''}
- ${sel}${usel}<p class="hint">โฟลเดอร์ “${esc(P.dir)}” • พบโฟลเดอร์จอ ${P.scr!=null?P.scr:P.plan.length} จอ${P.n?` • จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์ใน ${nW} จอ`:' • ครบแล้ว ไม่มีโฟลเดอร์ที่ต้องสร้าง'}</p>
+  b=`${p.made?(p.made.bad.length?alertHTML('er',`สร้างแล้ว ${p.made.n.toLocaleString()} โฟลเดอร์ สร้างไม่ได้ ${p.made.bad.length} โฟลเดอร์`,`${picMadeTxt(p.made)}<p>${esc(p.made.bad.slice(0,8).join(', '))}${p.made.bad.length>8?' …':''}</p>`):alertHTML('ok',`สร้างแล้ว ${p.made.n.toLocaleString()} โฟลเดอร์`,`${picMadeTxt(p.made)}<p>เปิดโฟลเดอร์แยกรูปดูได้เลย ถ้ามีหนังเพิ่มวันพรุ่งนี้ เติมใบเช็คแล้วกดตรวจอีกครั้ง ระบบจะสร้างเฉพาะเรื่องที่ยังไม่มี</p>`)):''}
+ ${sel}${usel}<p class="hint">โฟลเดอร์ “${esc(P.dir)}” • พบโฟลเดอร์จอ ${P.scr!=null?P.scr:P.plan.length} จอ${P.n?` • จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์ใน ${nW} จอ`:' • ครบแล้ว ไม่มีโฟลเดอร์ที่ต้องสร้าง'}${P.have?` • มีอยู่แล้ว ${P.have.toLocaleString()} โฟลเดอร์`:''}${P.miss.length?` • หาจอไม่เจอ ${P.miss.length} จอ`:''}</p>
  ${lay.A||lay.B?`<p class="hint piclay">${lay.B?`<b>แบบ Gallary</b> (แพค → รอบ → จอ → หนัง) ${lay.B} จอ`:''}${lay.A&&lay.B?' • ':''}${lay.A?`<b>แบบเดิม</b> (จอ → เดือน → รอบ → หนัง) ${lay.A} จอ — รอบนี้เริ่มแบบเดิมไว้แล้ว สร้างต่อแบบเดิมจนจบรอบ รอบหน้าเริ่มแบบ Gallary`:''}</p>`:''}
  ${W.length?`<details class="picd" open><summary>จะสร้างในจอเหล่านี้ (${nW} จอ)</summary><ul>${W.map(x=>`<li><b>${nm(x)}</b>${rt(x)} ${x.need.length?x.need.length+' โฟลเดอร์':''}${mkT(x)}<small class="pth">${esc(x.disp)}</small><small>${esc(x.need.slice(0,6).map(q=>q[1]).join(', '))}${x.need.length>6?' …':''}</small></li>`).join('')}</ul></details>`:''}
  ${P.miss.length?`<details class="picd"><summary>หาโฟลเดอร์จอไม่เจอ ${P.miss.length} จอ (ยังไม่มีโฟลเดอร์ของจอนี้เลย ระบบไม่รู้ชื่อโฟลเดอร์ — สร้างโฟลเดอร์จอเองครั้งแรก แล้วกดตรวจอีกครั้ง)</summary><ul>${P.miss.map(x=>`<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>`:''}
@@ -3104,16 +3117,16 @@ function vHome(){const has=DB.length>0,nk=KINDS.filter(K=>!K.x&&DB.some(K.has)).
  <div class="hkpi" data-tour="hkpi">${kpis}</div>
  <div class="hrow"><section class="hcard htbl" data-tour="htbl" aria-labelledby="htt"><div class="hch"><h2 id="htt">ใบเช็ครูปวันนี้</h2>${C.length?'<button class="linkb" data-a="tab" data-k="fl">ไปขั้นเติมใบเช็ครูป</button>':''}</div>${table}</section><div class="hside" data-tour="hside">${plCard}${resCard}</div></div>`}
 function vRes(){if(!last)return vFl();
- const R=last.res.map(r=>({ok:r.rep.filter(isFilled).length,bad:r.rep.filter(isWarn),inf:r.rep.filter(x=>x[1]==='รูปแบบ'&&!/^ตรวจ/.test(x[2])),scr:r.rep.filter(isFilled),sh:new Set(r.rep.filter(isFilled).map(x=>x[0])).size}));
+ const R=last.res.map(r=>({ok:r.rep.filter(isFilled).length,bad:r.rep.filter(isWarn),inf:r.rep.filter(x=>x[1]==='รูปแบบ'&&!/^ตรวจ/.test(x[2])),info:r.rep.filter(isInfo),scr:r.rep.filter(isFilled),sh:new Set(r.rep.filter(isFilled).map(x=>x[0])).size}));
  const tot=R.reduce((n,r)=>n+r.ok,0),nb=R.reduce((n,r)=>n+r.bad.length,0),nf=last.res.filter(r=>r.blob).length,ne=last.res.length-nf;
  return`${shead('ผลการเติม',last.saved?'บันทึกใบเช็คที่เติมแล้ว ใส่ Playlist ของวันถัดไปต่อได้เลย (กด “ใช้ผลนี้เติมวันถัดไป” ด้านล่าง)':FSA?'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กด “บันทึกทับไฟล์เดิม” หรือดาวน์โหลดก่อนปิดหน้านี้':'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กดดาวน์โหลดก่อนปิดหน้านี้',`<div class="go"><button class="btn secondary" data-a="tab" data-k="fl">${IC.back}กลับไปเติมใหม่</button></div>`)}
- <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span><span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ควรตรวจ</span><span class="sp"></span>${FSA?`<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf?'':'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf?'':'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>`:`<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf?'':'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
+ <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span><span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ควรตรวจ</span>${last.sec?`<span><b>${last.sec}</b>วินาที</span>`:''}<span class="sp"></span>${FSA?`<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf?'':'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf?'':'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>`:`<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf?'':'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
  <div class="stack">${last.sv?(last.sv.bad.length?alertHTML('er',`บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`,`<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`):alertHTML('ok',`บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`,`<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu?` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่`:''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)):''}
  ${ne?alertHTML('er',`${ne} ไฟล์ไม่ได้เติม`,'<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>'):''}
  ${nb?alertHTML('wr','“ควรตรวจ” คืออะไร','<p>จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน หรือหนังที่ระบบตั้งใจไม่ใส่ เปิดดูในแต่ละไฟล์แล้วตรวจในใบเช็คก่อนใช้งาน ความหมายของข้อความที่พบบ่อยอยู่ในปุ่ม “วิธีใช้”</p>'):alertHTML('ok','ไม่มีรายการที่ต้องตรวจเพิ่ม','<p>ดาวน์โหลดแล้วเปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p>')}</div>
  ${vArr()}<div class="rlist" data-tour="rlist">${last.res.map((r,i)=>{const o=R[i],open=RO.has(i),am=r.arr&&r.arr.moves?r.arr.moves.length:0;return`<div class="rfile"><div class="rhead"><span class="fn"><b>${esc(r.name)}</b><small>${r.blob?o.sh+' ชีต':'ไม่ได้เติม'}</small></span>${r.blob?`<span class="pill ok">เติมแล้ว ${o.ok} จอ</span>`:'<span class="pill er">ไม่ได้เติม</span>'}${am?`<span class="pill ac">ย้ายจอ ${am}</span>`:''}${o.bad.length?`<span class="pill wr">ควรตรวจ ${o.bad.length}</span>`:''}
  <button class="ib" data-a="dlf" data-k="${i}" aria-label="ดาวน์โหลด ${esc(r.name)}" title="ดาวน์โหลดไฟล์นี้" ${r.blob?'':'disabled'}>${IC.dl}</button><button class="ib tog" data-a="rx" data-k="${i}" aria-expanded="${open}" aria-label="ดูรายละเอียด ${esc(r.name)}" title="ดูรายละเอียด">${IC.chev}</button></div>
- ${open?`<div class="issues">${o.bad.map(x=>`<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}${o.scr.length?`<p class="ish">สรุปการจัดแต่ละชีต</p>${[...new Set(o.scr.map(x=>x[0]))].map(sn=>{const L=o.scr.filter(x=>x[0]===sn),f=o.inf.find(x=>x[0]===sn);return`<div class="iss inf"><b>${esc(sn)}</b><span><span class="scrs">เติม ${L.length} จอ: ${L.map(x=>{const m=x[2].match(/จอ (?:Spare ใช้รายการของสื่อ|CITY ใช้รายการ) ([^)]+)/);return esc(String(x[1]).split(' → ')[0])+' ('+x[3]+' เรื่อง'+(m?' จากรายการ '+esc(m[1]):'')+')'}).join(', ')}</span>${f?esc(f[2]):''}</span></div>`}).join('')}`:''}</div>`:''}</div>`}).join('')}</div>
+ ${open?`<div class="issues">${o.bad.map(x=>`<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}${o.scr.length?`<p class="ish">สรุปการจัดแต่ละชีต</p>${[...new Set(o.scr.map(x=>x[0]))].map(sn=>{const L=o.scr.filter(x=>x[0]===sn),f=o.inf.find(x=>x[0]===sn),I=o.info.filter(x=>x[0]===sn);return`<div class="iss inf"><b>${esc(sn)}</b><span><span class="scrs">เติม ${L.length} จอ: ${L.map(x=>{const m=x[2].match(/จอ (?:Spare ใช้รายการของสื่อ|CITY ใช้รายการ) ([^)]+)/);return esc(String(x[1]).split(' → ')[0])+' ('+x[3]+' เรื่อง'+(m?' จากรายการ '+esc(m[1]):'')+')'}).join(', ')}</span>${f?esc(f[2]):''}${I.map(x=>`<span class="infx"><b>${esc(x[1])}</b> ${esc(x[2].replace(/^ข้อมูล:\s*/,''))}</span>`).join('')}</span></div>`}).join('')}`:''}</div>`:''}</div>`}).join('')}</div>
  ${FSA?tlinkHTML('last','งานโฟลเดอร์และรูป','สร้างโฟลเดอร์แยกรูปของหนังใหม่ • ใส่วันที่ถ่าย • ตรวจโฟลเดอร์เทียบจอ — ใช้ใบเช็คที่เพิ่งเติมนี้ได้เลย','secondary'):''}<div class="nextday"><p>${FSA?'“บันทึกทับไฟล์เดิม” เขียนใบเช็คที่เติมแล้วทับไฟล์ในโฟลเดอร์เดิม (เลือกโฟลเดอร์ครั้งแรกครั้งเดียว) และเก็บไฟล์ก่อนเติมไว้ใน สำรองก่อนเติม ส่วน zip มีใบเช็คทุกไฟล์และ รายงาน.txt':'ไฟล์ zip มีใบเช็ครูปทุกไฟล์ที่เติมได้ (ชื่อเดิม) และ รายงาน.txt'} ใบเช็คที่ได้วันนี้คือไฟล์ตั้งต้นของวันพรุ่งนี้</p><button class="btn secondary" data-a="next" ${nf?'':'disabled'}>ใช้ผลนี้เติมวันถัดไป</button></div>`}
 
 /* ----- จัดจอเข้าชีตตามแพค (4.1): สรุปในผลการเติม และในรายงาน.txt ----- */
@@ -3159,6 +3172,7 @@ const vHelp=()=>`<div class="ov"><div class="dlg" role="dialog" aria-modal="true
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
 <li><b>รหัสนี้อยู่ในหลายสื่อ</b> ตั้งชื่อชีตในใบเช็คให้มี 40/80 + Blue/Red, CITY หรือ Spare แล้วเติมใหม่</li>
+<li><b>กันตกหล่น</b> (4.2.1) หนังที่มีใน Playlist แต่ยังไม่เคยลงใบเช็คของจอนี้ และวันนี้ไม่ได้ “ขึ้นใหม่” ระบบจึงไม่เพิ่มให้ (วงเล็บบอกวันเริ่มในไฟล์) ดูว่าลืมลงไปหรือเปล่า ถ้าต้องมี ลงเองในใบเช็ค • ส่วน “ขึ้นซ้ำ / ต่อสัญญา ใช้แถวเดิม” อยู่ในสรุปของชีต เป็นข้อมูลเฉย ๆ ไม่ต้องแก้</li>
 <li><b>ไม่ใส่ตามหมายเหตุ / จำนวนครั้ง = 0</b> บอกหนังที่ระบบตั้งใจไม่ใส่ ดูว่าตรงกับ Playlist • งาน Freeze Screen (จำนวนครั้ง = 0) ติ๊กให้ใส่ได้ที่ขั้นที่ 3 ในการตั้งค่า</li>
 <li><b>ยังไม่ใส่ เพราะวันเริ่มในไฟล์ยังไม่ถึง</b> หนังที่เริ่มหลังวันที่ทำงาน ระบบจะใส่ให้เองเมื่อถึงวันเริ่ม</li>
 
@@ -3441,7 +3455,7 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
  picmake:async()=>{const L=picS();if(!L||!L.pic||!L.pic.P||L.pic.busy)return;note='กำลังสร้างโฟลเดอร์ …';view();
   const F=await picPlan(L.pic.d,L.W,L.res,PICR,picUp()); /* 4.1.3: ตรวจตามตัวเลือกปัจจุบันอีกครั้งก่อนสร้าง ถ้ารายการไม่ตรงกับที่แสดง ไม่สร้าง ให้ดูรายการใหม่ก่อน */
   if(picSig(F)!==picSig(L.pic.P)){L.pic={d:L.pic.d,P:F,made:null};MQN='warn';note='รายการเปลี่ยนตามตัวเลือกล่าสุด ยังไม่ได้สร้าง — ตรวจรายการแล้วกดสร้างอีกครั้ง';return}
-  const r=await picMake(F);L.pic.P=await picPlan(L.pic.d,L.W,L.res,PICR,picUp());L.pic.made=r;
+  const T0=performance.now(),r=await picMake(F);r.sec=+((performance.now()-T0)/1000).toFixed(1);r.miss=F.miss.length;L.pic.P=await picPlan(L.pic.d,L.W,L.res,PICR,picUp());L.pic.made=r;
   MQN=r.bad.length?'warn':'done';note=r.bad.length?`สร้างแล้ว ${r.n} โฟลเดอร์ สร้างไม่ได้ ${r.bad.length} โฟลเดอร์`:`สร้างแล้ว ${r.n} โฟลเดอร์`},
  savedir:async k=>{if(!last||!FSA)return;let d=k==='pick'?null:CKDIR;
   try{if(!d&&k!=='pick'){const x=await HDB.get('ck').catch(()=>null);if(x)d=x}
@@ -3470,8 +3484,8 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
  fill:async()=>{if(FILLING||BUSY)return;if(!DB.length){note='ยังไม่ได้ใส่ Playlist ของวันนี้ — ใส่ไฟล์ที่ขั้นที่ 1 ก่อน';return}if(BASEERR){note='แก้วันที่ทำงานให้ถูกต้องก่อน';return}
   const o={...OP,W:workDate()};if(o.hand&&!o.W){note='ไม่พบวันที่ Playlist — ใส่วันที่ทำงานเอง เช่น 2-Oct-26';return}
   const list=[...C];if(!list.length)return;{const ps=PLI.filter(x=>x.lv==='stop'&&!x.ack);if(ps.length&&!confirm(`ด่านตรวจ Playlist พบ ${ps.length} เรื่องที่ระบบอาจอ่านผิด:\n\n${ps.slice(0,6).map(x=>'• '+x.f+': '+x.t).join('\n')}${ps.length>6?'\n…':''}\n\nเติมต่อเลยไหม? (กด Cancel เพื่อกลับไปตรวจ)`))return}if(last&&!last.saved&&!confirm('ผลการเติมครั้งก่อนยังไม่ได้บันทึกหรือดาวน์โหลด ถ้าเติมใหม่ ผลเดิมจะหายไป ต้องการเติมใหม่เลยไหม?'))return;FILLING=true;
-  try{const on=buildOn(o),ms=DB.find(s=>s.m==='MetroLED'),metro=ms?listOf(ms,o):[],out=new JSZip(),res=[],L=['รายงานการเติมใบเช็ครูป',...plRep(),...frzRep()];let i=0;
-   for(const f of list){i++;await busyStep('กำลังเติมใบเช็ครูป',i,list.length,f.name);let r;
+  try{const on=buildOn(o),ms=DB.find(s=>s.m==='MetroLED'),metro=ms?listOf(ms,o):[],out=new JSZip(),res=[],L=['รายงานการเติมใบเช็ครูป',...plRep(),...frzRep()],T0=performance.now();let i=0;
+   for(const f of list){i++;await busyStep('กำลังเติมใบเช็ครูป',i,list.length,f.name);let r;const T1=performance.now();
     const rd=f.nd?readyOf(f):null;
     if(rd&&(rd.bad||rd.empty))r={rep:[['ทั้งไฟล์','ไม่ได้เติม','ตรวจ: '+(rd.bad||'ไม่พบชีตของใบเช็ครูปในไฟล์นี้')+' จึงไม่ได้เติม',0]],blob:null};
     else{const fo={...o,col1:effCol(1,f),col2:effCol(2,f),k16:!!fcol(f.name).k16,padc:effPad(f),padh:padHist()};let A=null,g=f;
@@ -3481,8 +3495,9 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
      if(!r&&g!==f){A={err:1,moves:[],notes:[],relabeled:[],sorted:[],ana:0};try{r=await fillWb(f,on,metro,fo)}catch(e){r=null}} /* จัดจอแล้วเติมไม่ได้ → เติมไฟล์เดิมแบบไม่ย้ายจอ */
      if(!r)r={rep:[['ทั้งไฟล์','เติมไฟล์นี้ไม่ได้','ตรวจ: เติมไฟล์นี้ไม่ได้ ไฟล์เสีย หรือไม่ใช่ใบเช็ครูป (.xlsm / .xlsx)',0]],blob:null};
      if(r.blob)r.arr=A}
-    if(r.blob)out.file(f.name,r.blob,{createFolders:false});res.push({name:f.name,rep:r.rep,blob:r.blob,fold:r.fold||[],arr:r.arr||null});L.push('',f.name,...arrTxt(r.arr),...r.rep.map(x=>`  ${x[0]} | ${x[1]} | ${x[2]}${x[3]?' ('+x[3]+')':''}`))}
-   out.file('รายงาน.txt',L.join('\n'));last={res,zip:await out.generateAsync({type:'blob'}),saved:false,W:o.W?+o.W:Date.now(),txt:L.join('\n')};{const _w=res.reduce((t,r)=>t+r.rep.filter(isWarn).length,0),_f=res.filter(r=>r.blob).length;MQN=_w?'warn':'done';note=`เติมเสร็จแล้ว ${_f} ไฟล์`+(_w?` • ควรตรวจ ${_w} รายการ`:'')}last.csig=sigOf(C);tab='res';cs=null;RO.clear();window.scrollTo(0,0);
+    if(r.blob)out.file(f.name,r.blob,{createFolders:false});res.push({name:f.name,rep:r.rep,blob:r.blob,fold:r.fold||[],arr:r.arr||null});L.push('',f.name,...arrTxt(r.arr),...r.rep.map(x=>`  ${x[0]} | ${x[1]} | ${x[2]}${x[3]?' ('+x[3]+')':''}`),`  ⏱ ใช้เวลา ${((performance.now()-T1)/1000).toFixed(1)} วินาที`)}
+   const SEC=+((performance.now()-T0)/1000).toFixed(1);L.push(...fillSum(res,list.length,SEC)); /* 4.2.1: สรุปตัวเลขท้ายรายงาน */
+   out.file('รายงาน.txt',L.join('\n'));last={res,zip:await out.generateAsync({type:'blob'}),saved:false,W:o.W?+o.W:Date.now(),txt:L.join('\n'),sec:SEC};{const _w=res.reduce((t,r)=>t+r.rep.filter(isWarn).length,0),_f=res.filter(r=>r.blob).length;MQN=_w?'warn':'done';note=`เติมเสร็จแล้ว ${_f} ไฟล์`+(_w?` • ควรตรวจ ${_w} รายการ`:'')}last.csig=sigOf(C);tab='res';cs=null;RO.clear();window.scrollTo(0,0);
    const fi=res.findIndex(r=>r.rep.some(isWarn));if(fi>=0)RO.add(fi)}
   finally{FILLING=false;BUSY=null;$('.wrap').inert=false}}};
 function g(fn){const t=TQ.toLowerCase();if(!t)return;let c=0;for(const s of DB){let h=0;s.rows=s.rows.filter(r=>{if(!String(r.ad).toLowerCase().includes(t))return true;c++;h++;if(fn)fn(r);return !!fn});if(h){s.rows=stable(s.rows);touch(s)}}note=`แก้ไข ${c} แถว`}
