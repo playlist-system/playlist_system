@@ -80,6 +80,7 @@
  *   เวอร์ชัน 4.1.3: สร้างโฟลเดอร์แยกรูป — ปุ่มสร้างกดไม่ได้ระหว่างตรวจรายการใหม่ และตรวจซ้ำก่อนสร้าง (picRe, picSig, ACT.picmake)
  *   เวอร์ชัน 4.2: สร้างโฟลเดอร์แยกรูปแบบ Gallary แพค → รอบ → จอ → หนัง (rndF, rndName, reTag, picScreens, picPlan, picMake) ใส่วันที่ถ่ายอ่านได้ 2 แบบ
  *   เวอร์ชัน 4.2.1: บอกรายชื่อกันตกหล่น / ขึ้นซ้ำ สรุปตัวเลขและเวลา (fillSum, isInfo, picMadeTxt)
+ *   เวอร์ชัน 4.3: เติมหลายวันในครั้งเดียว — Playlist แยกตามวัน เติมต่อกันทีละวัน เตือนวันที่ขาด (PFS, plDays, plSync, fillRun, fillDays, vDays, thruSet)
  * ======================================================================
  */
 
@@ -355,8 +356,11 @@ const cmpN = (a, b) => {
 let PLD = null,
   PLM = {},
   PLX = [],
-  PLI =
-    []; /* PLI: ด่านตรวจ Playlist {f,lv:'stop'|'info',t} */ /* PLM: สื่อ → {f:ชื่อไฟล์, d:วันที่} • PLX: ไฟล์ที่อ่านไม่ได้ */
+  PLI = [];
+let PFS = [],
+  PSEQ = 0,
+  PDC =
+    null; /* 4.3: Playlist ทุกไฟล์ที่ใส่ไว้ {f,p,d,I,q} แยกวันได้ → เติมหลายวันต่อกัน */ /* PLI: ด่านตรวจ Playlist {f,lv:'stop'|'info',t} */ /* PLM: สื่อ → {f:ชื่อไฟล์, d:วันที่} • PLX: ไฟล์ที่อ่านไม่ได้ */
 const THM = {
   'ม.ค.': 0,
   'ก.พ.': 1,
@@ -456,6 +460,81 @@ const plDate = () => {
   return b ? new Date(b) : null;
 }; /* Show DC / LA PlanB ไม่ได้ส่งทุกวัน (อาจเป็นฉบับเก่าหรือของรอบถัดไป) จึงไม่ใช้กำหนดวันทำงาน */
 const workDate = () => parseD(OP.base) || PLD || autoBase();
+/* 4.3: เติมหลายวันต่อกัน — วันทำงาน = วันที่มีไฟล์ สรุปรายการหนังแยกจอ (6 แพค) • ไฟล์แบบอื่น (Show DC, Metro LED, BKJ …) อยู่กับวันแรกที่ไม่ก่อนวันของไฟล์ (ไม่มี → วันล่าสุด)
+   แต่ละวันใช้ไฟล์ของวันนั้น แบบที่วันนั้นไม่มี ใช้ของวันก่อนหน้าทั้งแบบ — ถ้าทุกวันมีครบ ผลเหมือนเติมทีละวัน */
+const pfFull = e => e.d > 0 && e.p.some(s => KINDS.some(K => K.g && K.has(s)));
+const pfPut = (db, p) => {
+  if (p.every(x => x.rep === 'screen')) {
+    const ks = new Set(p.map(x => x.m + '|' + x.c));
+    db = db.filter(x => !ks.has(x.m + '|' + x.c));
+  } else {
+    const ms = new Set(p.map(x => x.m));
+    db = db.filter(x => !ms.has(x.m));
+  }
+  return db.concat(p);
+};
+function plDays() {
+  const sig = PFS.map(e => e.q).join(',');
+  if (PDC && PDC.sig === sig) return PDC.G;
+  let G = null;
+  const ds = [...new Set(PFS.filter(pfFull).map(e => e.d))].sort((a, b) => a - b);
+  if (ds.length > 1) {
+    G = ds.map(d => ({ d, E: [] }));
+    for (const e of PFS) {
+      let i = pfFull(e) ? ds.indexOf(e.d) : e.d > 0 ? ds.findIndex(d => d >= e.d) : -1;
+      if (i < 0) i = ds.length - 1;
+      G[i].E.push(e);
+    }
+    let db = [];
+    for (const g of G) {
+      g.E.sort((a, b) => a.d - b.d || a.q - b.q);
+      const ks = new Set(g.E.flatMap(e => e.p.map(kindOfS)));
+      db = db.filter(s => !ks.has(kindOfS(s)));
+      for (const e of g.E) db = pfPut(db, e.p);
+      g.db = db;
+    }
+  }
+  PDC = { sig, G };
+  return G;
+}
+function plSync() {
+  const G = plDays();
+  if (G) DB = G[G.length - 1].db;
+  else {
+    let db = [];
+    for (const e of [...PFS].sort((a, b) => a.d - b.d || a.q - b.q)) db = pfPut(db, e.p);
+    DB = db;
+  }
+  PLD = plDate();
+  const live = new Set([...DB.map(s => s.pf), ...(G ? PFS.map(e => e.f) : [])]);
+  PLI = PFS.flatMap(e => e.I || []).filter(x => live.has(x.f));
+}
+const THW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+const rngTxt = G => {
+  const a = new Date(G[0].d),
+    b = new Date(G[G.length - 1].d);
+  return a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear()
+    ? `${a.getUTCDate()}–${thd(b)}`
+    : `${thdS(a)} – ${thd(b)}`;
+};
+/* 4.3: วันที่เติมล่าสุดของใบเช็คแต่ละชื่อ (จำไว้ในเครื่องนี้ ตอนบันทึก / ดาวน์โหลด) → เตือนถ้าข้ามวัน */
+const thruAll = () => {
+  try {
+    const o = JSON.parse(store.get('ps_thru') || '{}');
+    return o && typeof o === 'object' ? o : {};
+  } catch (_) {
+    return {};
+  }
+};
+const thruSet = (res, W) => {
+  try {
+    const o = thruAll();
+    for (const r of res) if (r && r.blob) o[r.name] = +(r.thru || W);
+    const k = Object.keys(o);
+    if (k.length > 300) for (const x of k.slice(0, k.length - 300)) delete o[x];
+    store.set('ps_thru', JSON.stringify(o));
+  } catch (_) {}
+};
 function autoBase() {
   const c = new Map();
   for (const s of DB)
@@ -5472,9 +5551,9 @@ function plCheck(p, I) {
   }
 }
 /* 4.1.2: งาน Freeze Screen ใน Playlist วันนี้ (จำนวนครั้ง = 0) — ผู้ใช้ติ๊กเรื่องที่จะใส่ ระบบจำไว้ในเครื่อง (ps_frz) */
-const frzList = () => {
+const frzList = (S = DB) => {
   const M = new Map();
-  for (const s of DB) {
+  for (const s of S) {
     if (SIGAL[s.c]) continue;
     for (const r of s.rows) {
       if (r.off || !isFrz(r)) continue;
@@ -5503,23 +5582,28 @@ const frzRep = () => {
       ]
     : [];
 };
+const frzAll = () => {
+  const G = plDays();
+  return G ? [...new Set(G.flatMap(g => g.db))] : DB;
+}; /* 4.3 */
 const vFrz = () => {
-  const L = frzList();
+  const L = frzList(frzAll());
   if (!L.length) return '';
   const on = L.filter(x => FRZIN.has(x.ad)).length;
   return `<div class="cols frz"><p class="cl">งาน Freeze Screen <span class="frzn">${on ? `ใส่ ${on} จาก ${L.length} เรื่อง` : `${L.length} เรื่อง ยังไม่ใส่`}</span></p><small>หนังที่ขึ้นจอเฉพาะช่วงเวลา (Playlist ใส่จำนวนครั้ง = 0 และหมายเหตุ Freeze Screen) ปกติระบบไม่ใส่ลงใบเช็ค ติ๊กเรื่องที่ต้องการให้ใส่ ระบบจำไว้ใช้วันต่อไป</small>${L.map(x => `<label class="cb frzi"><input type="checkbox" data-frz="${esc(x.ad)}"${FRZIN.has(x.ad) ? ' checked' : ''}><span>${esc(x.ad)}<small>${x.t ? esc(x.t) + ' • ' : ''}${x.n.size} จอ</small></span></label>`).join('')}</div>`;
 };
-const plRep = () =>
-  PLI.length
-    ? [
-        '',
-        'ด่านตรวจ Playlist',
-        ...PLI.map(
-          x =>
-            `  ${x.lv === 'stop' ? 'ต้องตรวจ' : 'ข้อสังเกต'}${x.ack ? ' (กดตรวจแล้ว)' : ''} | ${x.f} | ${x.t}`,
-        ),
-      ]
-    : [];
+const plRepOf = I =>
+    I.length
+      ? [
+          '',
+          'ด่านตรวจ Playlist',
+          ...I.map(
+            x =>
+              `  ${x.lv === 'stop' ? 'ต้องตรวจ' : 'ข้อสังเกต'}${x.ack ? ' (กดตรวจแล้ว)' : ''} | ${x.f} | ${x.t}`,
+          ),
+        ]
+      : [],
+  plRep = () => plRepOf(PLI);
 /* ตอนเติม: หมายเหตุที่พูดถึงจอที่กำลังเติม (ไม่ออน / ยกเว้น / เฉพาะ …) แต่ระบบอ่านกติกาไม่ออก → ขึ้นใน “ควรตรวจ” ไม่เปลี่ยนผลการเติม */
 const RULEW = /ยกเว้น|ไม่ออน|ไม่ขึ้น|ไม่รับ|ฉพาะ|ห้าม|งด/,
   NORMN = t => String(t || '').replace(/([ัิ-ฺ็-๎])\1+/g, '$1');
@@ -5615,6 +5699,7 @@ async function addFiles(kind, files) {
     PLI = [];
     try {
       const o = JSON.parse(new TextDecoder().decode(arr[0].buf));
+      PFS = [];
       if (Array.isArray(o)) {
         DB = o;
         PLD = null;
@@ -5667,12 +5752,14 @@ async function addFiles(kind, files) {
       x.pf = f.name;
       x.pd = fd0 ? +fd0 : 0;
     }
+    let I2 = [];
     {
       const I = p.iss || [];
       plCheck(p, I);
-      for (const x of I) PLI.push({ f: f.name, ...x });
+      I2 = I.map(x => ({ f: f.name, ...x }));
+      PLI.push(...I2);
     }
-    got.push({ f, p, d: fd0 ? +fd0 : 0 });
+    got.push({ f, p, d: fd0 ? +fd0 : 0, I: I2 });
   }
   got.sort((a, b) => a.d - b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
   for (const { f, p } of got) {
@@ -5687,6 +5774,10 @@ async function addFiles(kind, files) {
     n += p.length;
     ok.push(f.name);
   }
+  for (const g of got) {
+    PFS = PFS.filter(e => !(e.f === g.f.name && e.d === g.d));
+    PFS.push({ f: g.f.name, p: g.p, d: g.d, I: g.I, q: ++PSEQ });
+  } /* 4.3 */
   if (ok.length) {
     PLD = plDate();
     OP.base = '';
@@ -5695,6 +5786,7 @@ async function addFiles(kind, files) {
     const live = new Set(DB.map(s => s.pf));
     PLI = PLI.filter(x => live.has(x.f));
   }
+  if (plDays()) plSync(); /* 4.3: หลายวัน → Playlist ของวันล่าสุด (แบบที่วันนั้นไม่มี ใช้ของวันก่อนหน้า) */
   MQN = skip.length || emp.length ? 'warn' : 'done';
   note =
     `นำเข้า ${new Set(got.flatMap(x => x.p.map(s => s.m + '|' + s.c))).size} จอ` +
@@ -5707,7 +5799,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.2.1 (27 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.3 (27 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -6255,7 +6347,7 @@ const vNav = () => {
     t = tab === 'tools',
     wd = DB.length ? workDate() : null,
     ml = mqOn() ? 'ปิดผู้ช่วยน้องเช็ค' : 'เปิดผู้ช่วยน้องเช็ค';
-  return `<div class="tops" role="navigation" aria-label="ส่วนของระบบ" data-tour="sect"><button class="tp${t ? '' : ' on'}" data-a="fillsec" ${t ? '' : 'aria-current="page"'}>${IC.fillI}<span>เติมใบเช็ครูป</span></button><button class="tp${t ? ' on' : ''}" data-a="tools" ${t ? 'aria-current="page"' : ''}>${IC.folder}<span>งานโฟลเดอร์และรูป</span></button><button class="tp" data-a="help" aria-haspopup="dialog">${IC.book}<span>วิธีใช้</span></button></div><div class="hright" data-tour="hdr">${wd ? `<span class="dchip">${IC.cal}<span><b>Playlist ${thd(wd)}</b><small>รอบ ${rndOf(+wd)}</small></span></span>` : ''}<button class="rb${mqOn() ? '' : ' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${ml}" title="${ml}">${IC.bot}</button><button class="rb" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button></div>`;
+  return `<div class="tops" role="navigation" aria-label="ส่วนของระบบ" data-tour="sect"><button class="tp${t ? '' : ' on'}" data-a="fillsec" ${t ? '' : 'aria-current="page"'}>${IC.fillI}<span>เติมใบเช็ครูป</span></button><button class="tp${t ? ' on' : ''}" data-a="tools" ${t ? 'aria-current="page"' : ''}>${IC.folder}<span>งานโฟลเดอร์และรูป</span></button><button class="tp" data-a="help" aria-haspopup="dialog">${IC.book}<span>วิธีใช้</span></button></div><div class="hright" data-tour="hdr">${wd ? (G => `<span class="dchip">${IC.cal}<span><b>Playlist ${G ? rngTxt(G) : thd(wd)}</b><small>${G ? G.length + ' วัน • ' : ''}รอบ ${rndOf(+wd)}</small></span></span>`)(plDays()) : ''}<button class="rb${mqOn() ? '' : ' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${ml}" title="${ml}">${IC.bot}</button><button class="rb" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button></div>`;
 };
 const shead = (t, p, extra = '') =>
   `<div class="shead"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ''}</div>${extra}</div>`;
@@ -6301,9 +6393,44 @@ async function busyStep(t, i, n, f) {
 }
 
 /* ----- ขั้นที่ 1 ----- */
+/* 4.3: Playlist หลายวัน — รายการวัน แบบที่ขาด และวันที่ขาดไป */
+function vDays(G) {
+  if (!G) return '';
+  const core = KINDS.filter(K => !K.x && !K.latest),
+    gaps = [];
+  for (let i = 1; i < G.length; i++) for (let t = G[i - 1].d + 864e5; t < G[i].d; t += 864e5) gaps.push(t);
+  const row = (g, i) => {
+    const D = new Date(g.d),
+      own = new Set(g.E.flatMap(e => e.p.map(kindOfS))),
+      miss = core.filter(K => !own.has(K.k)),
+      car = miss.filter(K => g.db.some(K.has)).map(K => K.k),
+      non = miss.filter(K => !g.db.some(K.has)).map(K => K.k),
+      n = KINDS.filter(K => !K.x && g.db.some(K.has)).length;
+    return `<li class="drow${non.length ? ' wr' : ''}"><span class="dn">${i + 1}</span><span class="dd"><b>${THW[D.getUTCDay()]} ${thd(D)}</b><small>${g.E.length} ไฟล์ • ${n} จาก 11 แบบ</small></span><span class="dk">${car.length ? `<span>ใช้ของวันก่อนหน้า: ${esc(car.join(', '))}</span>` : ''}${non.length ? `<span class="no">ไม่มี: ${esc(non.join(', '))}</span>` : ''}${!car.length && !non.length ? '<span class="okk">ครบ</span>' : ''}</span><button class="ib" data-a="plday" data-k="${g.d}" aria-label="เอา Playlist วันที่ ${thd(D)} ออก" title="เอาวันนี้ออก">${IC.x}</button></li>`;
+  };
+  return `<section class="panel days" aria-label="Playlist หลายวัน"><h3 class="sec-t">${IC.cal}ใส่ Playlist ไว้ ${G.length} วัน — ระบบจะเติมต่อกันทีละวัน</h3><p class="dsub">เรียงจากวันแรกไปวันล่าสุด ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไปให้เอง กดเติมครั้งเดียว บันทึกครั้งเดียว • ใส่วันไหนผิด กด × เพื่อเอาออก</p><ol class="dlist">${G.map(row).join('')}</ol>${
+    gaps.length
+      ? alertHTML(
+          'wr',
+          `ขาด Playlist ${gaps.length} วัน: ${gaps
+            .map(t => {
+              const D = new Date(t);
+              return THW[D.getUTCDay()] + ' ' + thdS(D);
+            })
+            .join(', ')}`,
+          '<p>ถ้ามี Playlist ของวันนั้น ลากเพิ่มลงกล่องด้านบน ระบบจะแทรกให้ตามวัน ถ้าไม่ใส่ หนังที่ขึ้นใหม่วันนั้นจะไม่ได้ลงใบเช็ค (หนังที่ยังฉายอยู่จะขึ้นใน “กันตกหล่น” หลังเติม)</p>',
+        )
+      : ''
+  }</section>`;
+}
 function vDateCard(wd, has) {
   if (!has)
     return `<aside class="panel datecard dc0" data-tour="date"><span class="lbl">Playlist วันที่</span><b class="big">ยังไม่มี Playlist</b><span class="src">วันที่จะขึ้นเมื่อใส่ไฟล์ ระบบอ่านจากชื่อไฟล์ให้เอง</span></aside>`;
+  {
+    const G = plDays();
+    if (G)
+      return `<aside class="panel datecard" data-tour="date"><span class="lbl">Playlist หลายวัน</span><b class="big">${rngTxt(G)}</b><span class="src">เติมต่อกัน ${G.length} วัน ทีละวัน ตามวันที่ในไฟล์</span>${rndHTML(new Date(G[G.length - 1].d))}</aside>`;
+  } /* 4.3 */
   return `<aside class="panel datecard" data-tour="date"><span class="lbl">Playlist วันที่</span><b class="big">${wd ? thd(wd) : 'ไม่พบวันที่'}</b><span class="src">${OP.base ? 'ตามที่พิมพ์ไว้ในขั้นที่ 3' : PLD ? 'จากไฟล์ Playlist ถ้าไม่ตรง แก้ได้ในขั้นที่ 3' : wd ? 'คาดจากวันเริ่มของหนังในไฟล์ ตรวจให้แน่ใจ หรือแก้ในขั้นที่ 3' : 'ใส่วันที่เองได้ในขั้นที่ 3'}</span>${BASEERR ? `<span class="src" style="color:var(--er);font-weight:600">วันที่ที่พิมพ์ในขั้นที่ 3 อ่านไม่ได้ ตอนนี้ใช้วันที่จาก Playlist</span>` : ''}${wd ? rndHTML(wd) : ''}</aside>`;
 }
 function vWall(wd) {
@@ -6336,7 +6463,7 @@ function vWall(wd) {
       : n
         ? `<div class="wsum">${miss.length ? `<b>ยังขาด ${miss.length} แบบ</b><span>${miss.join(', ')}</span>` : '<b>ครบ 11 แบบ</b>'}${mis.length ? `<b>วันที่ไม่ตรง ${mis.length} แบบ</b><span>${mis.join(', ')} (ช่องไฟเหลือง)</span>` : ''}</div>`
         : `<div class="wsum"><span>ยังไม่ได้ใส่ Playlist ช่องจะสว่างทีละแบบเมื่อใส่ไฟล์</span></div>`;
-  return `<section class="wall" data-tour="wall" aria-label="เช็กลิสต์ Playlist"><div class="wtop"><h2>เช็กลิสต์ Playlist</h2><span class="wcount"><b>${n}</b>จาก 11 แบบ</span></div>
+  return `<section class="wall" data-tour="wall" aria-label="เช็กลิสต์ Playlist"><div class="wtop"><h2>เช็กลิสต์ Playlist${wd && plDays() ? `<small class="wsub"> • วันล่าสุด ${thdS(wd)}</small>` : ''}</h2><span class="wcount"><b>${n}</b>จาก 11 แบบ</span></div>
  <div class="wg"><p>สรุปรายการหนังแยกจอ 6 ไฟล์</p><div class="wgrid" role="list">${S.filter(x => x.K.g)
    .map(tile)
    .join('')}</div></div>
@@ -6384,12 +6511,15 @@ const vPLI = () => {
 function vData() {
   const has = DB.length > 0,
     wd = has ? workDate() : null,
-    sdc = KINDS.filter(K => K.latest);
-  const fl = (() => {
-    const M = new Map();
-    for (const x of DB) if (x.pf && (!M.has(x.pf) || x.pd > M.get(x.pf))) M.set(x.pf, x.pd || 0);
-    return [...M];
-  })();
+    sdc = KINDS.filter(K => K.latest),
+    MD = plDays();
+  const fl = MD
+    ? PFS.map(e => [e.f, e.d]).sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1))
+    : (() => {
+        const M = new Map();
+        for (const x of DB) if (x.pf && (!M.has(x.pf) || x.pd > M.get(x.pf))) M.set(x.pf, x.pd || 0);
+        return [...M];
+      })();
   const isSdc = ([f]) =>
     DB.some(
       s => s.pf === f && sdc.some(K => K.has(s)),
@@ -6402,12 +6532,12 @@ function vData() {
         .filter(Boolean),
     ),
   ].sort((a, b) => a - b);
-  return `${shead('ใส่ Playlist ของวันนี้', 'ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว')}
+  return `${shead('ใส่ Playlist ของวันนี้', 'ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว • หยุดหลายวัน ใส่ของทุกวันพร้อมกันได้ ระบบจะเติมต่อกันให้ทีละวัน')}
  <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม', '.xlsx,.xls,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
- ${vWall(wd)}
+ ${vDays(MD)}${vWall(wd)}
  <div class="stack">${PLX.length ? alertHTML('er', `อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`, `<ul>${PLX.map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`) : ''}
  ${vPLI()}
- ${ds.length > 1 ? alertHTML('wr', `ไฟล์ Playlist มีหลายวันปนกัน (${ds.map(d => thd(new Date(d))).join(', ')})`, `<p>ระบบใช้ ${thd(wd)} เป็นวันทำงาน ช่องไฟเหลืองในเช็กลิสต์คือแบบที่ไฟล์เป็นวันอื่น ใส่ไฟล์ของวันที่ถูกต้องแทน หรือกด “ล้าง Playlist (เริ่มวันใหม่)” แล้วใส่เฉพาะไฟล์ของวันนั้น</p>`) : ''}</div>
+ ${!MD && ds.length > 1 ? alertHTML('wr', `ไฟล์ Playlist มีหลายวันปนกัน (${ds.map(d => thd(new Date(d))).join(', ')})`, `<p>ระบบใช้ ${thd(wd)} เป็นวันทำงาน ช่องไฟเหลืองในเช็กลิสต์คือแบบที่ไฟล์เป็นวันอื่น ใส่ไฟล์ของวันที่ถูกต้องแทน หรือกด “ล้าง Playlist (เริ่มวันใหม่)” แล้วใส่เฉพาะไฟล์ของวันนั้น</p>`) : ''}</div>
  ${fl.length ? `<details class="files" ${FLOPEN ? 'open' : ''}><summary>ไฟล์ Playlist ที่ใส่แล้ว ${fl.length} ไฟล์</summary><div class="flist">${fl.map(([f, d]) => `<span class="fchip">${esc(f)}${d ? `<em>${thd(new Date(d))}</em>` : ''}</span>`).join('')}</div></details>` : ''}
  <div class="actbar"><div class="tools">${has ? `<button class="btn quiet" data-a="savepj">${IC.save}บันทึกโปรเจกต์</button>` : ''}<button class="btn quiet" data-a="pick" data-k="pj">${IC.folder}เปิดโปรเจกต์</button>${has ? `<button class="btn quiet" data-a="expx">${IC.dl}ส่งออก Playlist (.xlsx)</button><button class="btn quiet" data-a="reset">${IC.reset}ล้าง Playlist (เริ่มวันใหม่)</button>` : ''}</div>
  <div class="go"><button class="btn secondary" data-a="tab" data-k="pl" ${has ? '' : 'disabled'}>ตรวจ / แก้ไขก่อน</button><button class="btn primary" data-a="tab" data-k="fl" data-tour="next1" ${has ? '' : 'disabled'}>ไปเติมใบเช็ครูป</button></div></div>`;
@@ -6557,7 +6687,8 @@ function vFl() {
   const ms = ['ทั้งหมด', ...new Set(DB.filter(s => /^(40|80|CITY|Spare)/.test(s.m)).map(s => s.m))];
   if (!ms.includes(OP.media)) OP.media = 'ทั้งหมด';
   const ab = PLD || autoBase(),
-    wd = workDate();
+    wd = workDate(),
+    MD = plDays();
   const R = C.map(readyOf),
     busy = R.some(r => !r),
     nBad = R.filter(r => r && (r.bad || r.empty)).length,
@@ -6611,6 +6742,40 @@ function vFl() {
       );
   }
   {
+    const t0 = MD ? MD[0].d : wd && !BASEERR ? +wd : 0,
+      T = thruAll(),
+      G = [];
+    if (t0 && DB.length)
+      for (const f of C) {
+        const t = +(f.thru || T[f.name] || 0);
+        if (t && t0 - t > 1.5 * 864e5 && t0 - t < 40 * 864e5) G.push([f.name, t]);
+      } /* 4.3: ข้ามวัน */
+    if (G.length) {
+      const miss = t => {
+          const a = new Date(t + 864e5),
+            b = new Date(t0 - 864e5),
+            n = Math.round((t0 - t) / 864e5) - 1;
+          return n < 2
+            ? thdS(a)
+            : (a.getUTCMonth() === b.getUTCMonth()
+                ? `${a.getUTCDate()}–${thdS(b)}`
+                : `${thdS(a)} – ${thdS(b)}`) + ` (${n} วัน)`;
+        },
+        M = new Map();
+      for (const [n, t] of G) {
+        if (!M.has(t)) M.set(t, []);
+        M.get(t).push(n);
+      }
+      lines.push(
+        alertHTML(
+          'wr',
+          `ใบเช็ค ${G.length} ไฟล์อาจข้ามวัน`,
+          `<ul>${[...M].map(([t, N]) => `<li><b>${esc(N.join(', '))}</b> เติมล่าสุดถึงวันที่ ${thd(new Date(t))} — ขาดวันที่ ${miss(t)}</li>`).join('')}</ul><p>Playlist ที่ใส่${MD ? 'เริ่ม' : 'เป็น'}วันที่ ${thd(new Date(t0))} ถ้ายังไม่ได้เติมวันที่ขาด ใส่ Playlist ของวันนั้นเพิ่มในขั้นที่ 1 ระบบจะเติมต่อกันให้ (ระบบจำวันที่บันทึกล่าสุดไว้ในเครื่องนี้ ถ้าเติมจากเครื่องอื่นไปแล้ว ข้ามข้อความนี้ได้)</p>`,
+        ),
+      );
+    }
+  }
+  {
     const ch = optChanged();
     if (ch.length)
       lines.push(
@@ -6629,7 +6794,7 @@ function vFl() {
         '<p>จอแยกของสื่ออื่น (40/80 Blue/Red, CITY, Spare) จะไม่ถูกเติม ส่วน Signature Max, Show DC, BKJ และ Metro LED ยังเติมตามปกติ เปลี่ยนได้ใน “ตัวเลือกเพิ่มเติม”</p>',
       ),
     );
-  const can = C.length && DB.length && !BASEERR;
+  const can = C.length && DB.length && (MD || !BASEERR);
   let dmsg;
   if (BASEERR)
     dmsg = `<small class="err">อ่านวันที่ “${esc(BASEERR)}” ไม่ได้ พิมพ์แบบ 12-Oct-26, 12/10/2569 หรือ 12 ต.ค. 69 หรือลบออกเพื่อใช้วันที่จาก Playlist</small>`;
@@ -6644,7 +6809,7 @@ function vFl() {
  <section class="panel" data-tour="ready"><h3 class="sec-t">ใบเช็ครูปที่ใส่แล้ว<small>${C.length} ไฟล์</small></h3>
  ${C.length ? `<div class="ckl">${C.map((f, i) => vCk(f, R[i], i, wd && per(wd).two ? 2 : 1)).join('')}</div>` : '<p class="empty">ยังไม่มีใบเช็ครูป ลากไฟล์มาวางในกล่องด้านบน แล้วระบบจะบอกว่าแต่ละไฟล์ต้องใช้ Playlist แบบไหน</p>'}</section>${FSA && C.length ? tlinkHTML('c', 'สร้างโฟลเดอร์แยกรูป / ใส่วันที่ถ่าย', 'ย้ายไปอยู่หน้า “งานโฟลเดอร์และรูป” แล้ว (ปุ่มด้านบน) ใช้ใบเช็คชุดนี้ได้เลย', 'quiet') : ''}</div>
  <aside class="panel set" data-tour="settings"><h3 class="sec-t">การตั้งค่า</h3>
- <label class="date"><span>วันที่ทำงาน (วันของ Playlist)</span><input id="o_base" class="${BASEERR ? 'bad' : ''}" placeholder="${end(ab) || 'เช่น 12-Oct-26'}" autocomplete="off" aria-invalid="${!!BASEERR}">${dmsg}${wd && !BASEERR ? rndHTML(wd) + (wd.getUTCDate() === 1 ? '<small>วันที่ 1 ยังไม่ใส่ “ออกวันที่”</small>' : '') : ''}</label>
+ ${MD ? `<div class="date"><span>วันที่ทำงาน</span><b class="mdays">${rngTxt(MD)} • ${MD.length} วัน</b><small>เติมต่อกันทีละวัน ตามวันที่ในไฟล์ Playlist (${MD.map(g => thdS(new Date(g.d))).join(' → ')}) ถ้าจะเติมวันเดียว เอาวันอื่นออกในขั้นที่ 1</small>${rndHTML(new Date(MD[MD.length - 1].d))}</div>` : `<label class="date"><span>วันที่ทำงาน (วันของ Playlist)</span><input id="o_base" class="${BASEERR ? 'bad' : ''}" placeholder="${end(ab) || 'เช่น 12-Oct-26'}" autocomplete="off" aria-invalid="${!!BASEERR}">${dmsg}${wd && !BASEERR ? rndHTML(wd) + (wd.getUTCDate() === 1 ? '<small>วันที่ 1 ยังไม่ใส่ “ออกวันที่”</small>' : '') : ''}</label>`}
  <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายวันที่ถ่าย (ช่องหลังชื่อหนัง ทุกจอ) ตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
  ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และวันที่ถ่าย (ช่องหลังชื่อหนัง) จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
  <label class="tgl"><span>จัดจอเข้าชีตตามแพค <em class="rec">แนะนำ: เปิด</em><small>จอที่ Playlist วันนี้ย้ายแพค (เช่น Spare → 40 RED) ระบบย้ายจอไปชีตของแพคนั้นให้ หนัง วันที่ถ่าย และ “ออกวันที่” ไปด้วยครบ • ป้ายแพคที่เขียนผิดแก้ให้ • บอกในผลการเติมว่าย้ายอะไรไปไหน</small>${OP.arr && !arrOn(OP) ? `<small class="wrn">ตอนนี้ยังไม่จัดจอ — ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง” และเลือกสื่อ “ทั้งหมด”</small>` : ''}</span><span class="sw"><input type="checkbox" id="o_arr"><span></span></span></label>
@@ -6662,7 +6827,7 @@ function vFl() {
  <div class="opt"><label class="cb"><input type="checkbox" id="o_arrsort" aria-describedby="d_arrsort" ${OP.arr ? '' : 'disabled'}> เรียงจอในชีตตามเลขจอ</label><small id="d_arrsort">จัดจอเข้าชีตตามแพค: จอที่ย้ายเข้ามาวางตามลำดับเลขจอ (ชีตที่จอยังไม่เรียงจะถูกเรียงให้ด้วย) ถ้าไม่ติ๊ก จอที่ย้ายเข้ามาต่อท้ายทางขวา <b>แนะนำ: ติ๊ก</b></small></div>
  <div class="opt"><label class="cb"><input type="checkbox" id="o_off" aria-describedby="d_off"> รวมรายการปลดต่อท้าย</label><small id="d_off">เขียนรายชื่อหนังที่ปลด/ถอดแล้วต่อท้ายตาราง ใช้ตรวจว่าเรื่องไหนถอดไปแล้ว อย่าใช้กับไฟล์ที่จะส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
  <button class="btn quiet" data-a="optreset" ${optChanged().length ? '' : 'disabled'}>คืนค่าแนะนำทั้งหมด</button></div></aside></div>
- <div class="fillbar">${lines.join('')}<button class="btn primary big" data-a="fill" data-tour="fill" ${can ? '' : 'disabled'}>เติมใบเช็ครูป${C.length ? ` ${C.length} ไฟล์` : ''}</button>${BASEERR ? '<p class="hint">แก้วันที่ทำงานให้ถูกต้องก่อน แล้วปุ่มนี้จะกดได้</p>' : DB.length && !C.length ? '<p class="hint">ใส่ใบเช็ครูปอย่างน้อย 1 ไฟล์ แล้วปุ่มนี้จะกดได้</p>' : ''}</div>`;
+ <div class="fillbar">${lines.join('')}<button class="btn primary big" data-a="fill" data-tour="fill" ${can ? '' : 'disabled'}>เติมใบเช็ครูป${C.length ? ` ${C.length} ไฟล์` : ''}${MD ? ` • ${MD.length} วัน` : ''}</button>${BASEERR && !MD ? '<p class="hint">แก้วันที่ทำงานให้ถูกต้องก่อน แล้วปุ่มนี้จะกดได้</p>' : DB.length && !C.length ? '<p class="hint">ใส่ใบเช็ครูปอย่างน้อย 1 ไฟล์ แล้วปุ่มนี้จะกดได้</p>' : ''}</div>`;
 }
 
 /* ----- ขั้นที่ 4 ----- */
@@ -7552,7 +7717,17 @@ function vRes() {
     nf = last.res.filter(r => r.blob).length,
     ne = last.res.length - nf;
   return `${shead('ผลการเติม', last.saved ? 'บันทึกใบเช็คที่เติมแล้ว ใส่ Playlist ของวันถัดไปต่อได้เลย (กด “ใช้ผลนี้เติมวันถัดไป” ด้านล่าง)' : FSA ? 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กด “บันทึกทับไฟล์เดิม” หรือดาวน์โหลดก่อนปิดหน้านี้' : 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กดดาวน์โหลดก่อนปิดหน้านี้', `<div class="go"><button class="btn secondary" data-a="tab" data-k="fl">${IC.back}กลับไปเติมใหม่</button></div>`)}
- <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span><span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ควรตรวจ</span>${last.sec ? `<span><b>${last.sec}</b>วินาที</span>` : ''}<span class="sp"></span>${FSA ? `<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf ? '' : 'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>` : `<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
+ <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span>${last.days ? `<span><b>${last.days.length}</b>วัน</span>` : ''}<span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ควรตรวจ</span>${last.sec ? `<span><b>${last.sec}</b>วินาที</span>` : ''}<span class="sp"></span>${FSA ? `<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf ? '' : 'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>` : `<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
+ ${
+   last.days
+     ? `<div class="dstrip" aria-label="เติมต่อกันทีละวัน">${last.days
+         .map(x => {
+           const D = new Date(x.d);
+           return `<span class="dst"><b>${THW[D.getUTCDay()]} ${thdS(D)}</b><small>เติม ${x.n.toLocaleString()} จอ${x.w ? ` • ควรตรวจ ${x.w}` : ''} • ${x.sec} วิ</small></span>`;
+         })
+         .join('<span class="dar" aria-hidden="true">→</span>')}</div>`
+     : ''
+ }
  <div class="stack">${last.sv ? (last.sv.bad.length ? alertHTML('er', `บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`, `<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`) : alertHTML('ok', `บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`, `<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu ? ` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่` : ''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)) : ''}
  ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}
  ${nb ? alertHTML('wr', '“ควรตรวจ” คืออะไร', '<p>จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน หรือหนังที่ระบบตั้งใจไม่ใส่ เปิดดูในแต่ละไฟล์แล้วตรวจในใบเช็คก่อนใช้งาน ความหมายของข้อความที่พบบ่อยอยู่ในปุ่ม “วิธีใช้”</p>') : alertHTML('ok', 'ไม่มีรายการที่ต้องตรวจเพิ่ม', '<p>ดาวน์โหลดแล้วเปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p>')}</div>
@@ -7684,6 +7859,7 @@ const vHelp =
 <ol class="hs">
 <li><b>เตรียมไฟล์</b><span>Playlist ของวันนี้ 11 แบบ (สรุปรายการหนังแยกจอ 40Blue, 40Red, 80Blue, 80Red, CITY, Spare และ Signature Max, Show DC, BKJ1, BKJ2, Metro LED) กับใบเช็ครูปที่เติมแล้วของวันก่อนหน้า • ถ้ามีใบเช็ค CCTV / MRT ใส่ Playlist เพิ่มเติม Rama9 Connect, Digital MRT, Gateway X, Air Traveller, The 20 ด้วย (ไม่นับใน 11 แบบ)</span></li>
 <li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง (ไฟล์ .zip เช่น จากหน้าเว็บ Playlist รายวัน หรือดาวน์โหลดทั้งโฟลเดอร์จาก Google Drive ลากลงได้เลย ไม่ต้องแตกไฟล์) ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
+<li><b>หยุดหลายวัน (เช่น เสาร์–อาทิตย์)</b><span>วันทำงานถัดไป ลากไฟล์ .zip (หรือ Playlist) ของทุกวันที่หยุดลงขั้นที่ 1 พร้อมกัน ระบบเรียงวันให้ในกล่อง “ใส่ Playlist ไว้ … วัน” ตอนกดเติม ระบบเติมต่อกันทีละวันเอง (ใบเช็คที่ได้ของวันหนึ่งเป็นไฟล์ตั้งต้นของวันถัดไป) กดเติมครั้งเดียว บันทึกครั้งเดียว ผลเหมือนเติมทีละวัน • ถ้าขาดวันไหน หรือใบเช็คเติมล่าสุดไม่ถึงวันก่อนหน้า ระบบเตือนก่อนเติม</span></li>
 <li><b>ขั้นที่ 2 ตรวจ / แก้ไข (ไม่บังคับ)</b><span>ใช้เมื่อต้องปลด เพิ่ม หรือเปลี่ยนชื่อหนังก่อนเติม</span></li>
 <li><b>ขั้นที่ 3 เติมใบเช็ครูป</b><span>ลากใบเช็ครูปลงกล่อง ดูว่าแต่ละไฟล์ขึ้น “พร้อมเติม” วันที่ทำงานและรอบถูกต้อง แล้วกด “เติมใบเช็ครูป”</span></li>
 <li><b>ขั้นที่ 4 ผลการเติม</b><span>เปิดดูรายการ “ควรตรวจ” ของแต่ละไฟล์ แล้วกด “ดาวน์โหลดทั้งหมด (.zip)” ใบเช็คที่ได้คือไฟล์ตั้งต้นของวันพรุ่งนี้</span></li></ol>
@@ -8057,7 +8233,10 @@ function view() {
     $('#o_arr').checked = OP.arr;
     $('#o_arrmk').checked = OP.arrMk;
     $('#o_arrsort').checked = OP.arrSort;
-    $('#o_base').value = BASEERR || OP.base;
+    {
+      const b = $('#o_base');
+      if (b) b.value = BASEERR || OP.base;
+    }
   }
   for (const id in kv) {
     const el = $('#' + id);
@@ -8273,6 +8452,7 @@ async function loadProject(f) {
         if (r[k] != null && typeof r[k] !== 'string') r[k] = String(r[k]);
       for (const k of ['len', 'cnt']) if (r[k] != null && typeof r[k] !== 'number') r[k] = +r[k] || 0;
     }
+  PFS = [];
   if (Array.isArray(o)) {
     DB = L;
     PLD = null;
@@ -8422,6 +8602,260 @@ const touch = s => {
   dirty = 1;
 };
 const curS = () => (cs != null && DB[cs] ? DB[cs] : null);
+/* เติมใบเช็คทุกไฟล์ด้วย Playlist ใน DB ตอนนี้ (แยกจาก ACT.fill ใน 4.3 — ขั้นตอนเหมือนเดิมทุกอย่าง) */
+async function fillRun(list, o, L, out, bt) {
+  const on = buildOn(o),
+    ms = DB.find(s => s.m === 'MetroLED'),
+    metro = ms ? listOf(ms, o) : [],
+    res = [];
+  let i = 0;
+  for (const f of list) {
+    i++;
+    await busyStep(bt, i, list.length, f.name);
+    let r;
+    const T1 = performance.now();
+    const rd = f.nd ? readyOf(f) : null;
+    if (rd && (rd.bad || rd.empty))
+      r = {
+        rep: [
+          [
+            'ทั้งไฟล์',
+            'ไม่ได้เติม',
+            'ตรวจ: ' + (rd.bad || 'ไม่พบชีตของใบเช็ครูปในไฟล์นี้') + ' จึงไม่ได้เติม',
+            0,
+          ],
+        ],
+        blob: null,
+      };
+    else {
+      const fo = {
+        ...o,
+        col1: effCol(1, f),
+        col2: effCol(2, f),
+        k16: !!fcol(f.name).k16,
+        padc: effPad(f),
+        padh: padHist(),
+      };
+      let A = null,
+        g = f;
+      if (arrOn(o))
+        try {
+          A = await arrangeWb(f.buf, on, { mk: o.arrMk, sort: o.arrSort });
+          if (A.buf !== f.buf) g = { ...f, buf: A.buf };
+        } catch (e) {
+          A = { err: 1, moves: [], notes: [], relabeled: [], sorted: [], ana: 0 };
+        } /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม */
+      try {
+        r = await fillWb(g, on, metro, fo);
+      } catch (e) {
+        r = null;
+      }
+      if (
+        r &&
+        g !== f &&
+        A.moves.length &&
+        ![...new Set(A.moves.map(m => m.to))].every(sn =>
+          r.rep.some(x => x[0] === sn && x[1] === 'รูปแบบ' && !/^ตรวจ/.test(x[2])),
+        )
+      )
+        r = null; /* ชีตที่รับจอต้องจัดแถวได้ตอนเติม ไม่อย่างนั้นไม่ย้าย */
+      if (!r && g !== f) {
+        A = { err: 1, moves: [], notes: [], relabeled: [], sorted: [], ana: 0 };
+        try {
+          r = await fillWb(f, on, metro, fo);
+        } catch (e) {
+          r = null;
+        }
+      } /* จัดจอแล้วเติมไม่ได้ → เติมไฟล์เดิมแบบไม่ย้ายจอ */
+      if (!r)
+        r = {
+          rep: [
+            [
+              'ทั้งไฟล์',
+              'เติมไฟล์นี้ไม่ได้',
+              'ตรวจ: เติมไฟล์นี้ไม่ได้ ไฟล์เสีย หรือไม่ใช่ใบเช็ครูป (.xlsm / .xlsx)',
+              0,
+            ],
+          ],
+          blob: null,
+        };
+      if (r.blob) r.arr = A;
+    }
+    if (r.blob && out) out.file(f.name, r.blob, { createFolders: false });
+    res.push({ name: f.name, rep: r.rep, blob: r.blob, fold: r.fold || [], arr: r.arr || null });
+    L.push(
+      '',
+      f.name,
+      ...arrTxt(r.arr),
+      ...r.rep.map(x => `  ${x[0]} | ${x[1]} | ${x[2]}${x[3] ? ' (' + x[3] + ')' : ''}`),
+      `  ⏱ ใช้เวลา ${((performance.now() - T1) / 1000).toFixed(1)} วินาที`,
+    );
+  }
+  return res;
+}
+/* 4.3: เติมหลายวันต่อกัน — วันแรกใช้ใบเช็คที่ใส่ไว้ วันถัดไปใช้ใบเช็คที่ได้จากวันก่อน (เหมือนกด “ใช้ผลนี้เติมวันถัดไป” ทุกวัน) */
+const arrMerge = A => {
+  if (!A.length) return null;
+  const u = k => {
+    const S = new Set(),
+      o = [];
+    for (const a of A)
+      for (const x of a[k] || []) {
+        const j = JSON.stringify(x);
+        if (!S.has(j)) {
+          S.add(j);
+          o.push(x);
+        }
+      }
+    return o;
+  };
+  return {
+    err: A.some(a => a.err),
+    moves: A.flatMap(a => a.moves || []),
+    notes: u('notes'),
+    relabeled: u('relabeled'),
+    sorted: u('sorted'),
+    ana: A.reduce((t, a) => t + (a.ana || 0), 0),
+  };
+};
+async function fillDays(G, list) {
+  const T0 = performance.now(),
+    out = new JSZip(),
+    keep = DB,
+    nD = G.length,
+    D = [],
+    fin = new Map(),
+    old = new Map(list.map(f => [f.name, f]));
+  let cur = list;
+  const L = [
+    'รายงานการเติมใบเช็ครูป',
+    `เติมต่อกัน ${nD} วัน: ${G.map(g => thd(new Date(g.d))).join(', ')} — ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไป`,
+  ];
+  try {
+    for (let k = 0; k < nD; k++) {
+      const g = G[k],
+        W = new Date(g.d),
+        o = { ...OP, W },
+        T1 = performance.now(),
+        own = new Set(g.E.map(e => e.f));
+      DB = g.db;
+      PLD = W;
+      L.push(
+        '',
+        `===== วันที่ ${thd(W)} (${THW[W.getUTCDay()]}) • วันที่ ${k + 1} จาก ${nD} =====`,
+        ...plRepOf(PLI.filter(x => own.has(x.f))),
+        ...frzRep(),
+      );
+      const R = await fillRun(cur, o, L, null, `กำลังเติมวันที่ ${thdS(W)} (${k + 1}/${nD})`),
+        sec = +((performance.now() - T1) / 1000).toFixed(1);
+      L.push(...fillSum(R, cur.length, sec).map((x, i) => (i === 1 ? `สรุปวันที่ ${thd(W)}` : x)));
+      D.push({ d: g.d, R, sec });
+      for (const r of R) {
+        const p = fin.get(r.name);
+        if (r.blob) fin.set(r.name, { ...r, k });
+        else if (p && p.blob) fin.set(r.name, { ...p, fail: k });
+        else fin.set(r.name, { ...r, k });
+      }
+      cur = R.filter(r => r.blob).map(r => {
+        const x = {
+          ...(old.get(r.name) || {}),
+          name: r.name,
+          buf: r.blob.buffer.slice(r.blob.byteOffset, r.blob.byteOffset + r.blob.byteLength),
+        };
+        delete x.nd;
+        return x;
+      });
+      if (!cur.length) break;
+    }
+  } finally {
+    DB = keep;
+    PLD = plDate();
+  }
+  const key = y => y[0] + '|' + y[1] + '|' + y[2];
+  const res = list
+    .map(f => {
+      const x = fin.get(f.name);
+      if (!x) return null;
+      const seen = new Set(x.rep.map(key)),
+        rep = [...x.rep],
+        A = [];
+      for (let k = x.k - 1; k >= 0; k--) {
+        const r = D[k].R.find(y => y.name === f.name);
+        if (!r) continue;
+        if (r.arr) A.unshift(r.arr);
+        const t = thdS(new Date(D[k].d));
+        for (const y of r.rep) {
+          if (!isWarn(y) || isFilled(y) || seen.has(key(y))) continue;
+          seen.add(key(y));
+          rep.push([`${y[0]} (${t})`, y[1], y[2], y[3]]);
+        }
+      } /* วันก่อน ๆ: เฉพาะเรื่องที่ควรตรวจซึ่งวันหลังไม่มี */
+      if (x.fail != null)
+        rep.push([
+          'ทั้งไฟล์',
+          'ไม่ได้เติม',
+          `ตรวจ: เติมได้ถึงวันที่ ${thd(new Date(D[x.k].d))} เท่านั้น วันที่ ${thd(new Date(D[x.fail].d))} เติมไม่ได้ ไฟล์นี้ยังไม่มีวันนั้นเป็นต้นไป`,
+          0,
+        ]);
+      if (x.blob && x.arr) A.push(x.arr);
+      return {
+        name: f.name,
+        rep,
+        blob: x.blob,
+        fold: x.fold || [],
+        arr: x.blob ? arrMerge(A) : null,
+        thru: D[x.k].d,
+      };
+    })
+    .filter(Boolean);
+  for (const r of res) if (r.blob) out.file(r.name, r.blob, { createFolders: false });
+  const SEC = +((performance.now() - T0) / 1000).toFixed(1),
+    A = res.flatMap(r => r.rep),
+    dd = D.map(x => {
+      const B = x.R.flatMap(r => r.rep);
+      return {
+        d: x.d,
+        sec: x.sec,
+        f: x.R.filter(r => r.blob).length,
+        n: B.filter(isFilled).length,
+        w: B.filter(isWarn).length,
+      };
+    });
+  L.push(
+    '',
+    `สรุปรวม ${D.length} วัน (${rngTxt(D)})`,
+    `  เติมแล้ว ${res.filter(r => r.blob).length} จาก ${list.length} ไฟล์ • ควรตรวจ ${A.filter(isWarn).length} รายการ (เรื่องเดียวกันหลายวันนับครั้งเดียว)`,
+    ...dd.map(
+      x =>
+        `  ${thd(new Date(x.d))}: ${x.f} ไฟล์ • ${x.n.toLocaleString()} จอ • ควรตรวจ ${x.w} • ${x.sec} วินาที`,
+    ),
+    `  ⏱ ใช้เวลารวม ${SEC} วินาที`,
+  );
+  out.file('รายงาน.txt', L.join('\n'));
+  last = {
+    res,
+    zip: await out.generateAsync({ type: 'blob' }),
+    saved: false,
+    W: D[D.length - 1].d,
+    W0: D[0].d,
+    days: dd,
+    txt: L.join('\n'),
+    sec: SEC,
+  };
+  {
+    const _w = A.filter(isWarn).length,
+      _f = res.filter(r => r.blob).length;
+    MQN = _w ? 'warn' : 'done';
+    note = `เติมเสร็จแล้ว ${_f} ไฟล์ ${D.length} วัน` + (_w ? ` • ควรตรวจ ${_w} รายการ` : '');
+  }
+  last.csig = sigOf(C);
+  tab = 'res';
+  cs = null;
+  RO.clear();
+  window.scrollTo(0, 0);
+  const fi = res.findIndex(r => r.rep.some(isWarn));
+  if (fi >= 0) RO.add(fi);
+}
 const ACT = {
   help: () => {
     HELP = !HELP;
@@ -8542,9 +8976,19 @@ const ACT = {
   back: () => {
     cs = null;
   },
+  plday: k => {
+    const d = +k;
+    if (BUSY || FILLING || !d) return;
+    const n = PFS.filter(e => e.d === d).length;
+    PFS = PFS.filter(e => e.d !== d);
+    plSync();
+    LIT = new Set();
+    note = `เอา Playlist วันที่ ${thd(new Date(d))} ออกแล้ว (${n} ไฟล์)`;
+  } /* 4.3 */,
   reset: () => {
     if (confirm('ล้าง Playlist ใบเช็ครูป และผลการเติมที่ใส่ไว้ทั้งหมด เพื่อเริ่มวันใหม่?')) {
       DB = [];
+      PFS = [];
       PLD = null;
       PLM = {};
       PLX = [];
@@ -9150,7 +9594,9 @@ const ACT = {
     }
     CKDIR = d;
     HDB.set('ck', d).catch(() => {});
-    const day = isoD(new Date(last.W));
+    const day = last.W0
+      ? isoD(new Date(last.W0)) + ' ถึง ' + isoD(new Date(last.W))
+      : isoD(new Date(last.W)); /* 4.3: หลายวัน = ก่อนเติมวันแรก */
     const bk = await (
       await d.getDirectoryHandle('สำรองก่อนเติม', { create: true })
     ).getDirectoryHandle(day, { create: true });
@@ -9190,6 +9636,10 @@ const ACT = {
     } catch (_) {}
     last.sv = { dir: d.name, ok, neu, bad, day };
     if (!bad.length) last.saved = true;
+    thruSet(
+      last.res.filter(r => !bad.includes(r.name)),
+      last.W,
+    );
     MQN = bad.length ? 'warn' : 'done';
     note = bad.length
       ? `บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`
@@ -9213,11 +9663,13 @@ const ACT = {
           ...o,
           name: r.name,
           buf: r.blob.buffer.slice(r.blob.byteOffset, r.blob.byteOffset + r.blob.byteLength),
+          thru: +(r.thru || last.W),
         };
         delete x.nd;
         return x;
       });
     DB = [];
+    PFS = [];
     PLD = null;
     PLM = {};
     PLX = [];
@@ -9239,11 +9691,13 @@ const ACT = {
     if (!last) return;
     saveBlob('ใบเช็ครูป_เติมแล้ว.zip', last.zip);
     last.saved = true;
+    thruSet(last.res, last.W);
   },
   dlf: k => {
     const r = last && last.res[+k];
     if (r && r.blob) {
       saveBlob(r.name, r.blob);
+      thruSet([r], last.W);
       (last.dl = last.dl || new Set()).add(+k);
       if (last.res.every((x, i) => !x.blob || last.dl.has(i))) last.saved = true;
     }
@@ -9297,12 +9751,13 @@ const ACT = {
       note = 'ยังไม่ได้ใส่ Playlist ของวันนี้ — ใส่ไฟล์ที่ขั้นที่ 1 ก่อน';
       return;
     }
-    if (BASEERR) {
+    const MD = plDays();
+    if (BASEERR && !MD) {
       note = 'แก้วันที่ทำงานให้ถูกต้องก่อน';
       return;
     }
     const o = { ...OP, W: workDate() };
-    if (o.hand && !o.W) {
+    if (!MD && o.hand && !o.W) {
       note = 'ไม่พบวันที่ Playlist — ใส่วันที่ทำงานเอง เช่น 2-Oct-26';
       return;
     }
@@ -9331,96 +9786,15 @@ const ACT = {
       return;
     FILLING = true;
     try {
-      const on = buildOn(o),
-        ms = DB.find(s => s.m === 'MetroLED'),
-        metro = ms ? listOf(ms, o) : [],
-        out = new JSZip(),
-        res = [],
+      if (MD) {
+        await fillDays(MD, list);
+        return;
+      } /* 4.3: Playlist หลายวัน → เติมต่อกันทีละวัน */
+      const out = new JSZip(),
         L = ['รายงานการเติมใบเช็ครูป', ...plRep(), ...frzRep()],
         T0 = performance.now();
-      let i = 0;
-      for (const f of list) {
-        i++;
-        await busyStep('กำลังเติมใบเช็ครูป', i, list.length, f.name);
-        let r;
-        const T1 = performance.now();
-        const rd = f.nd ? readyOf(f) : null;
-        if (rd && (rd.bad || rd.empty))
-          r = {
-            rep: [
-              [
-                'ทั้งไฟล์',
-                'ไม่ได้เติม',
-                'ตรวจ: ' + (rd.bad || 'ไม่พบชีตของใบเช็ครูปในไฟล์นี้') + ' จึงไม่ได้เติม',
-                0,
-              ],
-            ],
-            blob: null,
-          };
-        else {
-          const fo = {
-            ...o,
-            col1: effCol(1, f),
-            col2: effCol(2, f),
-            k16: !!fcol(f.name).k16,
-            padc: effPad(f),
-            padh: padHist(),
-          };
-          let A = null,
-            g = f;
-          if (arrOn(o))
-            try {
-              A = await arrangeWb(f.buf, on, { mk: o.arrMk, sort: o.arrSort });
-              if (A.buf !== f.buf) g = { ...f, buf: A.buf };
-            } catch (e) {
-              A = { err: 1, moves: [], notes: [], relabeled: [], sorted: [], ana: 0 };
-            } /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม */
-          try {
-            r = await fillWb(g, on, metro, fo);
-          } catch (e) {
-            r = null;
-          }
-          if (
-            r &&
-            g !== f &&
-            A.moves.length &&
-            ![...new Set(A.moves.map(m => m.to))].every(sn =>
-              r.rep.some(x => x[0] === sn && x[1] === 'รูปแบบ' && !/^ตรวจ/.test(x[2])),
-            )
-          )
-            r = null; /* ชีตที่รับจอต้องจัดแถวได้ตอนเติม ไม่อย่างนั้นไม่ย้าย */
-          if (!r && g !== f) {
-            A = { err: 1, moves: [], notes: [], relabeled: [], sorted: [], ana: 0 };
-            try {
-              r = await fillWb(f, on, metro, fo);
-            } catch (e) {
-              r = null;
-            }
-          } /* จัดจอแล้วเติมไม่ได้ → เติมไฟล์เดิมแบบไม่ย้ายจอ */
-          if (!r)
-            r = {
-              rep: [
-                [
-                  'ทั้งไฟล์',
-                  'เติมไฟล์นี้ไม่ได้',
-                  'ตรวจ: เติมไฟล์นี้ไม่ได้ ไฟล์เสีย หรือไม่ใช่ใบเช็ครูป (.xlsm / .xlsx)',
-                  0,
-                ],
-              ],
-              blob: null,
-            };
-          if (r.blob) r.arr = A;
-        }
-        if (r.blob) out.file(f.name, r.blob, { createFolders: false });
-        res.push({ name: f.name, rep: r.rep, blob: r.blob, fold: r.fold || [], arr: r.arr || null });
-        L.push(
-          '',
-          f.name,
-          ...arrTxt(r.arr),
-          ...r.rep.map(x => `  ${x[0]} | ${x[1]} | ${x[2]}${x[3] ? ' (' + x[3] + ')' : ''}`),
-          `  ⏱ ใช้เวลา ${((performance.now() - T1) / 1000).toFixed(1)} วินาที`,
-        );
-      }
+      const res = await fillRun(list, o, L, out, 'กำลังเติมใบเช็ครูป');
+
       const SEC = +((performance.now() - T0) / 1000).toFixed(1);
       L.push(...fillSum(res, list.length, SEC)); /* 4.2.1: สรุปตัวเลขท้ายรายงาน */
       out.file('รายงาน.txt', L.join('\n'));
