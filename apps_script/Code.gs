@@ -57,9 +57,16 @@ const PROP_FOLDER = 'parentFolderId';
 /** ตั้งค่าครั้งแรก: สร้างโฟลเดอร์หลัก (ถ้ายังไม่มี) ตั้งให้ทำงานทุกชั่วโมง แล้วดึงครั้งแรก */
 function setup() {
   const parent = parentFolder_(true);
-  for (const t of ScriptApp.getProjectTriggers()) if (t.getHandlerFunction() === 'collectPlaylists') ScriptApp.deleteTrigger(t);
-  ScriptApp.newTrigger('collectPlaylists').timeBased().everyHours(1).inTimezone(TZ).create();
-  Logger.log('ตั้งค่าเสร็จแล้ว — ทำงานทุกชั่วโมง ' + CONFIG.startHour + ':00–' + CONFIG.endHour + ':59 เวลาไทย');
+  try {
+    for (const t of ScriptApp.getProjectTriggers()) if (t.getHandlerFunction() === 'collectPlaylists') ScriptApp.deleteTrigger(t);
+    ScriptApp.newTrigger('collectPlaylists').timeBased().everyHours(1).inTimezone(TZ).create();
+    Logger.log('ตั้งค่าเสร็จแล้ว — ทำงานทุกชั่วโมง ' + CONFIG.startHour + ':00–' + CONFIG.endHour + ':59 เวลาไทย');
+  } catch (e) {
+    /* ตอนกดอนุญาต ไม่ได้ติ๊กสิทธิ์ "เรียกใช้เมื่อคุณไม่ได้อยู่" (script.scriptapp) หรือบริษัทไม่อนุญาตสิทธิ์นี้ */
+    Logger.log('ยังตั้งให้ทำงานอัตโนมัติไม่ได้: ไม่มีสิทธิ์ "เรียกใช้เมื่อคุณไม่ได้อยู่"');
+    Logger.log('วิธีแก้: กด Run setup อีกครั้ง ตอน Google ถามสิทธิ์ ให้ติ๊ก "เลือกทั้งหมด" (ทุกช่อง) แล้วกดดำเนินการต่อ');
+    Logger.log('ระหว่างนี้ดึงเองได้ด้วย collectNow — ถ้าติ๊กครบแล้วยังขึ้นเรื่องนี้ แปลว่าบริษัทไม่อนุญาตสิทธิ์นี้ ต้องขอฝ่าย IT');
+  }
   Logger.log('โฟลเดอร์หลัก: ' + parent.getUrl());
   const r = run_(true);
   Logger.log(r.text);
