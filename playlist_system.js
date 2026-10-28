@@ -83,6 +83,7 @@
  *   เวอร์ชัน 4.3: เติมหลายวันในครั้งเดียว — Playlist แยกตามวัน เติมต่อกันทีละวัน เตือนวันที่ขาด (PFS, plDays, plSync, fillRun, fillDays, vDays, thruSet)
  *   เวอร์ชัน 4.4: ใบเช็คจอในห้าง / อาคาร — Playlist ใหม่ 11 สื่อ จับคู่ชีตกับกลุ่มจอ (VEN, parseVen, venK, VMAP, venScreen) • ออก วันที่เต็ม • BKJ สูตรแถว 10 แบบอื่น • NTW อ่านได้
  *   เวอร์ชัน 4.4.1: ใบเช็ค Central Network ชีตละห้าง (CNM, venScreen M1 / M4 / VDO Wall) • ไฟล์วันเดียวกันของจอชุดเดียวกัน ใช้ฉบับที่ชื่อมีข้อความต่อท้าย (addFiles) • ชีต ### ไม่ขึ้นควรตรวจ
+ *   เวอร์ชัน 4.4.2: Siam Paragon in mall ตามตารางรหัสจอ — GlassLift_Jewel = Glass_Lift_GM, M3M5 คอลัมน์ M5 = 55x5 (VMAP, venScreen)
  * ======================================================================
  */
 
@@ -5002,6 +5003,7 @@ const venK = (t, b) =>
 const VMAP = {
   'Siam Paragon In Mall': {
     m: [
+      [/GLASSLIFTJEWEL/, ['Glass_Lift_GM', 'Glass Lift']],
       [/GLASSLIFT/, 'Glass Lift'],
       [/POSTER|PTS/, 'Poster LED'],
       [/DIRECTORY|SPD/, 'Directory70_30'],
@@ -5096,16 +5098,21 @@ function venScreen(ws, sn, cn, k) {
         if (s && !P.includes(s)) P.push(s);
       }
   }
+  if (k === 'Siam Paragon In Mall' && /M3M5|LIFTLOBBY/.test(head) && cols.length > 1)
+    for (const c of cols) {
+      const s = (/M5/.test(T(c)) && by('55x5')) || by('Lift,33x3');
+      if (s && !P.includes(s)) P.push(s);
+    } /* 4.4.2: ชีต M3M5 — คอลัมน์ M5 = กลุ่มจอ 55x5 ที่เหลือ = Lift,33x3 */
   if (R && !P.length)
     for (const c of R.col ? cols : [cn]) {
       const t = R.col ? T(c) + head : head;
       for (const [re, nm] of R.m)
         if (re.test(t)) {
-          const s = by(nm);
+          const s = [].concat(nm).map(by).find(Boolean);
           if (s && !P.includes(s)) P.push(s);
           break;
         }
-    }
+    } /* 4.4.2: ชื่อกลุ่มจอสำรอง (ไม่มีกลุ่มแรกใช้กลุ่มถัดไป) */
   if (!P.length) return L.length === 1 ? L[0] : null;
   if (P.length === 1) return P[0];
   const seen = new Set(),
@@ -6116,7 +6123,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.4.1 (28 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.4.2 (28 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
