@@ -89,6 +89,7 @@
  *   เวอร์ชัน 4.6: ผู้ช่วยตัวการ์ตูนหน้าตาใหม่ — รูป 11 ท่า (MQIMG ในสคริปต์แยกของหน้า HTML, MQP, mqPic)
  *   เวอร์ชัน 4.6.1: ผู้ช่วยตัวการ์ตูนชื่อใหม่ “น้องโฟกัส” (เดิมน้องเช็ค)
  *   เวอร์ชัน 4.6.2: น้องโฟกัสพูดลงท้าย “ครับ” (mqKrub ใน mqShow)
+ *   เวอร์ชัน 4.7: กันเติมย้อนหลัง (layoutChk back skip, fillWb BKH → ไฟล์เดิม, ขั้นที่ 3 เตือน BK) • Central Network ชีตละห้างไม่เขียน “ออก” (noExit) • ใบเปล่า: วันที่ในแถบมีรูปแบบวันที่ (numFmt 14)
  * ======================================================================
  */
 
@@ -667,6 +668,10 @@ function mkStyles(doc) {
         xf.setAttribute('borderId', addU(bs, bo));
         xf.setAttribute('applyBorder', '1');
       }
+      if (opt.numFmt != null) {
+        xf.setAttribute('numFmtId', String(opt.numFmt));
+        xf.setAttribute('applyNumberFormat', '1');
+      } /* 4.7 */
       if (opt.right) {
         let al = xf.getElementsByTagNameNS(NS, 'alignment')[0];
         if (!al) {
@@ -935,6 +940,34 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     }
     if (B.some(b => vOf(b.lc, r) || /^ออก(วันที่)?\s*\d/.test(vOf(b.nc, r)))) last = r;
   }
+  {
+    let th = null;
+    for (let i = 0; i < bars.length; i++) {
+      const [r0, d] = bars[i];
+      if (!d) continue;
+      const r1 = i + 1 < bars.length ? bars[i + 1][0] : last + 1;
+      let has = false;
+      for (let r = r0 + 1; r < r1 && !has; r++) if (B.some(b => vOf(b.lc, r))) has = true;
+      if (has && (!th || +d > +th)) th = d;
+    }
+    {
+      const Wd = bars.length && bars[0][1] ? bars[0][1] : new Date(dd);
+      for (let r = hr; r <= last; r++)
+        for (const b of B) {
+          const m = vOf(b.nc, r).match(/^ออก(?:วันที่)?\s*(\d{1,2})(?:\s*\/\s*(\d{1,2})\s*\/\s*(\d{2,4}))?/);
+          if (!m) continue;
+          const x = m[2]
+            ? new Date(Date.UTC(yy(m[3]), +m[2] - 1, +m[1]))
+            : new Date(Date.UTC(Wd.getUTCFullYear(), Wd.getUTCMonth(), +m[1]));
+          if (!isNaN(+x) && (!th || +x > +th)) th = x;
+        }
+    } /* “ออกวันที่” ที่ลงไว้แล้ว = เติมถึงวันนั้นแล้ว (ออก 19 แบบไม่มีเดือน = เดือนของแถบแรกในชีต) */
+    if (th && +th > dd)
+      return {
+        skip: `ชีตนี้เติมถึงวันที่ ${thd(th)} แล้ว แต่ Playlist ที่เติมเป็นวันที่ ${thd(new Date(dd))} (ย้อนหลัง) — ไม่ได้แก้ชีตนี้ เพื่อไม่ให้รายการที่ลงไว้แล้วเพี้ยน • ถ้าใส่ Playlist วันเก่าปนมา เอาวันนั้นออกในขั้นที่ 1 • ถ้าตั้งใจเติมวันนั้นใหม่ ใช้ใบเช็คก่อนเติมวันนั้น (โฟลเดอร์ สำรองก่อนเติม)`,
+        back: 1,
+      };
+  } /* 4.7: กันเติมย้อนหลัง */
   const TRAIL =
     !bars.length ||
     bars[bars.length - 1][0] >=
@@ -1365,8 +1398,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     OSH.f = s + l ? f * 2 > s + l : (w.f || 0) * 2 > w.s + w.l + (w.f || 0);
   } /* ยังไม่มีหมายเหตุให้ดูแบบ (เช่นต้นเดือน): ใบ Air Traveller / THE 20 / Rama9 ทีมเขียน “ออกวันที่ 04” ใบ MRT / Gateway X / CCTV เขียน “ออก 4” */
   const note = (b, r, row) => {
-    if (noNotes || !r.ed || !isFinite(r.ed)) return;
-    const nd = +addD(new Date(r.ed), 1);
+    if (noNotes || !r.ed || !isFinite(r.ed) || (b.scr && b.scr.noExit)) return;
+    /* 4.7: ใบเช็คที่ทีมไม่เขียน “ออก” (Central Network ชีตละห้าง) */ const nd = +addD(new Date(r.ed), 1);
     if (nd > +P && nd <= H) {
       {
         const dn = new Date(nd).getUTCDate();
@@ -1525,7 +1558,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       if (i === 0 || BVAL) sh.setNum(b.nc, row, serial(d));
       else sh.setF(b.nc, row, B[i - 1].nc + row, serial(d));
       if (b.hs[0] != null) sh.setS(b.nc, row, hsx(b.hs[0], b.nc, r2));
-      if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1], b.lc, r2));
+      else sh.setS(b.nc, row, ST.derive(sh.getS(b.nc, row) || 0, 'd14', { numFmt: 14 }));
+      /* 4.7: ใบเปล่า */ if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1], b.lc, r2));
       sh.clear(b.pc, row);
       if (b.hs[2] != null) sh.setS(b.pc, row, hsx(b.hs[2], b.pc, r2));
     });
@@ -4523,12 +4557,15 @@ async function fillWb(f, on, metro, o) {
         )
       : null,
     W = o.hand ? o.W : null;
+  let BKH = 0; /* 4.7: ชีตที่เติมไปถึงวันหลังกว่า Playlist แล้ว */
   for (const sn in by) {
     const sh = new Sheet(await zip.file(path[sn]).async('string'));
     if (ST && W && by[sn].every(j => j[3])) {
       const L = layoutChk(sh, [...by[sn], ...(KEEP[sn] || [])], { ...o, osw: OSW }, ST, W, wb.Sheets[sn]);
-      if (L.skip) rep.push([sn, 'รูปแบบ', 'ตรวจ: ' + L.skip, 0]);
-      else {
+      if (L.skip) {
+        if (L.back) BKH++;
+        rep.push([sn, 'รูปแบบ', (L.back ? 'ตรวจ: ข้ามวันย้อนหลัง — ' : 'ตรวจ: ') + L.skip, 0]);
+      } else {
         for (const x of L.fold || [])
           FOLD.push({ sn, lc: x.lc, items: x.items, ...picId(wb.Sheets[sn], sn, x.lc) });
         if (L.dropped)
@@ -4701,6 +4738,20 @@ async function fillWb(f, on, metro, o) {
       new XMLSerializer().serializeToString(wx.documentElement),
     { createFolders: false },
   );
+  if (BKH)
+    return {
+      rep: [
+        ...rep.filter(x => /^ตรวจ: ข้ามวันย้อนหลัง/.test(x[2])),
+        [
+          'ทั้งไฟล์',
+          'รูปแบบ',
+          'ตรวจ: ไม่ได้แก้ไฟล์นี้ — มีชีตที่เติมไปถึงวันหลังกว่า Playlist ที่เติมแล้ว (ดูด้านบน) ไฟล์เดียวกันเติมวันเดียวกันทั้งไฟล์ ระบบจึงไม่แก้ชีตอื่นด้วย ไฟล์ที่ได้เหมือนไฟล์เดิมทุกอย่าง',
+          0,
+        ],
+      ],
+      fold: [],
+      blob: new Uint8Array(f.buf.slice(0)),
+    }; /* 4.7: ไม่แก้ทั้งไฟล์ */
   return { rep, fold: FOLD, blob: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }) };
 }
 
@@ -5102,6 +5153,7 @@ function venScreen(ws, sn, cn, k) {
     R = VMAP[k],
     by = nm => L.find(s => nrm(s.c) === nrm(nm)),
     P = [];
+  let cnx = false;
   if (k === 'Central Network') {
     const ml = CNM.find(x => x[0].test(head));
     if (ml)
@@ -5111,6 +5163,7 @@ function venScreen(ws, sn, cn, k) {
           s = ty && by(ty + '-' + ml[1]);
         if (s && !P.includes(s)) P.push(s);
       }
+    cnx = P.length > 0;
   }
   if (k === 'Siam Paragon In Mall' && /M3M5|LIFTLOBBY/.test(head) && cols.length > 1)
     for (const c of cols) {
@@ -5128,7 +5181,7 @@ function venScreen(ws, sn, cn, k) {
         }
     } /* 4.4.2: ชื่อกลุ่มจอสำรอง (ไม่มีกลุ่มแรกใช้กลุ่มถัดไป) */
   if (!P.length) return L.length === 1 ? L[0] : null;
-  if (P.length === 1) return P[0];
+  if (P.length === 1) return cnx ? { ...P[0], noExit: 1 } : P[0];
   const seen = new Set(),
     rows = [];
   for (const s of P)
@@ -5145,6 +5198,7 @@ function venScreen(ws, sn, cn, k) {
     ed: 0,
     pd: Math.max(0, ...P.map(s => s.pd || 0)),
     rows: stable(rows),
+    ...(cnx ? { noExit: 1 } : {}),
   };
 }
 function parseSig(wb, media, map, opt) {
@@ -6160,7 +6214,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.6.2 (28 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.7 (28 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -7178,12 +7232,28 @@ function vFl() {
   {
     const t0 = MD ? MD[0].d : wd && !BASEERR ? +wd : 0,
       T = thruAll(),
-      G = [];
+      G = [],
+      BK = [];
     if (t0 && DB.length)
       for (const f of C) {
         const t = +(f.thru || T[f.name] || 0);
         if (t && t0 - t > 1.5 * 864e5 && t0 - t < 40 * 864e5) G.push([f.name, t]);
-      } /* 4.3: ข้ามวัน */
+        if (t && t - t0 > 0.5 * 864e5 && t - t0 < 40 * 864e5) BK.push([f.name, t]);
+      } /* 4.3: ข้ามวัน • 4.7: ย้อนหลัง */
+    if (BK.length) {
+      const M = new Map();
+      for (const [n, t] of BK) {
+        if (!M.has(t)) M.set(t, []);
+        M.get(t).push(n);
+      }
+      lines.push(
+        alertHTML(
+          'wr',
+          `Playlist อาจเป็นวันที่เติมไปแล้ว (ใบเช็ค ${BK.length} ไฟล์)`,
+          `<ul>${[...M].map(([t, N]) => `<li><b>${esc(N.join(', '))}</b> บันทึกครั้งล่าสุดเติมถึงวันที่ ${thd(new Date(t))}</li>`).join('')}</ul><p>Playlist ที่ใส่${MD ? 'เริ่ม' : 'เป็น'}วันที่ ${thd(new Date(t0))} ซึ่งก่อนวันนั้น ตรวจว่าไม่ได้ใส่ Playlist วันเก่าปนมา (เอาวันที่ไม่ใช้ออกได้ที่กล่องวันในขั้นที่ 1) • ตอนเติม ชีตที่เติมไปถึงวันหลังกว่า Playlist แล้วจะถูกข้าม ไม่แก้ให้ • ถ้าตั้งใจเติมวันเก่าใหม่จากใบเช็คก่อนเติม ข้ามข้อความนี้ได้</p>`,
+        ),
+      );
+    }
     if (G.length) {
       const miss = t => {
           const a = new Date(t + 864e5),
@@ -7282,12 +7352,14 @@ const fillSum = (res, n, sec) => {
     c = re => A.filter(x => re.test(x[2])),
     nl = L => L.reduce((t, x) => t + (x[2].split(' → ')[1] || '').split(', ').filter(Boolean).length, 0),
     g = c(/^ตรวจ: กันตกหล่น/),
-    m = c(/^ข้อมูล: ขึ้นซ้ำ/);
+    m = c(/^ข้อมูล: ขึ้นซ้ำ/),
+    bk = c(/^ตรวจ: ข้ามวันย้อนหลัง/);
   return [
     '',
     'สรุป',
     `  เติมแล้ว ${res.filter(r => r.blob).length} จาก ${n} ไฟล์ • ${A.filter(isFilled).length.toLocaleString()} จอ • ควรตรวจ ${A.filter(isWarn).length} รายการ`,
     `  กันตกหล่น ${g.length} จอ (${nl(g)} เรื่อง) • ขึ้นซ้ำ / ต่อสัญญา ใช้แถวเดิม ${m.length} จอ (${nl(m)} เรื่อง)`,
+    ...(bk.length ? [`  ⚠ ข้ามชีตที่เติมไปแล้ว ${bk.length} ชีต (Playlist ย้อนหลัง)`] : []),
     `  ⏱ ใช้เวลารวม ${sec} วินาที`,
   ];
 }; /* 4.2.1: บรรทัดบอกข้อมูล (เช่น ขึ้นซ้ำ ใช้แถวเดิม) ไม่ใช่ควรตรวจ */
@@ -9311,7 +9383,13 @@ async function fillDays(G, list) {
     const _w = A.filter(isWarn).length,
       _f = res.filter(r => r.blob).length;
     MQN = _w ? 'warn' : 'party';
-    note = `เติมเสร็จแล้ว ${_f} ไฟล์ ${D.length} วัน` + (_w ? ` • ควรตรวจ ${_w} รายการ` : '');
+    {
+      const _b = A.filter(x => /^ตรวจ: ข้ามวันย้อนหลัง/.test(x[2])).length;
+      note =
+        `เติมเสร็จแล้ว ${_f} ไฟล์ ${D.length} วัน` +
+        (_w ? ` • ควรตรวจ ${_w} รายการ` : '') +
+        (_b ? ` • ข้ามชีตที่เติมไปแล้ว ${_b} ชีต` : '');
+    }
   }
   last.csig = sigOf(C);
   tab = 'res';
@@ -10276,7 +10354,16 @@ const ACT = {
         const _w = res.reduce((t, r) => t + r.rep.filter(isWarn).length, 0),
           _f = res.filter(r => r.blob).length;
         MQN = _w ? 'warn' : 'party';
-        note = `เติมเสร็จแล้ว ${_f} ไฟล์` + (_w ? ` • ควรตรวจ ${_w} รายการ` : '');
+        {
+          const _b = res.reduce(
+            (t, r) => t + r.rep.filter(x => /^ตรวจ: ข้ามวันย้อนหลัง/.test(x[2])).length,
+            0,
+          );
+          note =
+            `เติมเสร็จแล้ว ${_f} ไฟล์` +
+            (_w ? ` • ควรตรวจ ${_w} รายการ` : '') +
+            (_b ? ` • ข้ามชีตที่เติมไปแล้ว ${_b} ชีต` : '');
+        }
       }
       last.csig = sigOf(C);
       tab = 'res';
