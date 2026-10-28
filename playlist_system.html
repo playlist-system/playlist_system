@@ -2462,7 +2462,7 @@ function parseVen(f,wb,V,I){let L=isSectWb(wb)?parseSect(XLSX.read(f.buf,{type:'
 /* ใบเช็คจอในห้าง: ชีตแบบแถว 10 (ผลวิเคราะห์) จอที่อยู่ติดกันใช้รายชื่อหนังร่วมกัน • หาว่าเป็นสื่อไหนจากชื่อชีต/หัวชีต แล้วจับคู่กลุ่มจอใน Playlist */
 const venK=(t,b)=>/PARAGON90|PARCPARAGON/.test(t)?'Parc Paragon / Interchange':/FACADE|FAADE/.test(t)?'Siam Paragon Facade':/NEXTOPIA/.test(t)?'Nextopia':/MOTIONBLOCK|PARAGONMAX|LUXURYPARKING/.test(t)?'Paragon Max':/SIAMPARAGONINMALL/.test(t)?'Siam Paragon In Mall':/PANORAMIX/.test(t)||/CENTRALWORLDCONNECT/.test(b)?'The Panoramix':/CENTRALWORLD360|CTW360|CENTRALNETWORK/.test(t)?'Central Network':/LIDO/.test(t)?'LIDO Connect':/EMWONDER|EMS5M/.test(t+b)?'EMS 5M':/UOBLIVE/.test(t)?'UOB Live':/THEDISTRICTEM|DISTRICTEMINMALL/.test(t)?'The District EM':/^CENTRAL/.test(b)&&/M[14]/.test(b)&&CNM.some(x=>x[0].test(b))?'Central Network':''; /* 4.4.1: ชีตห้าง Central ที่หัวชีตเลื่อนไปคอลัมน์ E (เช่น Chonburi) */
 const VMAP={
- 'Siam Paragon In Mall':{m:[[/GLASSLIFT/,'Glass Lift'],[/POSTER|PTS/,'Poster LED'],[/DIRECTORY|SPD/,'Directory70_30'],[/FASHION/,'Fashion Hall'],[/CURVEJEWEL/,'Jewel'],[/STARDOME/,'Stardome'],[/BULKHEAD/,'Bulkhead'],[/LIFTLOBBY|M3M5/,'Lift,33x3'],[/TOILET|ห้องน้ำ/,'M1_restroom'],[/LINK/,'M Link']]},
+ 'Siam Paragon In Mall':{m:[[/GLASSLIFTJEWEL/,['Glass_Lift_GM','Glass Lift']],[/GLASSLIFT/,'Glass Lift'],[/POSTER|PTS/,'Poster LED'],[/DIRECTORY|SPD/,'Directory70_30'],[/FASHION/,'Fashion Hall'],[/CURVEJEWEL/,'Jewel'],[/STARDOME/,'Stardome'],[/BULKHEAD/,'Bulkhead'],[/LIFTLOBBY|M3M5/,'Lift,33x3'],[/TOILET|ห้องน้ำ/,'M1_restroom'],[/LINK/,'M Link']]},
  'Paragon Max':{col:1,m:[[/PYLON/,'Pylon @ Parking Entrance'],[/PARKINGENTRANCE/,'Paragon Parking Entrance'],[/ENTRANCEBANNER/,'Paragon Entrance Banner'],[/SKYWALK/,'Siam Kempinski sky walk'],[/KEMPINSKI/,'Siam Kempinski Entrance Wall'],[/ENTRANCEWALL/,'Paragon Entrance Wall'],[/POLES|WALKWAY/,'Walkway'],[/SIAMCENTER/,'G Siam Center'],[/LUXURY/,'Parking Luxury']]},
  'The Panoramix':{m:[[/ZEN/,'Zen'],[/./,'Panoramix & Pylon']]},
  'Central Network':{col:1,m:[[/W98/,'W98'],[/./,'CTW360']]},
@@ -2475,7 +2475,8 @@ function venScreen(ws,sn,cn,k){const L=DB.filter(s=>s.m===k);if(!L.length)return
  const av=avCols(ws),cols=[];for(let c=cn;av.includes(c);c++)cols.push(c);
  const g=a=>cl((ws[a]||{}).v),T=c=>nrm([11,12,13,14].map(r=>g(n2col(c)+r)).join(' ')),head=nrm(sn)+T(cn-1),R=VMAP[k],by=nm=>L.find(s=>nrm(s.c)===nrm(nm)),P=[];
  if(k==='Central Network'){const ml=CNM.find(x=>x[0].test(head));if(ml)for(const c of cols){const t=T(c),ty=/3X1|VDOWALL/.test(t)?'M4(3x1)':/M4/.test(t)?'M4':/M1/.test(t)?'M1':'',s=ty&&by(ty+'-'+ml[1]);if(s&&!P.includes(s))P.push(s)}}
- if(R&&!P.length)for(const c of R.col?cols:[cn]){const t=R.col?T(c)+head:head;for(const[re,nm]of R.m)if(re.test(t)){const s=by(nm);if(s&&!P.includes(s))P.push(s);break}}
+ if(k==='Siam Paragon In Mall'&&/M3M5|LIFTLOBBY/.test(head)&&cols.length>1)for(const c of cols){const s=/M5/.test(T(c))&&by('55x5')||by('Lift,33x3');if(s&&!P.includes(s))P.push(s)} /* 4.4.2: ชีต M3M5 — คอลัมน์ M5 = กลุ่มจอ 55x5 ที่เหลือ = Lift,33x3 */
+ if(R&&!P.length)for(const c of R.col?cols:[cn]){const t=R.col?T(c)+head:head;for(const[re,nm]of R.m)if(re.test(t)){const s=[].concat(nm).map(by).find(Boolean);if(s&&!P.includes(s))P.push(s);break}} /* 4.4.2: ชื่อกลุ่มจอสำรอง (ไม่มีกลุ่มแรกใช้กลุ่มถัดไป) */
  if(!P.length)return L.length===1?L[0]:null;if(P.length===1)return P[0];
  const seen=new Set(),rows=[];for(const s of P)for(const r of s.rows)if(!seen.has(r.ad)){seen.add(r.ad);rows.push(r)} /* คอลัมน์ของหลายกลุ่มจอใช้รายชื่อร่วมกัน → รวมรายชื่อของทุกกลุ่ม */
  return{m:k,c:P.map(s=>s.c).join(' + '),n:P.map(s=>s.n).join(' + '),f:'',ed:0,pd:Math.max(0,...P.map(s=>s.pd||0)),rows:stable(rows)}}
@@ -2666,7 +2667,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  MQN=skip.length||emp.length?'warn':'done';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.4.1 (28 ต.ค. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.4.2 (28 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',

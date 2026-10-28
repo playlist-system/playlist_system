@@ -1,6 +1,6 @@
 ﻿======================================================================
           คู่มือการใช้งาน  PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูปอัตโนมัติ)
-          เวอร์ชัน 4.4.1  •  ปรับปรุงล่าสุด 28 ต.ค. 2569
+          เวอร์ชัน 4.4.2  •  ปรับปรุงล่าสุด 28 ต.ค. 2569
 ======================================================================
 
 เปิดระบบ:  https://playlist-system.github.io/playlist_system/
@@ -606,7 +606,9 @@
        ParagonMax / Luxury Parking = กลุ่มจอของแต่ละคอลัมน์,
        CTW 360 = CTW360 + W98, EMP_EMQ = Emporium / Emquartier,
        Emsphere = Emsphere / Pylon PlanB, PI9 = Parc Paragon,
-       INTERCHANGE = Interchange21, Zen = Zen
+       INTERCHANGE = Interchange21, Zen = Zen,
+       GlassLift_Jewel = Glass_Lift_GM, GlassLift_Stardome = Glass Lift,
+       M3M5 = Lift,33x3 (คอลัมน์ M5 = 55x5) (ตั้งแต่ 4.4.2 ตามตารางรหัสจอ)
      - ชื่อหนังตัดคำหน้า-ท้ายที่ Playlist ใส่แต่ใบเช็คไม่ใส่
        (PRGFC_, EMS_5M_, UOB_LIVE_, NEX_, _LIDO, คำหน้าของกลุ่มจอ Paragon Max)
      - หนัง Content ของห้าง (เลขที่ PB = Content): Facade, Nextopia,
