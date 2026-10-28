@@ -82,6 +82,7 @@
  *   เวอร์ชัน 4.2.1: บอกรายชื่อกันตกหล่น / ขึ้นซ้ำ สรุปตัวเลขและเวลา (fillSum, isInfo, picMadeTxt)
  *   เวอร์ชัน 4.3: เติมหลายวันในครั้งเดียว — Playlist แยกตามวัน เติมต่อกันทีละวัน เตือนวันที่ขาด (PFS, plDays, plSync, fillRun, fillDays, vDays, thruSet)
  *   เวอร์ชัน 4.4: ใบเช็คจอในห้าง / อาคาร — Playlist ใหม่ 11 สื่อ จับคู่ชีตกับกลุ่มจอ (VEN, parseVen, venK, VMAP, venScreen) • ออก วันที่เต็ม • BKJ สูตรแถว 10 แบบอื่น • NTW อ่านได้
+ *   เวอร์ชัน 4.4.1: ใบเช็ค Central Network ชีตละห้าง (CNM, venScreen M1 / M4 / VDO Wall) • ไฟล์วันเดียวกันของจอชุดเดียวกัน ใช้ฉบับที่ชื่อมีข้อความต่อท้าย (addFiles) • ชีต ### ไม่ขึ้นควรตรวจ
  * ======================================================================
  */
 
@@ -4421,7 +4422,13 @@ async function fillWb(f, on, metro, o) {
           rep.push([sn, key + ' (คอลัมน์ ' + lc + ')', 'เติมแล้ว', ads.length]);
         }
       }
-    } else if (!blocks.length && !media && !/^(ANALYSIS|X+)$/.test(sn.toUpperCase().replace(/[^A-Z]/g, ''))) {
+    } else if (
+      !blocks.length &&
+      !media &&
+      !/^(ANALYSIS|X+)$/.test(sn.toUpperCase().replace(/[^A-Z]/g, '')) &&
+      !/^[^\p{L}\p{N}]*$/u.test(sn)
+    ) {
+      /* 4.4.1: ชีต ### */
       const av = avCols(ws);
       av.sort((x, y) => x - y);
       if (!av.length) rep.push([sn, '-', 'ข้าม (ไม่พบรหัสจอ และไม่พบคอลัมน์ผลวิเคราะห์ในแถว 9)', 0]);
@@ -4979,7 +4986,7 @@ const venK = (t, b) =>
             ? 'Siam Paragon In Mall'
             : /PANORAMIX/.test(t) || /CENTRALWORLDCONNECT/.test(b)
               ? 'The Panoramix'
-              : /CENTRALWORLD360|CTW360/.test(t)
+              : /CENTRALWORLD360|CTW360|CENTRALNETWORK/.test(t)
                 ? 'Central Network'
                 : /LIDO/.test(t)
                   ? 'LIDO Connect'
@@ -4989,7 +4996,9 @@ const venK = (t, b) =>
                       ? 'UOB Live'
                       : /THEDISTRICTEM|DISTRICTEMINMALL/.test(t)
                         ? 'The District EM'
-                        : '';
+                        : /^CENTRAL/.test(b) && /M[14]/.test(b) && CNM.some(x => x[0].test(b))
+                          ? 'Central Network'
+                          : ''; /* 4.4.1: ชีตห้าง Central ที่หัวชีตเลื่อนไปคอลัมน์ E (เช่น Chonburi) */
 const VMAP = {
   'Siam Paragon In Mall': {
     m: [
@@ -5048,6 +5057,23 @@ const VMAP = {
   },
 };
 const VKS = new Set(VEN.filter(v => !v.ntw).map(v => v.k));
+/* 4.4.1: ใบเช็ค Central Network ชีตละห้าง — ชื่อชีต / ชื่อห้าง → ชื่อห้างใน Playlist (M1-Rama3, M4-Nakhonratchasima …) • หัวคอลัมน์ M1 / M4 / VDO Wall (= M4(3x1)) บอกกลุ่มจอ */
+const CNM = [
+  [/FLORESTA/, 'Phuket Floresta'],
+  [/PHUKETFESTIVAL|FESTIVALPHUKET/, 'CentralPhuketFestival'],
+  [/RAMA3/, 'Rama3'],
+  [/RAMA9/, 'Rama9'],
+  [/PINKLAO/, 'Pinklao'],
+  [/LADPRAO/, 'Ladprao'],
+  [/BANGNA/, 'Bangna'],
+  [/WESTGATE/, 'Westgate'],
+  [/EASTVILLE/, 'Eastville'],
+  [/KORAT|NAKHONRATCHASIMA/, 'Nakhonratchasima'],
+  [/MAHACHAI/, 'Mahachai'],
+  [/CHIANGRAI/, 'Chiangrai'],
+  [/CHONBURI/, 'Chonburi'],
+  [/^CTW|CENTRALWORLD/, 'CTW'],
+];
 function venScreen(ws, sn, cn, k) {
   const L = DB.filter(s => s.m === k);
   if (!L.length) return null;
@@ -5060,7 +5086,17 @@ function venScreen(ws, sn, cn, k) {
     R = VMAP[k],
     by = nm => L.find(s => nrm(s.c) === nrm(nm)),
     P = [];
-  if (R)
+  if (k === 'Central Network') {
+    const ml = CNM.find(x => x[0].test(head));
+    if (ml)
+      for (const c of cols) {
+        const t = T(c),
+          ty = /3X1|VDOWALL/.test(t) ? 'M4(3x1)' : /M4/.test(t) ? 'M4' : /M1/.test(t) ? 'M1' : '',
+          s = ty && by(ty + '-' + ml[1]);
+        if (s && !P.includes(s)) P.push(s);
+      }
+  }
+  if (R && !P.length)
     for (const c of R.col ? cols : [cn]) {
       const t = R.col ? T(c) + head : head;
       for (const [re, nm] of R.m)
@@ -6021,6 +6057,28 @@ async function addFiles(kind, files) {
     got.push({ f, p, d: fd0 ? +fd0 : 0, I: I2 });
   }
   got.sort((a, b) => a.d - b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
+  {
+    const kk = g => new Set(g.p.map(x => x.m + '|' + x.c)),
+      rv = g => g.f.name.replace(/\.[^.]+$/, '').length,
+      ov = (a, b) => {
+        const A = kk(a),
+          B = kk(b);
+        return A.size === B.size && [...A].every(k => B.has(k));
+      }; /* จอชุดเดียวกันทั้งไฟล์เท่านั้น (ไฟล์ NTW แต่ละแพ็กที่มีจอบางจอซ้ำกันไม่นับ) */
+    for (let i = 0; i < got.length; i++)
+      for (let j = i + 1; j < got.length && got[j].d === got[i].d; j++)
+        if (got[i].d && got[i].f.name !== got[j].f.name && ov(got[i], got[j])) {
+          if (rv(got[i]) > rv(got[j])) [got[i], got[j]] = [got[j], got[i]];
+          const w = got[j],
+            x = {
+              f: w.f.name,
+              lv: 'info',
+              t: `มีไฟล์วันเดียวกันของจอชุดเดียวกัน 2 ไฟล์ — ระบบใช้ไฟล์นี้ ${rv(w) > rv(got[i]) ? '(ชื่อมีข้อความต่อท้าย ถือเป็นฉบับแก้ไข) ' : ''}แทน “${got[i].f.name}” • ถ้าไม่ถูก ให้เอาไฟล์ที่ไม่ใช้ออกแล้วโยนใหม่`,
+            };
+          w.I.push(x);
+          PLI.push(x);
+        }
+  } /* 4.4.1 */
   for (const { f, p } of got) {
     if (p.every(x => x.rep === 'screen')) {
       const ks = new Set(p.map(x => x.m + '|' + x.c));
@@ -6058,7 +6116,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.4 (27 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.4.1 (28 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
