@@ -2676,7 +2676,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.6.1 (28 ต.ค. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.6.2 (28 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -3122,7 +3122,8 @@ const MQP={idle:'p01',scan:'p02',find:'p03',list:'p04',catch:'p05',catchck:'p06'
 let MQU=null; /* รูปแปลงเป็น blob URL ครั้งเดียว — หน้าจอวาดใหม่บ่อย ไม่ต้องถอดรหัสรูปซ้ำ */
 const mqURL=k=>{if(!MQU){MQU={};try{for(const n in MQIMG){const t=atob(MQIMG[n]),u=new Uint8Array(t.length);for(let i=0;i<t.length;i++)u[i]=t.charCodeAt(i);MQU[n]=URL.createObjectURL(new Blob([u],{type:'image/webp'}))}}catch(_){}}return MQU[k]||'data:image/webp;base64,'+MQIMG[k]};
 function mqPic(p){if(typeof MQIMG==='undefined')return'';const k=MQP[p]||MQP.idle;return`<img class="mq-pic mq-float" src="${mqURL(k)}" alt="" draggable="false">`}
-function mqShow(pose,text){const d=$('#mq');if(!d)return;clearTimeout(MQT);const m=$('#msg');if(m)m.classList.remove('show');
+const mqKrub=t=>{t=String(t||'').replace(/[\s.!]+$/,'');return !t||/ครับ/.test(t)?t:t+(/[)\]”"…\d]$/.test(t)?' ครับ':'ครับ')}; /* 4.6.2: น้องโฟกัสพูดลงท้าย “ครับ” (เฉพาะข้อความในกล่องของน้องโฟกัส) */
+function mqShow(pose,text){text=mqKrub(text);const d=$('#mq');if(!d)return;clearTimeout(MQT);const m=$('#msg');if(m)m.classList.remove('show');
  d.innerHTML=`<div class="mqdock" role="status" aria-live="polite"><div class="mqt"><p>${esc(text)}</p><button type="button" class="mqx" data-a="mqx" aria-label="ปิดข้อความของน้องโฟกัส">ปิด</button></div><span class="mq" aria-hidden="true">${mqPic(pose)}</span></div>`;
  MQT=setTimeout(()=>{d.innerHTML=''},/^(catch|catchck|idle)$/.test(pose)?4000:8000)}
 IC.bot='<svg viewBox="0 0 24 24"><rect x="4.5" y="8" width="15" height="11" rx="4.5"/><path d="M12 8V5.5M9.5 13h.01M14.5 13h.01M10 16c1.2.8 2.8.8 4 0"/><circle cx="12" cy="4.5" r="1"/></svg>';
@@ -3586,7 +3587,7 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
  picck:async()=>{if(!TC.length)return;await tcRead()},
  toolv:k=>{if(!['pic','shot','cmp'].includes(k))return;TOOLV=k;setTimeout(()=>{const d=$('#tdetail');if(d)d.scrollIntoView({behavior:'smooth',block:'start'})},60)},
  mqx:()=>{clearTimeout(MQT);const d=$('#mq');if(d)d.innerHTML=''},
- mqtoggle:()=>{const on=!mqOn();store.set('ps_mascot',on?'on':'off');clearTimeout(MQT);const d=$('#mq');if(d)d.innerHTML='';if(on){MQN='idle';note='สวัสดี! น้องโฟกัสจะโผล่มาบอกตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู'}else note='ปิดผู้ช่วยแล้ว กดปุ่มหน้ายิ้มมุมขวาบนเพื่อเปิดอีกครั้ง'},
+ mqtoggle:()=>{const on=!mqOn();store.set('ps_mascot',on?'on':'off');clearTimeout(MQT);const d=$('#mq');if(d)d.innerHTML='';if(on){MQN='idle';note='สวัสดีครับ! น้องโฟกัสจะโผล่มาบอกตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู'}else note='ปิดผู้ช่วยแล้ว กดปุ่มหน้ายิ้มมุมขวาบนเพื่อเปิดอีกครั้ง'},
  tools:async k=>{if(BUSY||FILLING)return;HELP=HOW=false;if(tab!=='tools'){FTAB=tab;tab='tools';cs=null;window.scrollTo(0,0)}
   const want=k==='last'||k==='c'?k:tcWant();
   if(want&&(want==='last'?last:C.length)&&!(TCS===want&&TCK===tcKey(want))&&(!k||tcOk())){tcSet(want);await tcRead()}},
