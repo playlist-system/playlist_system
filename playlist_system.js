@@ -85,6 +85,7 @@
  *   เวอร์ชัน 4.4.1: ใบเช็ค Central Network ชีตละห้าง (CNM, venScreen M1 / M4 / VDO Wall) • ไฟล์วันเดียวกันของจอชุดเดียวกัน ใช้ฉบับที่ชื่อมีข้อความต่อท้าย (addFiles) • ชีต ### ไม่ขึ้นควรตรวจ
  *   เวอร์ชัน 4.4.2: Siam Paragon in mall ตามตารางรหัสจอ — GlassLift_Jewel = Glass_Lift_GM, M3M5 คอลัมน์ M5 = 55x5 (VMAP, venScreen)
  *   เวอร์ชัน 4.5: สวิตช์ “เพิ่มหนังกันตกหล่นให้เอง” (OP.nostAdd, ps_nost) — layoutChk ลงใต้แถบวันที่เติม, fillWb บอกในควรตรวจ
+ *   เวอร์ชัน 4.5.1: อ่าน Playlist เร็วขึ้น — slimXlsx ตัดสูตร (FORMC) และแถว 13+ ของชีตช่วยคำนวณ (HELPSH, ROWC)
  * ======================================================================
  */
 
@@ -5457,6 +5458,10 @@ function parseSplit(wb, media, I) {
 /* อ่าน Playlist ให้เร็วขึ้น (3.3): ชีตใน Playlist โดยเฉพาะ Signature Max มีช่องว่างที่มีแต่รูปแบบเป็นล้านช่อง (ข้อมูลจริงไม่ถึง 3,000 ช่อง) → ตัดช่องที่ไม่มีค่าออกก่อนให้ SheetJS อ่าน และคลายไฟล์ด้วยตัวคลายของเบราว์เซอร์ (เร็วกว่า) — ค่าที่อ่านได้เหมือนเดิมทุกช่อง ถ้ามีปัญหาใช้ไฟล์เดิม */
 const EMPTYC = /<c r="[A-Z]{1,3}\d+"(?: s="\d+")?\/>/g,
   WSX = /^xl\/worksheets\/[^/]+\.xml$/;
+/* 4.5.1: สูตรในช่อง (ระบบใช้แค่ค่าที่คำนวณไว้) และแถวที่ 13 ลงไปของชีตช่วยคำนวณ ตัดออกก่อนอ่าน — เร็วขึ้นราว 30–40% ค่าที่อ่านได้เหมือนเดิม (เทียบ Playlist จริง 197 ไฟล์) */
+const FORMC = /<f\b[^>]*\/>|<f\b[^>]*>[^<]*<\/f>/g,
+  ROWC = /<row r="(\d+)"[^>]*\/>|<row r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,
+  HELPSH = /^(สูตร\s*(ON|OFF)|รายการหนังรายจอและ\s*playlist|Dropdownlist|pack|ข้อมูลสำหรับฟอร์ม\s*Playlist)/i;
 async function slimXlsx(buf) {
   try {
     const u = new Uint8Array(buf),
@@ -5493,11 +5498,30 @@ async function slimXlsx(buf) {
           ).arrayBuffer(),
         );
     let cut = 0;
+    const HELP = new Set();
+    try {
+      const wx = await z.file('xl/workbook.xml').async('string'),
+        rx = await z.file('xl/_rels/workbook.xml.rels').async('string'),
+        T = {}; /* 4.5.1: ชีตช่วยคำนวณ ระบบอ่านแค่หัวชีต */
+      for (const m of rx.matchAll(/<Relationship\b[^>]*>/g)) {
+        const id = (m[0].match(/\bId="([^"]+)"/) || [])[1],
+          t = (m[0].match(/\bTarget="([^"]+)"/) || [])[1];
+        if (id && t) T[id] = t.replace(/^\/?(xl\/)?/, 'xl/');
+      }
+      for (const m of wx.matchAll(/<sheet\b[^>]*>/g)) {
+        const nm = (m[0].match(/\bname="([^"]+)"/) || [])[1],
+          id = (m[0].match(/\br:id="([^"]+)"/) || [])[1];
+        if (nm && id && T[id] && HELPSH.test(nm.replace(/&amp;/g, '&').trim())) HELP.add(T[id]);
+      }
+    } catch (_) {}
     for (const k of Object.keys(z.files)) {
       if (!WSX.test(k)) continue;
       const r = raw[k],
         x = r ? td.decode(r[0] === 8 ? await inf(r[1]) : r[1]) : await z.file(k).async('string'),
-        y = x.replace(EMPTYC, '');
+        y = x
+          .replace(EMPTYC, '')
+          .replace(FORMC, '')
+          .replace(HELP.has(k) ? ROWC : /$^/g, (m, a, b) => (+(a || b) <= 12 ? m : ''));
       cut += x.length - y.length;
       z.file(k, y);
     }
@@ -6133,7 +6157,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.5 (28 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.5.1 (28 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
