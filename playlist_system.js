@@ -90,6 +90,7 @@
  *   เวอร์ชัน 4.6.1: ผู้ช่วยตัวการ์ตูนชื่อใหม่ “น้องโฟกัส” (เดิมน้องเช็ค)
  *   เวอร์ชัน 4.6.2: น้องโฟกัสพูดลงท้าย “ครับ” (mqKrub ใน mqShow)
  *   เวอร์ชัน 4.7: กันเติมย้อนหลัง (layoutChk back skip, fillWb BKH → ไฟล์เดิม, ขั้นที่ 3 เตือน BK) • Central Network ชีตละห้างไม่เขียน “ออก” (noExit) • ใบเปล่า: วันที่ในแถบมีรูปแบบวันที่ (numFmt 14)
+ *   เวอร์ชัน 4.7.1: ใบเปล่าต้นเดือน — แถบวันแรกตามช่วงสูตรนับในหัวชีต (layoutChk hr), แถบสีตามการตั้งค่าทั้งแถว (hdr)
  * ======================================================================
  */
 
@@ -769,7 +770,35 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     hr = sh.numRow(pv(j[1]), 14, 40);
     if (hr) break;
   }
-  if (!hr) hr = FIRST - 1;
+  if (!hr) {
+    let cs = 0;
+    {
+      const M = new Map();
+      for (const k in wsv || {}) {
+        const m = k.match(/^[A-Z]{1,3}(\d+)$/);
+        if (!m || +m[1] > 10) continue;
+        const f = wsv[k] && wsv[k].f,
+          x = f && String(f).match(/COUNTA?\(\$?[A-Z]{1,3}\$?(\d+)\s*:/);
+        if (x) M.set(+x[1], (M.get(+x[1]) || 0) + 1);
+      }
+      let bn = 0;
+      for (const [v, n] of M)
+        if (n > bn && v >= 13 && v <= 40) {
+          bn = n;
+          cs = v;
+        }
+    }
+    let lh = 0;
+    for (const k in wsv || {}) {
+      const m = k.match(/^[A-Z]{1,3}(\d+)$/);
+      if (!m) continue;
+      const r = +m[1];
+      if (r < 11 || r > 20 || r <= lh) continue;
+      const x = wsv[k];
+      if (x && !x.f && cl(x.v)) lh = r;
+    }
+    hr = cs && cs <= 18 ? Math.max(cs - 1, lh + 2) : Math.max(FIRST - 1, cs ? cs - 1 : 0, lh + 2);
+  } /* 4.7.1: ใบเปล่า (ยังไม่มีหัววันที่) — แถบวันแรกตามช่วงสูตรนับในหัวชีต หนังจะอยู่ในช่วงที่สูตรนับเสมอ */
   let { two, P1, P, E } = per(W);
   const P2 = two ? P : null,
     SCAN = 1500,
@@ -1558,10 +1587,15 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       if (i === 0 || BVAL) sh.setNum(b.nc, row, serial(d));
       else sh.setF(b.nc, row, B[i - 1].nc + row, serial(d));
       if (b.hs[0] != null) sh.setS(b.nc, row, hsx(b.hs[0], b.nc, r2));
-      else sh.setS(b.nc, row, ST.derive(sh.getS(b.nc, row) || 0, 'd14', { numFmt: 14 }));
-      /* 4.7: ใบเปล่า */ if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1], b.lc, r2));
+      if (b.hs[1] != null) sh.setS(b.lc, row, hsx(b.hs[1], b.lc, r2));
       sh.clear(b.pc, row);
       if (b.hs[2] != null) sh.setS(b.pc, row, hsx(b.hs[2], b.pc, r2));
+      if (b.hs[0] == null) {
+        const bc = two || r2 ? C2 : o.col1 || NAVY;
+        sh.setS(b.nc, row, ST.derive(sh.getS(b.nc, row) || 0, 'bkd' + bc, { numFmt: 14, fill: bc }));
+        for (const L of [b.lc, ...b.pcs])
+          if (L) sh.setS(L, row, ST.derive(sh.getS(L, row) || 0, 'bkf' + bc, { fill: bc }));
+      } /* 4.7: ใบเปล่า (ยังไม่มีแถบให้ดูแบบ) — แถบวันที่สีตามการตั้งค่า (ค่าเริ่มต้นน้ำเงินเข้มแบบที่ทีมใช้) + รูปแบบวันที่ */
     });
   };
   hdr(S, P);
@@ -6214,7 +6248,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.7 (28 ต.ค. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.7.1 (28 ต.ค. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:

@@ -804,7 +804,10 @@ const s2d=v=>new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5);
 const CONT=/ไฟล์เดิม|ต่อสัญญา|อัปเดต/,NEWST=/ขึ้นใหม่/;
 function layoutChk(sh,jobs,o,ST,W,wsv){
  jobs.sort((x,y)=>col2n(x[1])-col2n(y[1]));const pv=c=>n2col(col2n(c)-1),nx=c=>n2col(col2n(c)+1);
- let hr=0;for(const j of jobs){hr=sh.numRow(pv(j[1]),14,40);if(hr)break}if(!hr)hr=FIRST-1;
+ let hr=0;for(const j of jobs){hr=sh.numRow(pv(j[1]),14,40);if(hr)break}
+ if(!hr){let cs=0;{const M=new Map();for(const k in wsv||{}){const m=k.match(/^[A-Z]{1,3}(\d+)$/);if(!m||+m[1]>10)continue;const f=wsv[k]&&wsv[k].f,x=f&&String(f).match(/COUNTA?\(\$?[A-Z]{1,3}\$?(\d+)\s*:/);if(x)M.set(+x[1],(M.get(+x[1])||0)+1)}let bn=0;for(const[v,n]of M)if(n>bn&&v>=13&&v<=40){bn=n;cs=v}}
+  let lh=0;for(const k in wsv||{}){const m=k.match(/^[A-Z]{1,3}(\d+)$/);if(!m)continue;const r=+m[1];if(r<11||r>20||r<=lh)continue;const x=wsv[k];if(x&&!x.f&&cl(x.v))lh=r}
+  hr=cs&&cs<=18?Math.max(cs-1,lh+2):Math.max(FIRST-1,cs?cs-1:0,lh+2)} /* 4.7.1: ใบเปล่า (ยังไม่มีหัววันที่) — แถบวันแรกตามช่วงสูตรนับในหัวชีต หนังจะอยู่ในช่วงที่สูตรนับเสมอ */
  let{two,P1,P,E}=per(W);const P2=two?P:null,SCAN=1500,dd=+W,noNotes=W.getUTCDate()===1;
  const PADK=[...new Set(['8AEDFE','82ECFE',...PADS.slice(1).map(x=>x[0].slice(-6)),...(o.padh||[]).map(c=>String(c).slice(-6).toUpperCase())])],PADO=o.padc?String(o.padc).toUpperCase():'',PADRE=new RegExp('^(FF)?('+PADK.join('|')+')$','i');
  MARK.p=new Set(PADO?[...PADK,PADO.slice(-6)]:PADK); /* สีช่องว่างเหนือแถบวันที่ (3.9): สีที่เลือก / สีชุดให้เลือก / สีที่เคยเลือกในเครื่องนี้ ถือเป็นสีแถบ */
@@ -921,7 +924,9 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  const C2=o.col2||'FF4472C4',fx=(st,c,k)=>String(ST.fillOf(st)||'').toUpperCase().slice(-6)===String(c).toUpperCase().slice(-6)?st:ST.derive(st,k+c,{fill:c});
  const hsx=(st,L,r2)=>{if(st==null)return st;if(two||r2){if(KEEP2)return st;return(!o.col2&&L&&R2[L]!=null)?R2[L]:fx(st,C2,'c2')}if(o.col1)return fx(st,o.col1,'c1');return ISG.test(ST.fillOf(st))?ST.derive(st,'nvy',{fill:NAVY}):st};
  const HXA=[...HX,...B.flatMap(b=>b.pcs.slice(1).map((L,i)=>[L,b.hss[i+1]]))].sort((x,y)=>col2n(x[0])-col2n(y[0])); /* แถบวันที่คลุมทุกช่องวันที่ถ่ายของบล็อก (และคอลัมน์หัวสีเข้มอื่นที่เป็นส่วนของแถบ) */
- const hdr=(row,d)=>{const r2=CONTM&&+d>=+P2;for(const[L,st]of HXA){sh.clear(L,row);if(st!=null)sh.setS(L,row,hsx(st,L,r2))}B.forEach((b,i)=>{sh.clear(b.lc,row);if(i===0||BVAL)sh.setNum(b.nc,row,serial(d));else sh.setF(b.nc,row,B[i-1].nc+row,serial(d));if(b.hs[0]!=null)sh.setS(b.nc,row,hsx(b.hs[0],b.nc,r2));else sh.setS(b.nc,row,ST.derive(sh.getS(b.nc,row)||0,'d14',{numFmt:14})); /* 4.7: ใบเปล่า */if(b.hs[1]!=null)sh.setS(b.lc,row,hsx(b.hs[1],b.lc,r2));sh.clear(b.pc,row);if(b.hs[2]!=null)sh.setS(b.pc,row,hsx(b.hs[2],b.pc,r2))})};
+ const hdr=(row,d)=>{const r2=CONTM&&+d>=+P2;for(const[L,st]of HXA){sh.clear(L,row);if(st!=null)sh.setS(L,row,hsx(st,L,r2))}B.forEach((b,i)=>{sh.clear(b.lc,row);if(i===0||BVAL)sh.setNum(b.nc,row,serial(d));else sh.setF(b.nc,row,B[i-1].nc+row,serial(d));if(b.hs[0]!=null)sh.setS(b.nc,row,hsx(b.hs[0],b.nc,r2));if(b.hs[1]!=null)sh.setS(b.lc,row,hsx(b.hs[1],b.lc,r2));sh.clear(b.pc,row);if(b.hs[2]!=null)sh.setS(b.pc,row,hsx(b.hs[2],b.pc,r2));
+  if(b.hs[0]==null){const bc=(two||r2)?C2:(o.col1||NAVY);sh.setS(b.nc,row,ST.derive(sh.getS(b.nc,row)||0,'bkd'+bc,{numFmt:14,fill:bc}));for(const L of[b.lc,...b.pcs])if(L)sh.setS(L,row,ST.derive(sh.getS(L,row)||0,'bkf'+bc,{fill:bc}))} /* 4.7: ใบเปล่า (ยังไม่มีแถบให้ดูแบบ) — แถบวันที่สีตามการตั้งค่า (ค่าเริ่มต้นน้ำเงินเข้มแบบที่ทีมใช้) + รูปแบบวันที่ */
+ })};
  hdr(S,P);
  const pad=(b,a,z)=>{for(let row=a;row<=z;row++){sh.setS(b.lc,row,ST.derive(b.bl,'pad'+PADC,{fill:PADC,border:true}));b.pcs.forEach((L,i)=>sh.setS(L,row,ST.derive(b.bps[i]!=null?b.bps[i]:'0','pad'+PADC,{fill:PADC,border:true})))}}; /* แถบสีฟ้าในช่องว่างต่อจากรายการที่สั้นกว่า */
  const mainLen=Math.max(0,...B.map(b=>b.main.length));for(const b of B){b.main.forEach((r,i)=>put(b,r,S+1+i));pad(b,S+1+b.main.length,S+mainLen)}
@@ -2682,7 +2687,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.7 (28 ต.ค. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.7.1 (28 ต.ค. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
