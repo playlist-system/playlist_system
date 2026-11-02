@@ -1033,11 +1033,11 @@ const plDate=()=>{let b=0,a=0;for(const s of DB){if(s.pd>a)a=s.pd;if(!KINDS.some
 const workDate=()=>parseD(OP.base)||PLD||autoBase();
 /* 4.3: เติมหลายวันต่อกัน — วันทำงาน = วันที่มีไฟล์ สรุปรายการหนังแยกจอ (6 แพค) • ไฟล์แบบอื่น (Show DC, Metro LED, BKJ …) อยู่กับวันแรกที่ไม่ก่อนวันของไฟล์ (ไม่มี → วันล่าสุด)
    แต่ละวันใช้ไฟล์ของวันนั้น แบบที่วันนั้นไม่มี ใช้ของวันก่อนหน้าทั้งแบบ — ถ้าทุกวันมีครบ ผลเหมือนเติมทีละวัน */
-const pfG=e=>e.d>0&&e.p.some(s=>KINDS.some(K=>K.g&&K.has(s))),pfV=e=>e.d>0&&e.p.some(s=>KINDS.some(K=>K.day&&K.has(s)));
+const pfG=e=>e.d>0&&e.p.some(s=>KINDS.some(K=>K.g&&K.has(s))),pfV=e=>e.d>0&&e.p.some(s=>KINDS.some(K=>K.day&&K.has(s))),pfX=e=>e.d>0&&e.p.some(s=>KINDS.some(K=>K.x&&!K.v&&!K.latest&&K.has(s))); /* 5.3.2: Playlist เพิ่มเติม (CCTV / MRT) */
 const pfPut=(db,p)=>{if(p.every(x=>x.rep==='screen')){const ks=new Set(p.map(x=>x.m+'|'+x.c));db=db.filter(x=>!ks.has(x.m+'|'+x.c))}else{const ms=new Set(p.map(x=>x.m));db=db.filter(x=>!ms.has(x.m))}return db.concat(p)};
 function plDays(){const sig=PFS.map(e=>e.q).join(',');if(PDC&&PDC.sig===sig)return PDC.G;
- let G=null;const vd=!PFS.some(pfG),pfFull=vd?pfV:pfG,ds=[...new Set(PFS.filter(pfFull).map(e=>e.d))].sort((a,b)=>a-b);
- if(ds.length>1){G=ds.map(d=>({d,E:[]}));G.v=vd;for(const e of PFS){let i=pfFull(e)?ds.indexOf(e.d):e.d>0?ds.findIndex(d=>d>=e.d):-1;if(i<0)i=ds.length-1;G[i].E.push(e)}
+ let G=null;const vd=!PFS.some(pfG),xm=vd&&!PFS.some(pfV),pfFull=!vd?pfG:xm?pfX:pfV,ds=[...new Set(PFS.filter(pfFull).map(e=>e.d))].sort((a,b)=>a-b);
+ if(ds.length>1){G=ds.map(d=>({d,E:[]}));G.v=vd&&!xm;G.x=xm;for(const e of PFS){let i=pfFull(e)?ds.indexOf(e.d):e.d>0?ds.findIndex(d=>d>=e.d):-1;if(i<0)i=ds.length-1;G[i].E.push(e)}
   let db=[];for(const g of G){g.E.sort((a,b)=>a.d-b.d||a.q-b.q);const ks=new Set(g.E.flatMap(e=>e.p.map(kindOfS)));db=db.filter(s=>!ks.has(kindOfS(s)));for(const e of g.E)db=pfPut(db,e.p);g.db=db}}
  PDC={sig,G};return G}
 function plSync(){const G=plDays();if(G)DB=G[G.length-1].db;else{let db=[];for(const e of [...PFS].sort((a,b)=>a.d-b.d||a.q-b.q))db=pfPut(db,e.p);DB=db}
@@ -3115,7 +3115,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3.1 (2 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3.2 (2 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -3289,9 +3289,9 @@ async function busyStep(t,i,n,f){BUSY={t,i,n,f};busyPaint();$('.wrap').inert=tru
 
 /* ----- ขั้นที่ 1 ----- */
 /* 4.3: Playlist หลายวัน — รายการวัน แบบที่ขาด และวันที่ขาดไป */
-function vDays(G){if(!G)return'';const core=G.v?KINDS.filter(K=>K.day):KINDS.filter(K=>!K.x&&!K.latest),gaps=[];for(let i=1;i<G.length;i++)for(let t=G[i-1].d+864e5;t<G[i].d;t+=864e5)gaps.push(t);
- const row=(g,i)=>{const D=new Date(g.d),own=new Set(g.E.flatMap(e=>e.p.map(kindOfS))),miss=core.filter(K=>!own.has(K.k)),car=miss.filter(K=>g.db.some(K.has)).map(K=>K.k),non=miss.filter(K=>!g.db.some(K.has)).map(K=>K.k),n=KINDS.filter(K=>(G.v?K.v:!K.x)&&g.db.some(K.has)).length;
-  return`<li class="drow${non.length?' wr':''}"><span class="dn">${i+1}</span><span class="dd"><b>${THW[D.getUTCDay()]} ${thd(D)}</b><small>${g.E.length} ไฟล์ • ${G.v?n+' แบบ (ห้าง / อาคาร)':n+' จาก 11 แบบ'}</small></span><span class="dk">${car.length?`<span>ใช้ของวันก่อนหน้า: ${esc(car.join(', '))}</span>`:''}${non.length?`<span class="no">ไม่มี: ${esc(non.join(', '))}</span>`:''}${!car.length&&!non.length?'<span class="okk">ครบ</span>':''}</span><button class="ib" data-a="plday" data-k="${g.d}" aria-label="เอา Playlist วันที่ ${thd(D)} ออก" title="เอาวันนี้ออก">${IC.x}</button></li>`};
+function vDays(G){if(!G)return'';const core=G.x?KINDS.filter(K=>K.x&&!K.v&&!K.latest&&PFS.some(e=>e.p.some(K.has))):G.v?KINDS.filter(K=>K.day):KINDS.filter(K=>!K.x&&!K.latest),gaps=[];for(let i=1;i<G.length;i++)for(let t=G[i-1].d+864e5;t<G[i].d;t+=864e5)gaps.push(t);
+ const row=(g,i)=>{const D=new Date(g.d),own=new Set(g.E.flatMap(e=>e.p.map(kindOfS))),miss=core.filter(K=>!own.has(K.k)),car=miss.filter(K=>g.db.some(K.has)).map(K=>K.k),non=miss.filter(K=>!g.db.some(K.has)).map(K=>K.k),n=KINDS.filter(K=>(G.x?K.x&&!K.v:G.v?K.v:!K.x)&&g.db.some(K.has)).length;
+  return`<li class="drow${non.length?' wr':''}"><span class="dn">${i+1}</span><span class="dd"><b>${THW[D.getUTCDay()]} ${thd(D)}</b><small>${g.E.length} ไฟล์ • ${G.x?n+' แบบ (Playlist เพิ่มเติม)':G.v?n+' แบบ (ห้าง / อาคาร)':n+' จาก 11 แบบ'}</small></span><span class="dk">${car.length?`<span>ใช้ของวันก่อนหน้า: ${esc(car.join(', '))}</span>`:''}${non.length?`<span class="no">ไม่มี: ${esc(non.join(', '))}</span>`:''}${!car.length&&!non.length?'<span class="okk">ครบ</span>':''}</span><button class="ib" data-a="plday" data-k="${g.d}" aria-label="เอา Playlist วันที่ ${thd(D)} ออก" title="เอาวันนี้ออก">${IC.x}</button></li>`};
  return`<section class="panel days" aria-label="Playlist หลายวัน"><h3 class="sec-t">${IC.cal}ใส่ Playlist ไว้ ${G.length} วัน — ระบบจะเติมต่อกันทีละวัน</h3><p class="dsub">เรียงจากวันแรกไปวันล่าสุด ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไปให้เอง กดเติมครั้งเดียว บันทึกครั้งเดียว • ใส่วันไหนผิด กด × เพื่อเอาออก</p><ol class="dlist">${G.map(row).join('')}</ol>${gaps.length?alertHTML('wr',`ขาด Playlist ${gaps.length} วัน: ${gaps.map(t=>{const D=new Date(t);return THW[D.getUTCDay()]+' '+thdS(D)}).join(', ')}`,'<p>ถ้ามี Playlist ของวันนั้น ลากเพิ่มลงกล่องด้านบน ระบบจะแทรกให้ตามวัน ถ้าไม่ใส่ หนังที่ขึ้นใหม่วันนั้นจะไม่ได้ลงใบเช็ค (หนังที่ยังฉายอยู่จะขึ้นใน “กันตกหล่น” หลังเติม)</p>'):''}</section>`}
 function vDateCard(wd,has){
  if(!has)return`<aside class="panel datecard dc0" data-tour="date"><span class="lbl">Playlist วันที่</span><b class="big">ยังไม่มี Playlist</b><span class="src">วันที่จะขึ้นเมื่อใส่ไฟล์ ระบบอ่านจากชื่อไฟล์ให้เอง</span></aside>`;
