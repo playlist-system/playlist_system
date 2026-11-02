@@ -98,6 +98,7 @@
  *   เวอร์ชัน 5.1: หน้าตาใหม่รอบ 2 — หน้าหลักใหม่ (h5hero / h5box / h5must / h5log) • คำเตือนขั้นที่ 3 แยกเป็น flAlerts() ใช้ร่วมกับหน้าหลัก • บันทึกการทำงาน logTick() • ค้นหา Ctrl K (FIND / findRes / vFind) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.2: หน้าตาใหม่รอบ 3 — หน้าผลการเติมใหม่ (r5hero / r5rep / r5side) • ต้องแก้เรียงเป็นข้อ (rx5 เปิดไฟล์) • แจ้งให้ทราบแยกประเภท • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.3: หน้าตาใหม่รอบ 4 — CSS ชั้น 5.3 (ปุ่มทรงเม็ดยา กล่องลากไฟล์ การ์ดเครื่องมือ สวิตช์ไล่สี) • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.3.1: ลากโฟลเดอร์มาวางได้ (walkEntries) • ปุ่มเลือกทั้งโฟลเดอร์ (#pickdir) • ไฟล์ที่เปิดไม่ได้ขึ้นข้อความ • ไม่แก้ส่วนเติม
  * ======================================================================
  */
 
@@ -6765,8 +6766,21 @@ function buildOn(o) {
   return on;
 }
 async function addFiles(kind, files) {
-  const arr = [];
-  for (const f of files) arr.push({ name: f.name, buf: await f.arrayBuffer() });
+  const arr = [],
+    rb = [];
+  for (const f of files) {
+    try {
+      arr.push({ name: f.name, buf: await f.arrayBuffer() });
+    } catch (_) {
+      rb.push(f.name);
+    }
+  } /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
+  if (rb.length) {
+    say(
+      `เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')} — ถ้าลากจากในไฟล์ .zip ที่เปิดดูใน Windows ให้ลากไฟล์ .zip มาทั้งไฟล์ หรือแตกไฟล์ก่อน`,
+    );
+    if (!arr.length) return view();
+  }
   if (kind === 'ck') {
     C.push(...arr);
     MQN = 'catchck';
@@ -6899,7 +6913,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3 (2 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3.1 (2 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -7708,7 +7722,8 @@ function vData() {
     ),
   ].sort((a, b) => a - b);
   return `${shead('ใส่ Playlist ของวันนี้', 'ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว • หยุดหลายวัน ใส่ของทุกวันพร้อมกันได้ ระบบจะเติมต่อกันให้ทีละวัน')}
- <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม', '.xlsx,.xls,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
+ <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม • ลากโฟลเดอร์ของแต่ละวันมาทั้งโฟลเดอร์ก็ได้', '.xlsx,.xls,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
+ <button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>
  ${vDays(MD)}${vWall(wd)}
  <div class="stack">${PLX.length ? alertHTML('er', `อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`, `<ul>${PLX.map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`) : ''}
  ${vPLI()}
@@ -9109,7 +9124,7 @@ function vHome() {
   const hero = `<section class="h5hero" data-tour="hhero" aria-labelledby="hht">${mqOn() ? `<span class="h5mq" aria-hidden="true"><span class="mq">${mqPic(pose)}</span></span>` : ''}
   <span class="h5chip"><i class="${st[0]}"></i>${has ? `Playlist ${dtx ? dtx + ' · ' : ''}${nk}/11 แบบ` : 'ยังไม่ได้ใส่ Playlist'}</span>
   <h1 id="hht">${hl}</h1><p class="h5sub">${st[2]}</p>
-  <div class="h5box" data-dz="any" data-tour="hflow"><p class="h5ph">${IC.up}<span>ลากไฟล์ Playlist และใบเช็ครูปมาวางที่นี่ ระบบแยกให้เอง (.xlsm = ใบเช็ค)</span></p>
+  <div class="h5box" data-dz="any" data-tour="hflow"><p class="h5ph">${IC.up}<span>ลากไฟล์หรือทั้งโฟลเดอร์ของ Playlist และใบเช็ครูปมาวางที่นี่ ระบบแยกให้เอง (.xlsm = ใบเช็ค)</span></p>
    <div class="h5att">${chips}</div>
    <div class="h5bar"><div class="h5l"><button class="h5plus" data-a="pick" data-k="any" aria-label="เลือกไฟล์ Playlist หรือใบเช็ครูป" title="เลือกไฟล์"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>${FSA ? `<button class="h5q" data-a="ckdir">${IC.folder}เปิดใบเช็คทั้งโฟลเดอร์</button>` : ''}</div>
    <button class="btn primary h5go" data-a="tab" data-k="${st[3]}">${go}<span class="h5ar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button></div></div>
@@ -10346,6 +10361,16 @@ async function unzipFiles(files) {
 async function addAny(kind, files) {
   files = [...files];
   if (!files.length) return;
+  {
+    const dir = files.filter(f => !/\.[A-Za-z0-9]{2,5}$/.test(f.name) && !f.size);
+    if (dir.length) {
+      files = files.filter(f => !dir.includes(f));
+      say(
+        `ข้าม ${dir.length} รายการที่ไม่ใช่ไฟล์ (${dir.map(f => f.name).join(', ')}) — ถ้าเป็นโฟลเดอร์ ใช้ปุ่ม “เลือกทั้งโฟลเดอร์” ในขั้นที่ 1 หรือเปิดโฟลเดอร์แล้วเลือกไฟล์ข้างใน`,
+      );
+      if (!files.length) return;
+    }
+  } /* 5.3.1 */
   if (BUSY || FILLING) {
     say('กำลังทำงานอยู่ รอให้เสร็จก่อน');
     return;
@@ -10822,6 +10847,14 @@ const ACT = {
   },
   pick: k => {
     if (!BUSY && !FILLING) openPicker(k);
+  },
+  pickdir: k => {
+    if (BUSY || FILLING) return;
+    const p = $('#pickdir');
+    if (!p) return;
+    p.dataset.k = k || 'pl';
+    p.value = '';
+    p.click();
   },
   adv: () => {
     adv = !adv;
@@ -12125,6 +12158,16 @@ document.addEventListener('change', e => {
     addAny(t.dataset.k, fs);
     return;
   }
+  if (t.id === 'pickdir') {
+    const fs = [...t.files].filter(f => okExt(f.name));
+    t.value = '';
+    if (!fs.length) {
+      say('ไม่พบไฟล์ Excel (.xlsx / .xlsm / .xls) หรือ .zip ในโฟลเดอร์ที่เลือก');
+      return;
+    }
+    addAny(t.dataset.k || 'pl', fs);
+    return;
+  } /* 5.3.1 */
   if (t.dataset.shotman != null) {
     if (SHOT && SHOT.R && !SHOT.done) {
       SHOT.man = SHOT.man || {};
@@ -12191,10 +12234,51 @@ document.addEventListener('input', e => {
 document.addEventListener('dragover', e => {
   e.preventDefault();
 });
+/* 5.3.1: ลากโฟลเดอร์มาวาง — เปิดโฟลเดอร์ (และโฟลเดอร์ย่อย ลึกไม่เกิน 4 ชั้น) เอาเฉพาะไฟล์ Excel / .zip / .json • เดิมลากโฟลเดอร์แล้วไม่มีอะไรเกิดขึ้น */
+const okExt = n => /\.(xlsx|xlsm|xls|zip|json)$/i.test(n) && !/^~\$/.test(n);
+async function walkEntries(ents) {
+  const out = [],
+    rd = d =>
+      new Promise(r => {
+        const R = d.createReader(),
+          A = [];
+        const nx = () =>
+          R.readEntries(
+            es => {
+              if (!es.length) return r(A);
+              A.push(...es);
+              nx();
+            },
+            () => r(A),
+          );
+        nx();
+      }),
+    fileOf = f => new Promise(r => f.file(r, () => r(null)));
+  const go = async (x, dep) => {
+    if (!x || dep > 4) return;
+    if (x.isFile) {
+      if (okExt(x.name)) {
+        const f = await fileOf(x);
+        if (f) out.push(f);
+      }
+    } else if (x.isDirectory) for (const y of await rd(x)) await go(y, dep + 1);
+  };
+  for (const x of ents) await go(x, 0);
+  return out;
+}
 document.addEventListener('drop', e => {
   e.preventDefault();
   const fs = [...((e.dataTransfer && e.dataTransfer.files) || [])];
   if (!fs.length) return;
+  let ents = [];
+  try {
+    ents = [...((e.dataTransfer && e.dataTransfer.items) || [])]
+      .filter(it => it.kind === 'file')
+      .map(it => it.webkitGetAsEntry && it.webkitGetAsEntry())
+      .filter(Boolean);
+  } catch (_) {
+    ents = [];
+  }
   const z = e.target.closest && e.target.closest('[data-dz]');
   let k = z
     ? z.dataset.dz
@@ -12217,6 +12301,26 @@ document.addEventListener('drop', e => {
   if (TOUR) {
     TOUR = null;
     view();
+  }
+  if (ents.some(x => x.isDirectory)) {
+    if (BUSY || FILLING) {
+      say('กำลังทำงานอยู่ รอให้เสร็จก่อน');
+      return;
+    }
+    (async () => {
+      let all = [];
+      try {
+        all = await walkEntries(ents);
+      } catch (_) {
+        all = [];
+      }
+      if (!all.length) {
+        say('ไม่พบไฟล์ Excel (.xlsx / .xlsm / .xls) หรือ .zip ในโฟลเดอร์ที่ลากมา');
+        return;
+      }
+      addAny(k, all);
+    })();
+    return;
   }
   addAny(k, fs);
 });
