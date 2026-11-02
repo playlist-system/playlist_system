@@ -101,6 +101,7 @@
  *   เวอร์ชัน 5.3.1: ลากโฟลเดอร์มาวางได้ (walkEntries) • ปุ่มเลือกทั้งโฟลเดอร์ (#pickdir) • ไฟล์ที่เปิดไม่ได้ขึ้นข้อความ • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.3.2: แบ่งวันจาก Playlist เพิ่มเติม (pfX) เมื่อไม่มีไฟล์ 6 สื่อหลักและไฟล์ห้าง • กล่องวันบอก “Playlist เพิ่มเติม” • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.3.3: Digital MRT / Gateway X / The 20 ตั้งเป็นไม่ได้ส่งทุกวัน (latest) • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.4: ย้ายจอตามฐานข้อมูลจอ (sdbMovePlan / sdbMoveApply, arrangeWb opt.dels) ในใบเปล่า • ไม่แก้ส่วนเติม
  * ======================================================================
  */
 
@@ -3573,8 +3574,11 @@ const arrangeWb = (() => {
       let hr = 0;
       for (let r = 14; r <= 40 && !hr; r++) if (numV(wsv, nc0, r)) hr = r;
       const filled = !!hr;
-      if (!hr && opt.adds && opt.adds.length)
-        hr = blankHr(wsv); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม */
+      if (!hr && ((opt.adds && opt.adds.length) || (opt.dels && opt.dels.length)))
+        hr =
+          blankHr(
+            wsv,
+          ); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย */
       if (!ok || !hr) {
         notes.push([sn, 'ไม่ได้จัด (รูปแบบชีตไม่ตรงแบบบล็อก 3 คอลัมน์)']);
         continue;
@@ -3666,6 +3670,33 @@ const arrangeWb = (() => {
         k = '\u0001add:' + A.code;
       ADD[k] = I;
       plan[A.sn].push({ code: A.code, from: k, s: t.s, add: A });
+    }
+    /* 5.4: เอาจอออกจากชีต (ย้ายไปใบของคนอื่นตามฐานข้อมูลจอ) — เฉพาะชีตที่ยังไม่มีแถบวันที่ (ใบเปล่า) • ไม่เอาจอสุดท้ายของชีตออก */
+    const removed = [];
+    for (const D of opt.dels || []) {
+      const I = info[D.sn];
+      if (!I) {
+        notes.push([
+          D.sn,
+          D.code + ' — เอาออกไม่ได้: ชีตนี้ไม่ใช่แบบบล็อกจอ 3 คอลัมน์ (รหัสจอแถว 11) เอาออกเองในใบเช็ค',
+        ]);
+        continue;
+      }
+      if (I.filled) {
+        notes.push([
+          D.sn,
+          D.code + ' — เอาออกไม่ได้: ชีตนี้เติมไปแล้ว (ย้ายได้เฉพาะใบเปล่า) เอาออกเองในใบเช็ค',
+        ]);
+        continue;
+      }
+      const keep = plan[D.sn].filter(x => nk(x.code) !== nk(D.code));
+      if (keep.length === plan[D.sn].length) continue;
+      if (!keep.length) {
+        notes.push([D.sn, D.code + ' — เอาออกไม่ได้: เป็นจอเดียวในชีตนี้ เอาออกเองในใบเช็ค']);
+        continue;
+      }
+      plan[D.sn] = keep;
+      removed.push({ sheet: D.sn, code: D.code });
     }
     /* ชื่อชีตใหม่ */
     const newName = {};
@@ -4458,7 +4489,8 @@ const arrangeWb = (() => {
     }
     /* ป้ายแพคผิดในชีตที่ไม่ได้ย้าย */
     for (const sn in info) {
-      if (out[sn] || opt.adds) continue; /* 4.8.1: ตอนเพิ่มจอ ไม่แก้ชีตอื่น */
+      if (out[sn] || opt.adds || opt.dels)
+        continue; /* 4.8.1: ตอนเพิ่มจอ ไม่แก้ชีตอื่น • 5.4: ตอนเอาจอออกก็เช่นกัน */
       const I = info[sn];
       const bad = I.blocks.filter(b => {
         const t = strV(I.wsv, b.s + 1, 10);
@@ -4498,7 +4530,7 @@ const arrangeWb = (() => {
     }
     const nb = await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
     const sorted = [...touched].filter(sn => info[sn] && !moves.some(m => m.from === sn || m.to === sn));
-    return { buf: nb, moves, notes, relabeled, sorted, ana, added };
+    return { buf: nb, moves, notes, relabeled, sorted, ana, added, removed };
   }
   return arrangeWb;
 })();
@@ -5214,6 +5246,152 @@ function sdbAddPlan(files) {
   }
   return out;
 }
+/* 5.4: ย้ายจอตามฐานข้อมูลจอ (ใบเปล่า) — จอที่อยู่ในใบของ ก แต่ฐานข้อมูลบอกว่าเป็นของ ข → เอาออกจากใบของ ก แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของ ข */
+function sdbMovePlan(files, fail = []) {
+  const Q = sdbCheck(files.map(f => ({ name: f.name, codes: ndCodes(f.nd) }))) || [],
+    mv = [],
+    skip = [];
+  for (const x of Q) {
+    if (!x.who) continue;
+    const fx = files.find(z => z.name === x.name),
+      S0 = (fx && fx.nd && fx.nd.S) || [];
+    for (const r of x.moved) {
+      const k = sdbK(r.c),
+        T = Q.filter(q => q.who && q.who === r.to && q.name !== x.name),
+        src = S0.find(z => z.sn === r.sn);
+      if (src && (src.codes || []).length <= 1) {
+        skip.push({
+          code: r.c,
+          from: x.name,
+          why: `เป็นจอเดียวในชีต ${r.sn} ของใบนี้ (ระบบไม่เอาจอสุดท้ายของชีตออก) — ฐานข้อมูลบอกว่าเป็นของ${r.to}`,
+        });
+        continue;
+      }
+      if (!T.length) {
+        skip.push({
+          code: r.c,
+          from: x.name,
+          why: `ไม่มีใบของ${r.to}ในชุดนี้ (เปิดใบของทุกคนไว้ในกล่อง “ใบเช็คที่ใช้”)`,
+        });
+        continue;
+      }
+      let ok = null,
+        why = '';
+      for (const y of T) {
+        const mi = y.miss.find(z => z.k === k);
+        if (!mi) {
+          why = `ใบของ${r.to}มีจอนี้อยู่แล้ว`;
+          continue;
+        }
+        let m = mediaOf(mi.pk || '');
+        if (!m) {
+          const p = DB.find(z => sdbK(z.c) === k);
+          if (p) m = mediaOf(String(p.m || '')) || (/spare/i.test(p.m || '') ? 'Spare' : null);
+        }
+        const m0 = (S0.find(z => z.sn === r.sn) || {}).media || null;
+        if (!m) m = m0; /* ไม่รู้แพคจากฐานข้อมูล → ใช้แพคของชีตเดิม */
+        const fy = files.find(z => z.name === y.name),
+          S = (fy && fy.nd && fy.nd.S) || [];
+        let sn = m && (S.find(z => z.media === m) || {}).sn;
+        if (!sn && m0 && m0 !== m) {
+          sn = (S.find(z => z.media === m0) || {}).sn;
+          if (sn) m = m0;
+        } /* ใบใหม่ไม่มีชีตแพคตามฐานข้อมูล → ใช้แพคเดียวกับชีตเดิม (ตอนเติม ระบบจัดจอเข้าชีตตามแพคใน Playlist อีกครั้ง) */
+        if (!sn) {
+          why = m ? `ใบของ${r.to}ไม่มีชีตแพค ${m}` : 'ไม่รู้ว่าจอนี้อยู่แพคไหน';
+          continue;
+        }
+        ok = {
+          code: r.c,
+          k,
+          loc: mi.loc || '',
+          fmt: mi.fmt,
+          from: x.name,
+          fsn: r.sn,
+          to: y.name,
+          tsn: sn,
+          who: r.to,
+        };
+        break;
+      }
+      if (ok) {
+        const fz = fail.find(z => z.code === ok.code && z.from === ok.from && z.to === ok.to);
+        if (fz) skip.push({ code: ok.code, from: ok.from, why: fz.why });
+        else mv.push(ok);
+      } else skip.push({ code: r.c, from: x.name, why });
+    }
+  } /* ครั้งก่อนย้ายไม่ได้ → แสดงเหตุผล ไม่ให้กดซ้ำ */
+  return { mv, skip };
+}
+async function sdbMoveApply(files, mv) {
+  const by = n => files.find(z => z.name === n),
+    run = async (f, adds, dels) => {
+      try {
+        return await arrangeWb(f.buf, new Map(), { mk: false, sort: false, adds, dels });
+      } catch (e) {
+        return null;
+      }
+    },
+    add1 = m => ({ sn: m.tsn, code: m.code, fmt: m.fmt, loc: m.loc, k: m.k }),
+    del1 = m => ({ sn: m.fsn, code: m.code }),
+    key = (n, c) => n + '|' + sdbK(c);
+  /* ลองทีละฝั่งก่อน — ย้ายเฉพาะจอที่ทั้งเอาออกจากใบเดิม และเพิ่มในใบใหม่ได้ (จอจะไม่หาย และไม่ซ้ำ 2 ใบ) */
+  const okA = new Set(),
+    okD = new Set(),
+    why = new Map();
+  for (const n of new Set(mv.map(m => m.to))) {
+    const A = await run(by(n), mv.filter(m => m.to === n).map(add1), []);
+    for (const a of (A && A.added) || []) okA.add(key(n, a.code));
+    for (const t of (A && A.notes) || [])
+      if (/เพิ่มให้ไม่ได้/.test(t[1]))
+        why.set(
+          key(n, String(t[1]).split(' — ')[0]),
+          String(t[1])
+            .split(' — ')
+            .slice(1)
+            .join(' — ')
+            .replace(/\s*(เอาออก|ใส่)เองในใบเช็ค$/, ''),
+        );
+  }
+  for (const n of new Set(mv.map(m => m.from))) {
+    const A = await run(by(n), [], mv.filter(m => m.from === n).map(del1));
+    for (const d of (A && A.removed) || []) okD.add(key(n, d.code));
+    for (const t of (A && A.notes) || [])
+      if (/เอาออกไม่ได้/.test(t[1]))
+        why.set(
+          key(n, String(t[1]).split(' — ')[0]),
+          String(t[1])
+            .split(' — ')
+            .slice(1)
+            .join(' — ')
+            .replace(/\s*(เอาออก|ใส่)เองในใบเช็ค$/, ''),
+        );
+  }
+  const go = mv.filter(m => okA.has(key(m.to, m.code)) && okD.has(key(m.from, m.code))),
+    no = mv
+      .filter(m => !go.includes(m))
+      .map(m => ({ ...m, why: why.get(key(m.from, m.code)) || why.get(key(m.to, m.code)) || 'ย้ายไม่ได้' }));
+  const R = new Map();
+  for (const n of new Set(go.flatMap(m => [m.from, m.to]))) {
+    const adds = go.filter(m => m.to === n).map(add1),
+      dels = go.filter(m => m.from === n).map(del1),
+      A = await run(by(n), adds, dels);
+    if (!A || (A.added || []).length !== adds.length || (A.removed || []).length !== dels.length)
+      return { err: n, go: [], no: mv, names: [] };
+    R.set(n, A);
+  }
+  for (const [n, A] of R) {
+    const f = by(n);
+    f.buf = A.buf;
+    f.nd = null;
+    try {
+      f.nd = sheetNeeds(f.buf, f.name);
+    } catch (_) {
+      f.nd = { S: [] };
+    }
+  }
+  return { go, no, names: [...R.keys()] };
+}
 async function sdbApply(files, plan) {
   const done = [];
   for (const P0 of plan) {
@@ -5433,7 +5611,10 @@ async function sdbLoad(files) {
   SDB = D;
   store.set('ps_sdb', JSON.stringify(D));
   SDQ = null;
-  if (BLK) BLK.plan = null;
+  if (BLK) {
+    BLK.plan = null;
+    BLK.mplan = null;
+  }
   TOOLV = 'sdb';
   await sdbRun();
   MQN = 'catch';
@@ -6922,7 +7103,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3.3 (2 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.4 (2 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -8728,7 +8909,30 @@ const blkFiles = B =>
       }
       return { name: r.name, buf: u8buf(r.blob), nd: r.nd };
     });
+/* 5.4: ใบเปล่าเดือนใหม่ — จอที่อยู่ในใบของคนอื่นตามฐานข้อมูลจอ ย้ายให้ก่อนบันทึก */
+function vBlankMove(B) {
+  if (!sdb() || !B.ok) return '';
+  const M = B.mplan || (B.mplan = sdbMovePlan(blkFiles(B), (B.moved && B.moved.no) || [])),
+    D = B.moved;
+  let h = '';
+  if (D)
+    h += alertHTML(
+      D.go.length ? 'ok' : 'wr',
+      D.go.length ? `ย้ายจอในใบเปล่าแล้ว ${D.go.length} จอ` : 'ย้ายจอไม่ได้',
+      `<p>${D.go.map(m => `<b>${esc(m.code)}</b> ${esc(m.from)} → ${esc(m.to)} (ชีต ${esc(m.tsn)})`).join('<br>') || '–'}${D.no.length ? `<br>ย้ายไม่ได้: ${D.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}</p>`,
+    );
+  if (M.mv.length || M.skip.length)
+    h += alertHTML(
+      'wr',
+      `มี ${M.mv.length + M.skip.length} จออยู่ในใบของคนอื่นตามฐานข้อมูลจอ`,
+      `<ul>${M.mv.map(m => `<li><b>${esc(m.code)}</b> ${esc(m.loc)} อยู่ใน <b>${esc(m.from)}</b> (ชีต ${esc(m.fsn)}) → ย้ายไปต่อท้ายชีต ${esc(m.tsn)} ใน <b>${esc(m.to)}</b></li>`).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b> ใน <b>${esc(z.from)}</b> — ${esc(z.why)} ย้ายเองในใบเช็ค</li>`).join('')}</ul><p>ระบบเอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต ใส่รหัส Format และสถานที่ของจอ) • ย้ายเฉพาะจอที่ทั้งเอาออกและเพิ่มได้ จอจึงไม่หายและไม่ซ้ำ 2 ใบ</p>${M.mv.length ? `<div class="picb"><button class="btn primary" data-a="blkmove">ย้ายจอตามฐานข้อมูล (${M.mv.length} จอ)</button></div>` : ''}`,
+    );
+  return h;
+}
 function vBlankAdd(B) {
+  return vBlankMove(B) + vBlankAdd0(B);
+}
+function vBlankAdd0(B) {
   if (!sdb())
     return B.ok
       ? '<p class="hint">ใส่ไฟล์ฐานข้อมูลจอที่การ์ด “ตรวจจอกับฐานข้อมูล” ระบบจะบอกและเพิ่มจอที่ใบเปล่ายังขาดให้ได้ก่อนบันทึก</p>'
@@ -8755,13 +8959,21 @@ function vBlankAdd(B) {
   return alertHTML(
     'wr',
     `ใบเปล่ายังขาดจอ ${n + sk.length} จอ ตามฐานข้อมูลจอ`,
-    `${li}<ul>${P.flatMap(x => x.adds.map(a => `<li><b>${esc(x.name)}</b> ขาด <b>${esc(a.code)}</b> ${esc(a.loc)} → เพิ่มต่อท้ายชีต ${esc(a.sn)}</li>`)).join('')}${sk.map(([nm, s]) => `<li><b>${esc(nm)}</b> ขาด <b>${esc(s.code)}</b> — ${esc(s.why)} ใส่เองในใบเช็ค</li>`).join('')}</ul><p>ระบบเพิ่มจอต่อท้ายชีตแพค ใช้หัวตารางแบบเดียวกับจอสุดท้ายในชีต แล้วใส่รหัส Format และสถานที่ของจอใหม่ (เฉพาะชีตแบบรหัสจอแถว 11) • จอที่อยู่ในใบของคนอื่น ระบบไม่ย้ายให้ ดูได้ที่ “ตรวจจอกับฐานข้อมูล”</p>${n ? `<div class="picb"><button class="btn primary" data-a="blkadd">เพิ่มจอที่ขาดลงใบเปล่า (${n} จอ)</button></div>` : ''}`,
+    `${li}<ul>${P.flatMap(x => x.adds.map(a => `<li><b>${esc(x.name)}</b> ขาด <b>${esc(a.code)}</b> ${esc(a.loc)} → เพิ่มต่อท้ายชีต ${esc(a.sn)}</li>`)).join('')}${sk.map(([nm, s]) => `<li><b>${esc(nm)}</b> ขาด <b>${esc(s.code)}</b> — ${esc(s.why)} ใส่เองในใบเช็ค</li>`).join('')}</ul><p>ระบบเพิ่มจอต่อท้ายชีตแพค ใช้หัวตารางแบบเดียวกับจอสุดท้ายในชีต แล้วใส่รหัส Format และสถานที่ของจอใหม่ (เฉพาะชีตแบบรหัสจอแถว 11) • จอที่อยู่ในใบของคนอื่น ย้ายได้ที่กล่องด้านบน</p>${n ? `<div class="picb"><button class="btn primary" data-a="blkadd">เพิ่มจอที่ขาดลงใบเปล่า (${n} จอ)</button></div>` : ''}`,
   );
 }
 function vSdbAdd() {
   const A = SDA && SDA.sig === ckSig() ? SDA : null;
   let h = '';
-  if (A)
+  if (A && A.kind === 'move')
+    h += alertHTML(
+      A.sv ? 'ok' : 'wr',
+      A.sv
+        ? `บันทึกใบเช็คที่ย้ายจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
+        : `ย้ายจอแล้ว ${A.go.length} จอ — ยังไม่ได้บันทึก`,
+      `<p>${A.go.map(m => `<b>${esc(m.code)}</b> ${esc(m.from)} → ${esc(m.to)} (ชีต ${esc(m.tsn)})`).join('<br>') || '–'}${A.no.length ? `<br>ย้ายไม่ได้: ${A.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${A.sv ? ` • ไฟล์ก่อนย้ายเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
+    );
+  else if (A)
     h += alertHTML(
       A.sv ? 'ok' : 'wr',
       A.sv
@@ -8775,8 +8987,16 @@ function vSdbAdd() {
       h +
       (A
         ? ''
-        : '<p class="hint">เพิ่มจอที่ขาดให้อัตโนมัติได้เฉพาะใบเปล่า (ตอนทำใบเปล่าเดือนใหม่ หรือเปิดโฟลเดอร์ใบเปล่าของเดือนใหม่ไว้ในกล่อง “ใบเช็คที่ใช้”) • ใบที่เติมแล้ว ให้เพิ่มจอเองในใบเช็ค</p>')
+        : '<p class="hint">ย้ายจอตามฐานข้อมูล และเพิ่มจอที่ขาด ทำให้อัตโนมัติได้เฉพาะใบเปล่า (ตอนทำใบเปล่าเดือนใหม่ หรือเปิดโฟลเดอร์ใบเปล่าของเดือนใหม่ไว้ในกล่อง “ใบเช็คที่ใช้”) • ใบที่เติมแล้ว ให้เพิ่มจอเองในใบเช็ค</p>')
     );
+  {
+    const M = sdbMovePlan(
+      TC.map(f => ({ name: f.name, buf: f.buf, nd: f.nd || { S: [] } })),
+      A && A.kind === 'move' ? A.no : [],
+    ); /* 5.4 */
+    if (M.mv.length || M.skip.length)
+      h += `<div class="cmpg g-fix"><h4>ย้ายจอตามฐานข้อมูลจอ<span>${M.mv.length}</span></h4><ol class="cmpl">${M.mv.map(m => `<li><b>${esc(m.code)}</b> ${esc(m.loc)}<span class="do">ย้ายจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) ไป ${esc(m.to)} (ต่อท้ายชีต ${esc(m.tsn)})</span></li>`).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b><span class="do">${esc(z.from)}: ${esc(z.why)} — ย้ายเองในใบเช็ค</span></li>`).join('')}</ol>${M.mv.length ? `<div class="picb"><button class="btn primary" data-a="sdbmove">ย้ายจอตามฐานข้อมูล (${M.mv.length} จอ)</button></div><p class="hint">เอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต) • ย้ายเฉพาะจอที่ทั้งเอาออกและเพิ่มได้ จอจึงไม่หายและไม่ซ้ำ 2 ใบ • ยังไม่แก้ไฟล์ในเครื่องจนกว่าจะกดบันทึก (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ)</p>` : ''}</div>`;
+  }
   const P = sdbAddPlan(TC.map(f => ({ name: f.name, buf: f.buf, nd: f.nd || { S: [] } }))),
     n = P.reduce((t, x) => t + x.adds.length, 0),
     sk = P.flatMap(x => x.skip.map(z => [x.name, z]));
@@ -11416,12 +11636,55 @@ const ACT = {
     }
     B.added = [...(B.added || []), ...done];
     B.plan = null;
+    B.mplan = null;
     B.sv = null;
     const n = done.reduce((t, d) => t + d.ok.length, 0);
     MQN = n ? 'done' : 'warn';
     note = n
       ? `เพิ่มจอในใบเปล่าแล้ว ${n} จอ — กดบันทึกลงโฟลเดอร์ใหม่`
       : 'เพิ่มจอไม่ได้ — ดูรายละเอียดในกล่อง';
+  },
+  blkmove: async () => {
+    const B = BLK;
+    if (!B || !B.ok || BUSY || FILLING || !sdb()) return;
+    const fs = blkFiles(B),
+      P = sdbMovePlan(fs, (B.moved && B.moved.no) || []);
+    if (!P.mv.length) return; /* 5.4 */
+    note = 'กำลังย้ายจอ …';
+    view();
+    await new Promise(r => setTimeout(r, 30));
+    const R = await sdbMoveApply(fs, P.mv);
+    if (R.err) {
+      MQN = 'err';
+      note = `ย้ายจอไม่ได้ (${R.err}) — ใบเปล่ายังเหมือนเดิม`;
+      return;
+    }
+    for (const n of R.names) {
+      const r = B.res.find(z => z.name === n),
+        f = fs.find(z => z.name === n);
+      if (r && f) {
+        r.blob = new Uint8Array(f.buf);
+        r.nd = f.nd;
+      }
+    }
+    for (const m of R.go) {
+      const a = B.res.find(z => z.name === m.from),
+        b = B.res.find(z => z.name === m.to);
+      if (a) a.rep.push(['ย้ายจอ', `${m.code} ย้ายไปใบ ${m.to}`]);
+      if (b) b.rep.push(['ย้ายจอ', `${m.code} รับมาจากใบ ${m.from} (ต่อท้ายชีต ${m.tsn})`]);
+    }
+    for (const m of R.no) {
+      const a = B.res.find(z => z.name === m.from);
+      if (a) a.rep.push(['ย้ายจอ', `${m.code} ย้ายไม่ได้: ${m.why}`]);
+    }
+    B.moved = R;
+    B.mplan = null;
+    B.plan = null;
+    B.sv = null;
+    MQN = R.go.length ? 'done' : 'warn';
+    note = R.go.length
+      ? `ย้ายจอในใบเปล่าแล้ว ${R.go.length} จอ — กดบันทึกลงโฟลเดอร์ใหม่`
+      : 'ย้ายจอไม่ได้ — ดูรายละเอียดในกล่อง';
   },
   blkdl: async () => {
     const B = BLK;
@@ -11535,6 +11798,38 @@ const ACT = {
     MQN = n ? 'done' : 'warn';
     note = n ? `เพิ่มจอแล้ว ${n} จอ — บันทึก หรือดาวน์โหลด` : 'เพิ่มจอไม่ได้ — ดูรายละเอียดในกล่อง';
   },
+  sdbmove: async () => {
+    if (!sdb() || !TC.length || BUSY || FILLING) return;
+    const fs = TC.map(f => ({ name: f.name, buf: f.buf, nd: f.nd || { S: [] } })),
+      P = sdbMovePlan(fs, SDA && SDA.kind === 'move' && SDA.sig === ckSig() ? SDA.no : []);
+    if (!P.mv.length) return; /* 5.4 */
+    note = 'กำลังย้ายจอ …';
+    view();
+    await new Promise(r => setTimeout(r, 30));
+    const R = await sdbMoveApply(fs, P.mv);
+    if (R.err) {
+      MQN = 'err';
+      note = `ย้ายจอไม่ได้ (${R.err}) — ยังไม่ได้แก้ใบเช็คใบไหนเลย`;
+      return;
+    }
+    for (const n of R.names) {
+      const f = TC.find(z => z.name === n),
+        g = fs.find(z => z.name === n);
+      if (f && g) {
+        f.buf = g.buf;
+        f.nd = g.nd;
+      }
+    }
+    const pv = PICX;
+    if (pv) pv.sig = ckSig();
+    SDA = { kind: 'move', go: R.go, no: R.no, names: R.names, sv: null, sig: ckSig() };
+    SDQ = null;
+    await sdbRun();
+    MQN = R.go.length ? 'done' : 'warn';
+    note = R.go.length
+      ? `ย้ายจอแล้ว ${R.go.length} จอ (${R.names.length} ไฟล์) — บันทึก หรือดาวน์โหลด`
+      : 'ย้ายจอไม่ได้ — ดูรายละเอียดในกล่อง';
+  },
   sdbdl: async () => {
     const A = SDA;
     if (!A || !A.names.length) return;
@@ -11543,7 +11838,10 @@ const ACT = {
       const f = TC.find(x => x.name === n);
       if (f) z.file(n, f.buf, { createFolders: false });
     }
-    saveBlob('ใบเช็ค_เพิ่มจอ.zip', await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }));
+    saveBlob(
+      A.kind === 'move' ? 'ใบเช็ค_ย้ายจอ.zip' : 'ใบเช็ค_เพิ่มจอ.zip',
+      await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
+    );
   },
   sdbsave: async k => {
     const A = SDA;
@@ -11565,7 +11863,9 @@ const ACT = {
     let bk;
     try {
       bk = await (
-        await d.getDirectoryHandle('สำรองก่อนเพิ่มจอ', { create: true })
+        await d.getDirectoryHandle(A.kind === 'move' ? 'สำรองก่อนย้ายจอ' : 'สำรองก่อนเพิ่มจอ', {
+          create: true,
+        })
       ).getDirectoryHandle(day, { create: true });
     } catch (_) {
       MQN = 'err';
@@ -11607,13 +11907,16 @@ const ACT = {
     }
     A.sv = { dir: d.name, day };
     MQN = 'party';
-    note = `บันทึกใบเช็คที่เพิ่มจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${d.name}”`;
+    note = `บันทึกใบเช็คที่${A.kind === 'move' ? 'ย้าย' : 'เพิ่ม'}จอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${d.name}”`;
   },
   sdbclear: () => {
     if (!confirm('ลบฐานข้อมูลจอออกจากเครื่องนี้? (ใส่ใหม่ได้ตลอด)')) return;
     SDB = null;
     SDQ = null;
-    if (BLK) BLK.plan = null;
+    if (BLK) {
+      BLK.plan = null;
+      BLK.mplan = null;
+    }
     store.set('ps_sdb', '');
     note = 'ลบฐานข้อมูลจอแล้ว';
   },
