@@ -891,6 +891,33 @@ h1,h2,h3{letter-spacing:-.005em}
 .r5lh{margin:26px 0 12px;font:600 20px var(--f-hd)}.r5lh small{font:400 14px var(--f-ui);color:var(--mu);margin-left:8px}
 .r5foot{margin-top:16px}
 @media (max-width:640px){.r5top,.r5sec{padding-left:16px;padding-right:16px}.r5act{width:100%}.r5act .btn{flex:1 1 auto}.r5ml li{flex-wrap:wrap}.r5go{margin-left:42px}}
+
+/* ===== 5.3: หน้าตาใหม่รอบ 4 — ขั้นที่ 1 / ขั้นที่ 3 / หน้างานโฟลเดอร์และรูป / การตั้งค่า ให้เข้าชุดกับหน้าหลัก (แค่หน้าตา) ===== */
+.btn,button.btn,.btn.big{border-radius:999px}
+.shead h1{font:600 clamp(28px,3.2vw,38px)/1.22 var(--f-hd);letter-spacing:-.02em}
+.shead p{color:var(--mu)}
+.drop,[data-theme=dark] .drop{border:1.5px dashed var(--ln2);border-radius:26px;background:var(--sf);box-shadow:var(--boxsh)}
+.drop:hover,.drop.over,[data-theme=dark] .drop:hover,[data-theme=dark] .drop.over{border-color:var(--ac);background:var(--acsoft)}
+.dic,[data-theme=dark] .dic{width:64px;height:64px;border-radius:18px;background:var(--acsoft);color:var(--acd)}
+.dic svg{width:30px;height:30px}
+.drop.sm .dic{width:52px;height:52px;border-radius:15px}.drop.sm .dic svg{width:24px;height:24px}
+.drop b{font-weight:600;letter-spacing:-.01em}
+.alert{border-radius:16px}
+.panel>h3,.sec-t{font-weight:600;letter-spacing:-.005em}
+.ck{border-radius:16px}
+.tile{border-radius:16px}
+.tcard{border-radius:24px}
+.tcard.sel{border-color:var(--ac);box-shadow:0 0 0 3px var(--acsoft),var(--shadow)}
+.tci{background:var(--acsoft);color:var(--acd)}
+.tcs{border-radius:16px}
+.tcn b{font:600 32px/1.05 var(--f-hd);letter-spacing:-.01em}
+.tlist>div{border-radius:16px}
+.fillgo{background:var(--hdrbg);-webkit-backdrop-filter:saturate(1.3) blur(10px);backdrop-filter:saturate(1.3) blur(10px)}
+.date input{border-radius:14px;font-weight:600;letter-spacing:-.01em}
+.date input:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--acsoft);outline:0}
+.sw input:checked+span{background:var(--grad)}
+select{border-radius:10px}
+details.files{border-radius:16px}
 </style></head><body>
 <div class="wrap"><header class="hdr"><div class="brand"><span class="logo5" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="3.5"/><path d="M8 7l2-3h4l2 3"/><path d="M9.2 13.6l2 2 3.8-4"/></svg></span><div><b>PHOTO CHECK STUDIO</b><small>BUILT WITH AI • 2026</small></div></div><nav id="hnav" class="hnav" aria-label="เมนูหลัก"></nav></header><div class="shell"><nav id="side" class="side" aria-label="เมนู" data-tour="steps"></nav><div class="mainc"><nav id="sect" class="sect" aria-label="ส่วนของระบบ"></nav><nav id="steps" class="band" aria-label="ขั้นตอน"></nav><main id="app"></main></div></div><footer class="foot"><span id="ver"></span><span>ไฟล์ทั้งหมดประมวลผลในเครื่องนี้ ไม่ถูกส่งออกไปที่ใด</span></footer></div><input type="color" id="colpick" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="picker" class="sr" tabindex="-1" aria-hidden="true" multiple><div id="ovl"></div><div id="busy"></div><div id="tour"></div><div id="msg" role="status" aria-live="polite"></div><div id="mq"></div>
 <script>/*! xlsx.js (C) 2013-present SheetJS -- http://sheetjs.com */
@@ -3084,7 +3111,7 @@ async function addFiles(kind,files){const arr=[];for(const f of files)arr.push({
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.2 (2 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3 (2 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
