@@ -1364,22 +1364,28 @@ function pzScr(b,pack){const X=b.px||{hd:'',cols:[]},t=pkTag(pack),num=v=>/^\d{1
  const hd=pzT(X.hd)||pzT(b.sn);
  if(/BASE/.test(nrm(b.sn))||/^BASE/.test(nrm(hd))){const q=hd.toUpperCase().replace(/\s*-\s*/g,' - '),m=q.match(/SCREEN\s+([A-Z])\b/),i=m?m[1].charCodeAt(0)-64:0;return[[hd,{nm:'BASE|'+nrm(hd)},['Pic @ BASE',(i?i+'. ':'')+q]]]}
  return[[hd,{nm:nrm(hd)},['Pic @ '+hd]]]}
-function pzPlan(W,res,rs,upto){const D=new Date(W),y=D.getUTCFullYear(),m=D.getUTCMonth(),two=D.getUTCDate()>=16,cut=Date.UTC(y,m,16),
+function pzPlan(W,res,rs,upto,X){ /* 5.5.1: X = {S, shut, dir} จากโฟลเดอร์ที่เลือก (อ่านอย่างเดียว) → ชื่อจอตามโฟลเดอร์ที่มีอยู่ (ชื่อเดิมทุกตัวอักษร • แก้ป้ายแพคเฉพาะจอที่อยู่คนละแพค) */const D=new Date(W),y=D.getUTCFullYear(),m=D.getUTCMonth(),two=D.getUTCDate()>=16,cut=Date.UTC(y,m,16),
   RS=(two?(rs==='1'?[false]:rs==='both'?[false,true]:[true]):[false]).map(t=>({t,h:t?2:1,cur:t===two})).filter(R=>!(upto>0&&R.t&&upto<16)),
   capT=upto>0?Date.UTC(y,m,upto+1):Infinity,m0=Date.UTC(y,m,1),m1=Date.UTC(y,m+1,1);
- const T=new Map(),skip=[];
+ const T=new Map(),skip=[],closed=[];
  for(const r of res||[])for(const b of r.fold||[]){const pack=pzPack(b);
   if(!pack){skip.push({f:r.name,sn:b.sn,id:b.code?codeOf(b.raw)||b.code:''});continue}
   const fs=RS.map(R=>[...new Set((b.items||[]).filter(([n,g])=>n&&(R.t?g>=cut:g<cut)&&g<capT&&g>=m0&&g<m1).map(([n])=>String(n).trim()).filter(Boolean))]);
-  for(const[id,,path]of pzScr(b,pack)){const k=(pack+'/'+path.join('/')).toLowerCase(),e=T.get(k)||{id,pack,path,films:RS.map(()=>new Set()),src:new Set()};
+  const Ls=pzScr(b,pack),T0=X?picTg(b,X.S):[];
+  for(let[id,key,path]of Ls){let ns='ck';
+   if(X){const t=T0.find(x=>x[1]&&sameK(x[1],key))||(Ls.length===1&&T0.length===1&&!T0[0][1]?T0[0]:null),z=t&&t[2];
+    if(z){const g=z.g?[z.name]:z.path.slice(z.pp.length?1:0);if(g.length){if(z.pp.length&&nrm(z.pp[0])!==nrm(pack))g[g.length-1]=reTag(g[g.length-1],pack);path=g;ns='fd'}}
+    else if(X.shut.some(q=>sameK(q,key))){closed.push({f:r.name,sn:b.sn,id});continue}}
+   const k=(pack+'/'+path.join('/')).toLowerCase(),e=T.get(k)||{id,pack,path,ns,films:RS.map(()=>new Set()),src:new Set()};
    fs.forEach((L,i)=>L.forEach(f=>e.films[i].add(f)));e.src.add(r.name+' • '+b.sn);T.set(k,e)}}
  const list=[];
  for(const e of T.values())RS.forEach((R,i)=>{if(!R.cur&&!e.films[i].size)return; /* รอบ 1–15 ที่จอนี้ไม่มีหนัง ไม่ทำ (แบบเดียวกับตอนสร้างลงโฟลเดอร์) */
   const sub=[...PMOD,...[...e.films[i]].sort((a,b)=>a.localeCompare(b,'th'))].map(fsafe).filter(Boolean);
-  list.push({id:e.id,pack:e.pack,rnd:rndName(y,m,R.h,null),path:e.path.map(fsafe),sub:[...new Map(sub.map(x=>[x.toLowerCase(),x])).values()],films:e.films[i].size,src:[...e.src]})});
+  list.push({id:e.id,pack:e.pack,ns:e.ns,rnd:rndName(y,m,R.h,null),path:e.path.map(fsafe),sub:[...new Map(sub.map(x=>[x.toLowerCase(),x])).values()],films:e.films[i].size,src:[...e.src]})});
  list.sort((a,b)=>a.pack.localeCompare(b.pack)||a.rnd.localeCompare(b.rnd)||a.path.join('/').localeCompare(b.path.join('/'),'th'));
  const dirs=new Set();for(const x of list){let p='';for(const q of[x.pack,x.rnd,...x.path]){p+=(p?'/':'')+q;dirs.add(p.toLowerCase())}for(const q of x.sub)dirs.add((p+'/'+q).toLowerCase())}
- return{list,skip,n:dirs.size,rounds:[...new Set(list.map(x=>x.rnd))].sort(),scr:new Set(list.map(x=>(x.pack+'/'+x.path.join('/')).toLowerCase())).size,upto:capT<Infinity?upto:0}}
+ const cs=new Map();for(const x of list)cs.set((x.pack+'/'+x.path.join('/')).toLowerCase(),x.ns);
+ return{list,skip,closed,dir:X?X.dir:'',cnt:{fd:[...cs.values()].filter(v=>v==='fd').length,ck:[...cs.values()].filter(v=>v==='ck').length},n:dirs.size,rounds:[...new Set(list.map(x=>x.rnd))].sort(),scr:new Set(list.map(x=>(x.pack+'/'+x.path.join('/')).toLowerCase())).size,upto:capT<Infinity?upto:0}}
 async function pzZip(P){const z=new JSZip(),seen=new Set(),add=p=>{const l=p.toLowerCase();if(!seen.has(l)){seen.add(l);z.folder(p)}};
  for(const x of P.list){const base=[x.pack,x.rnd,...x.path].join('/');add(base);for(const q of x.sub)add(base+'/'+q)}
  return z.generateAsync({type:'uint8array',compression:'DEFLATE'})}
@@ -3216,7 +3222,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5 (2 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.1 (2 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -3555,7 +3561,7 @@ const fillSum=(res,n,sec)=>{const A=res.flatMap(r=>r.rep),c=re=>A.filter(x=>re.t
 const isWarn=x=>isFilled(x)?/ใช้รายการ/.test(x[2])&&!/จอ (Spare|CITY) ใช้รายการ/.test(x[2]):!isInfo(x)&&(x[1]!=='รูปแบบ'||/^ตรวจ/.test(x[2]));
 /* 4.9: ควรตรวจ แบ่ง 2 กลุ่ม — แจ้งให้ทราบ = ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น • ต้องแก้ = ที่เหลือ (เติมไม่ได้ ใช้รายการอื่นแทน จอขาด ชีตที่ข้าม ฯลฯ) */
 const isNote=x=>isWarn(x)&&/^ตรวจ: (กันตกหล่น|ยังไม่ใส่ เพราะวันเริ่ม|ไม่ใส่ตามหมายเหตุ|ไม่ใส่เพราะจำนวนครั้ง)/.test(x[2]),isMust=x=>isWarn(x)&&!isNote(x);
-let PICR='cur',PICU=0,PICX=null,PICD=null; /* PICX = รายชื่อหนังของใบเช็คในหน้างานโฟลเดอร์และรูป {W,res,bad,n,sig,pic,cmp} (3.13: ผลตรวจโฟลเดอร์เทียบจออยู่ใน cmp) • PICD = โฟลเดอร์แยกรูปที่เลือกล่าสุด */
+let PICR='cur',PICU=0,PICX=null,PICD=null,PZN=null,PZM=store.get('ps_pzm')==='fd'?'fd':'ck'; /* 5.5.1: PZM = ชื่อโฟลเดอร์จอใน .zip ck ตามใบเช็ค / fd ตามโฟลเดอร์ที่มีอยู่ • PZN = โฟลเดอร์ที่อ่านชื่อ */ /* PICX = รายชื่อหนังของใบเช็คในหน้างานโฟลเดอร์และรูป {W,res,bad,n,sig,pic,cmp} (3.13: ผลตรวจโฟลเดอร์เทียบจออยู่ใน cmp) • PICD = โฟลเดอร์แยกรูปที่เลือกล่าสุด */
 let TC=[],TCS='',TCK=null,TCL=null,TCN='',FTAB='home'; /* ใบเช็คของหน้างานโฟลเดอร์และรูป (3.13): TCS = last ใบที่เพิ่งเติม / c ใบในขั้นที่ 3 / dir เปิดทั้งโฟลเดอร์ / own เพิ่มเอง • TCK = ต้นทางตอนเลือก • TCL = ผลการเติมตอนเลือก • FTAB = ขั้นที่ค้างไว้ */
 const sigOf=A=>A.map(f=>f.name+':'+f.buf.byteLength).join('|'),picS=()=>PICX,ckSig=()=>sigOf(TC); /* โฟลเดอร์แยกรูป (3.10): PICR รอบ cur = รอบนี้ / 1 = รอบ 1–15 / both = ทั้ง 2 รอบ (เลือกได้เมื่อวันทำงานเป็นวันที่ 16 ขึ้นไป) • PICU เอาหนังที่เริ่มถึงวันที่ (0 = ทั้งหมด) */
 /* 4.1.3: ระหว่างตรวจใหม่ตามตัวเลือก (รอบ / ถึงวันที่) ปุ่มสร้างกดไม่ได้ — เดิมกดได้ระหว่างนั้นและสร้างตามรายการเก่า (เช่น เลือกถึงวันที่ 26 แต่ได้หนังวันที่ 27 ด้วย) */
@@ -3564,10 +3570,15 @@ const picMadeTxt=r=>{const c=r.c||{},a=[c.rnd?`รอบ ${c.rnd}`:'',c.mon?`เ
 const picSig=P=>P?P.plan.map(p=>p.disp+'|'+p.mk.map(q=>q.join(':')).join(',')+'|'+p.need.map(q=>q[1]).join(',')).join('\n')+'|'+P.upto+'|'+(P.rounds||[]).join(','):'';
 const picRe=async()=>{const L=picS();if(!L||!L.pic||!L.pic.d)return;note='กำลังตรวจโฟลเดอร์แยกรูป …';const o=L.pic;o.busy=true;view();try{const P=await picPlan(o.d,L.W,L.res,PICR,picUp());L.pic={d:o.d,P,made:null};note=P.n?`ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์`:'โฟลเดอร์แยกรูปครบแล้ว'}finally{o.busy=false}};
 const picRng=()=>{const D=new Date(picS().W),wd=D.getUTCDate(),two=wd>=16,rs=two?PICR:'cur';return rs==='cur'&&two?[16,wd]:rs==='1'?[1,15]:[1,wd]},picUp=()=>{const[lo,hi]=picRng();return PICU>=lo&&PICU<=hi?PICU:0};
+/* 5.5.1: ตัวเลือกชื่อโฟลเดอร์จอใน .zip */
+const pzOpt=()=>{const fd=PZM==='fd',nm=PZN?PZN.name:store.get('ps_pznm')||'';
+ return`<div class="picr"><span>ชื่อโฟลเดอร์จอใน .zip</span><div class="seg" role="radiogroup" aria-label="ชื่อโฟลเดอร์จอใน .zip">${[['ck','ตามใบเช็ค'],['fd','ตามโฟลเดอร์ที่มีอยู่']].map(([k,t])=>`<button role="radio" aria-checked="${PZM===k}" class="${PZM===k?'on':''}" data-a="pzmode" data-k="${k}"${k==='fd'&&!FSA?' disabled':''}>${t}</button>`).join('')}</div></div>
+ <small class="pich">${fd?`ระบบอ่านชื่อจอจากโฟลเดอร์แยกรูป / Gallary ที่เลือก (อ่านอย่างเดียว ไม่สร้าง ไม่แก้อะไรในโฟลเดอร์นั้น) จอที่ยังไม่มีโฟลเดอร์ใช้ชื่อจากใบเช็ค • จอที่อยู่ในจอปิดถาวรไม่ใส่${nm?` • โฟลเดอร์ที่อ่าน: <b>“${esc(nm)}”</b> <button class="linkb" data-a="pzdir">เปลี่ยนโฟลเดอร์</button>`:' • กดดาวน์โหลดแล้วเลือกโฟลเดอร์ (เช่น 2.Gallary 2026) ครั้งแรกครั้งเดียว'}`:`ชื่อจอจากหัวบล็อกในใบเช็คของแต่ละคน: รหัส สถานที่ (ป้ายแพค) (Format)${FSA?' • เลือก “ตามโฟลเดอร์ที่มีอยู่” เพื่อใช้ชื่อเดียวกับโฟลเดอร์ในไดรฟ์':''}`}</small>`};
 /* 5.5: ผลการดาวน์โหลด .zip */
 const vPz=L=>{const Z=L&&L.zip;if(!Z)return'';const by=new Map();for(const x of Z.list){if(!by.has(x.pack))by.set(x.pack,new Set());by.get(x.pack).add(x.path.join('/'))}
- return`${Z.name?alertHTML('ok',`ดาวน์โหลด “${esc(Z.name)}” แล้ว`,`<p>${Z.scr} จอ • ${Z.n.toLocaleString()} โฟลเดอร์ • รอบ ${esc(Z.rounds.join(', '))}${Z.upto?' • หนังที่ขึ้นถึงวันที่ '+Z.upto:''}</p><p>${[...by].map(([k,v])=>esc(k.replace(/^Pic @ /,''))+' '+v.size+' จอ').join(' • ')}</p><p>เปิดไฟล์ .zip เลือกโฟลเดอร์ Pic @ ทั้งหมด แล้วคัดลอกไปวางในโฟลเดอร์ Gallary (เช่น 2.Gallary 2026) โฟลเดอร์ที่มีอยู่แล้วจะรวมกัน รูปเดิมไม่หาย</p>`):alertHTML('wr','ไม่มีจอที่ทำโฟลเดอร์ได้','<p>ดูรายการด้านล่าง</p>')}
- ${Z.list.length?`<details class="picd"><summary>จอใน .zip (${Z.scr} จอ)</summary><ul>${Z.list.map(x=>`<li><b>${esc(x.path[x.path.length-1])}</b> ${x.sub.length} โฟลเดอร์ (หนัง ${x.films} เรื่อง)<small class="pth">${esc([x.pack,x.rnd,...x.path].join(' › '))}</small><small>${esc(x.src.join(' / '))}</small></li>`).join('')}</ul></details>`:''}
+ return`${Z.name?alertHTML('ok',`ดาวน์โหลด “${esc(Z.name)}” แล้ว`,`<p>${Z.scr} จอ • ${Z.n.toLocaleString()} โฟลเดอร์ • รอบ ${esc(Z.rounds.join(', '))}${Z.upto?' • หนังที่ขึ้นถึงวันที่ '+Z.upto:''}</p><p>${Z.dir?`ชื่อจอตามโฟลเดอร์ “${esc(Z.dir)}” ${Z.cnt.fd} จอ • ชื่อจากใบเช็ค ${Z.cnt.ck} จอ (ยังไม่มีโฟลเดอร์)`:'ชื่อจอตามใบเช็ค'}</p><p>${[...by].map(([k,v])=>esc(k.replace(/^Pic @ /,''))+' '+v.size+' จอ').join(' • ')}</p><p>เปิดไฟล์ .zip เลือกโฟลเดอร์ Pic @ ทั้งหมด แล้วคัดลอกไปวางในโฟลเดอร์ Gallary (เช่น 2.Gallary 2026) โฟลเดอร์ที่มีอยู่แล้วจะรวมกัน รูปเดิมไม่หาย</p>`):alertHTML('wr','ไม่มีจอที่ทำโฟลเดอร์ได้','<p>ดูรายการด้านล่าง</p>')}
+ ${Z.list.length?`<details class="picd"><summary>จอใน .zip (${Z.scr} จอ)</summary><ul>${Z.list.map(x=>`<li><b>${esc(x.path[x.path.length-1])}</b>${Z.dir&&x.ns==='ck'?'<span class="rtag">ชื่อจากใบเช็ค</span>':''} ${x.sub.length} โฟลเดอร์ (หนัง ${x.films} เรื่อง)<small class="pth">${esc([x.pack,x.rnd,...x.path].join(' › '))}</small><small>${esc(x.src.join(' / '))}</small></li>`).join('')}</ul></details>`:''}
+ ${Z.closed&&Z.closed.length?`<p class="hint">จอปิดถาวร ไม่ใส่: ${esc([...new Set(Z.closed.map(x=>x.id))].join(', '))}</p>`:''}
  ${Z.skip.length?`<details class="picd"><summary>ไม่ได้ใส่ใน .zip ${Z.skip.length} จอ (ไม่รู้ว่าอยู่แพคไหน เช่น จอห้าง / ชีตที่ไม่บอกแพค)</summary><ul>${Z.skip.map(x=>`<li><b>${esc(x.id||'ชีต '+x.sn)}</b><small>${esc(x.f)}${x.id?' • ชีต '+esc(x.sn):''}</small></li>`).join('')}</ul></details>`:''}`};
 const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))return'';
  const D=new Date(L.W),two=D.getUTCDate()>=16,ld=new Date(Date.UTC(D.getUTCFullYear(),D.getUTCMonth()+1,0)).getUTCDate(),rs=two?PICR:'cur',r2='16–'+ld,up=picUp(),[lo,hi]=picRng(),rn=(two?(rs==='1'?'1–15':rs==='both'&&!(up&&up<16)?'1–15 และ '+r2:rs==='both'?'1–15':r2):'1–15')+' '+TH[D.getUTCMonth()]+(up?' • หนังที่ขึ้นถึง '+up+' '+TH[D.getUTCMonth()]:''),p=L.pic,P=p&&p.P,
@@ -3581,7 +3592,7 @@ const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))retu
   usel=`<label class="picr"><span>หนังที่ขึ้นจอถึงวันที่</span><select id="picupto" aria-label="หนังที่ขึ้นจอถึงวันที่" aria-describedby="picuh"><option value="0" ${up?'':'selected'}>ทุกเรื่องในรอบ (ค่าปกติ)</option>${days.map(d=>`<option value="${d}" ${up===d?'selected':''}>${d} ${TM}${dc.has(d)?(d===lo?` • ต้นรอบ ${dc.get(d).size} เรื่อง`:` • ขึ้น ${dc.get(d).size} เรื่อง`):''}</option>`).join('')}</select></label><small class="pich" id="picuh">${uhelp}</small>`,
   sel=two?`<div class="picr"><span>สร้างโฟลเดอร์ของ</span><div class="seg" role="radiogroup" aria-label="รอบที่จะสร้างโฟลเดอร์">${[['cur','รอบ '+r2+' (รอบนี้)'],['1','รอบ 1–15'],['both','ทั้ง 2 รอบ']].map(([k,t])=>`<button role="radio" aria-checked="${rs===k}" class="${rs===k?'on':''}" data-a="picround" data-k="${k}">${t}</button>`).join('')}</div></div>`:'';
  let b='';
- if(!P)b=`${sel}${usel}<p class="hint"><b>ดาวน์โหลดเป็น .zip</b> (ไม่ต้องเลือกโฟลเดอร์): ระบบทำโฟลเดอร์ว่าง<b>แบบ Gallary: Pic @ แพค → ${esc(rndName(D.getUTCFullYear(),D.getUTCMonth(),two?2:1,null))} → จอ</b> (ชื่อจอจากใบเช็คของแต่ละคน) → ${dsc} • เปิดไฟล์ .zip แล้วคัดลอกโฟลเดอร์ Pic @ ไปวางในโฟลเดอร์ Gallary โฟลเดอร์ที่มีอยู่แล้วจะรวมกัน รูปเดิมไม่หาย</p><p class="hint">${FSA?'<b>หรือเลือกโฟลเดอร์แยกรูป</b> ให้ระบบสร้างเฉพาะที่ยังไม่มีลงในโฟลเดอร์นั้นเลย (จอที่ยังไม่มีโฟลเดอร์ ระบบตั้งชื่อจากใบเช็ค) • ถ้ารอบนี้เริ่มแบบเดิมไว้แล้ว (จอ → เดือน → รอบ) สร้างต่อแบบเดิมจนจบรอบ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อโฟลเดอร์หรือรูปที่มีอยู่ ดูรายการก่อนกดสร้าง':'การเลือกโฟลเดอร์ให้ระบบสร้างเองใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์'}</p><div class="picb"><button class="btn primary" data-a="piczip">${IC.folder}ดาวน์โหลดโครงโฟลเดอร์ (.zip)</button>${FSA?`<button class="btn secondary" data-a="picscan">${IC.folder}เลือกโฟลเดอร์แยกรูปแล้วตรวจ</button>`:''}</div>${vPz(L)}`;
+ if(!P)b=`${sel}${usel}<p class="hint"><b>ดาวน์โหลดเป็น .zip</b> (ไม่ต้องเลือกโฟลเดอร์): ระบบทำโฟลเดอร์ว่าง<b>แบบ Gallary: Pic @ แพค → ${esc(rndName(D.getUTCFullYear(),D.getUTCMonth(),two?2:1,null))} → จอ</b> (ชื่อจอ${PZM==='fd'?'ตามโฟลเดอร์ที่มีอยู่ จอที่ยังไม่มีใช้ชื่อจากใบเช็ค':'จากใบเช็คของแต่ละคน'}) → ${dsc} • เปิดไฟล์ .zip แล้วคัดลอกโฟลเดอร์ Pic @ ไปวางในโฟลเดอร์ Gallary โฟลเดอร์ที่มีอยู่แล้วจะรวมกัน รูปเดิมไม่หาย</p>${pzOpt()}<div class="picb"><button class="btn primary" data-a="piczip">${IC.folder}ดาวน์โหลดโครงโฟลเดอร์ (.zip)</button>${FSA?`<button class="btn secondary" data-a="picscan">${IC.folder}เลือกโฟลเดอร์แยกรูปแล้วตรวจ</button>`:''}</div><p class="hint">${FSA?'<b>หรือเลือกโฟลเดอร์แยกรูป</b> ให้ระบบสร้างเฉพาะที่ยังไม่มีลงในโฟลเดอร์นั้นเลย (จอที่ยังไม่มีโฟลเดอร์ ระบบตั้งชื่อจากใบเช็ค) • ถ้ารอบนี้เริ่มแบบเดิมไว้แล้ว (จอ → เดือน → รอบ) สร้างต่อแบบเดิมจนจบรอบ • ไม่ลบ ไม่ย้าย ไม่เปลี่ยนชื่อโฟลเดอร์หรือรูปที่มีอยู่ ดูรายการก่อนกดสร้าง':'การเลือกโฟลเดอร์ให้ระบบสร้างเองใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์'}</p>${vPz(L)}`;
  else{const W=P.plan.filter(x=>x.need.length||x.mk.length),nm=x=>esc(x.label),nW=new Set(W.map(x=>x.bk+'|'+x.label)).size,lay=P.lay||{A:0,B:0},
   mkT=x=>x.mk.map(([k,n])=>k==='rnd'?` • โฟลเดอร์รอบ ${esc(n)}`:k==='scr'?' • โฟลเดอร์จอในรอบนี้':` • โฟลเดอร์เดือน ${esc(n)}`).join(''),
   tg=(P.rounds||[]).length>1||(P.rounds||[P.rndN])[0]!==P.rndN,rt=x=>tg?`<span class="rtag">รอบ ${esc(x.r)}</span>`:'';
@@ -4343,9 +4354,21 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
   if(!fs.length){note=`ไม่พบไฟล์ใบเช็ค (.xlsm / .xlsx) ในโฟลเดอร์ “${d.name}”`;return}if(!tcOk())return;CKDIR=d;HDB.set('ck',d).catch(()=>{});
   fs.sort((a,b)=>a.name.localeCompare(b.name,'th'));const L=[];for(const f of fs)L.push({name:f.name,buf:await f.arrayBuffer()});TC=L;tcMark('dir',d.name);SHOT=null;await tcRead();MQN=PICX&&PICX.res.length?'catch':'warn'},
  tcclear:()=>{if(!tcOk())return;TC=[];TCS='';TCK=TCL=null;TCN='';PICX=null;SHOT=null;note='ล้างรายการใบเช็คของหน้านี้แล้ว'},
- piczip:async()=>{const L=picS();if(!L||!L.res.length)return;note='กำลังทำไฟล์ .zip …';view();await new Promise(r=>setTimeout(r,20)); /* 5.5 */
-  const P=pzPlan(L.W,L.res,PICR,picUp());if(!P.list.length){L.zip={...P,name:''};MQN='warn';note='ไม่มีจอที่ทำโฟลเดอร์ได้';return}
+ piczip:async()=>{const L=picS();if(!L||!L.res.length)return;let X=null; /* 5.5 */
+  if(PZM==='fd'&&FSA){let d=PZN; /* 5.5.1: อ่านชื่อจอจากโฟลเดอร์ที่มีอยู่ (อ่านอย่างเดียว) */
+   try{if(!d){const x=await HDB.get('pzn').catch(()=>null);if(x)d=x}
+    if(d&&(await d.queryPermission({mode:'read'}))!=='granted'&&(await d.requestPermission({mode:'read'}))!=='granted')d=null;
+    if(!d)d=await showDirectoryPicker({id:'pzn',mode:'read'})}
+   catch(e){if(e&&e.name==='AbortError')return;note='เลือกโฟลเดอร์ไม่ได้';return}
+   PZN=d;HDB.set('pzn',d).catch(()=>{});store.set('ps_pznm',d.name);note=`กำลังอ่านชื่อจอจากโฟลเดอร์ “${d.name}” …`;view();
+   try{X=await picScreens(d);X.dir=d.name}catch(_){MQN='warn';note=`อ่านโฟลเดอร์ “${d.name}” ไม่ได้`;return}
+   if(!X.S.length){L.zip=null;MQN='warn';note=`ไม่พบโฟลเดอร์จอในโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูป / Gallary ที่มีโฟลเดอร์ Pic @ … (กด “เปลี่ยนโฟลเดอร์”)`;return}}
+  note='กำลังทำไฟล์ .zip …';view();await new Promise(r=>setTimeout(r,20));
+  const P=pzPlan(L.W,L.res,PICR,picUp(),X);if(!P.list.length){L.zip={...P,name:''};MQN='warn';note='ไม่มีจอที่ทำโฟลเดอร์ได้';return}
   const name='แยกรูป '+P.rounds.join(' + ')+'.zip';saveBlob(name,await pzZip(P));L.zip={...P,name};MQN='photo';note=`ดาวน์โหลด ${name} แล้ว • ${P.scr} จอ ${P.n.toLocaleString()} โฟลเดอร์`},
+ pzmode:k=>{if(!['ck','fd'].includes(k)||(k==='fd'&&!FSA))return;PZM=k;store.set('ps_pzm',k);if(picS())picS().zip=null},
+ pzdir:async()=>{if(!FSA)return;let d;try{d=await showDirectoryPicker({id:'pzn',mode:'read'})}catch(e){if(e&&e.name==='AbortError')return;note='เลือกโฟลเดอร์ไม่ได้';return}
+  PZN=d;HDB.set('pzn',d).catch(()=>{});store.set('ps_pznm',d.name);if(picS())picS().zip=null;note=`จะใช้ชื่อจอจากโฟลเดอร์ “${d.name}”`},
  picround:async k=>{if(!['cur','1','both'].includes(k)||k===PICR)return;if(picS())picS().zip=null;PICR=k;PICU=0;await picRe()},
  picupto:async v=>{if(picS())picS().zip=null;PICU=Math.max(0,parseInt(v,10)||0);await picRe()},
  picmake:async()=>{const L=picS();if(!L||!L.pic||!L.pic.P||L.pic.busy)return;note='กำลังสร้างโฟลเดอร์ …';view();
