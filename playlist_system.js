@@ -93,6 +93,7 @@
  *   เวอร์ชัน 4.7.1: ใบเปล่าต้นเดือน — แถบวันแรกตามช่วงสูตรนับในหัวชีต (layoutChk hr), แถบสีตามการตั้งค่าทั้งแถว (hdr)
  *   เวอร์ชัน 4.8: ใบเปล่าเดือนใหม่ (blankWb, หน้างานโฟลเดอร์ vBlank) • ฐานข้อมูลจอ (sdbRead / sdbCheck, vSdb, ขั้นที่ 3 + รายงาน) • แถบวันที่: ช่องวันที่ไม่มีรูปแบบวันที่ → numFmt 14 (hdr)
  *   เวอร์ชัน 4.8.1: เพิ่มจอที่ขาดลงใบเปล่า (arrangeWb opt.adds, blankHr, sdbAddPlan / sdbApply, vBlankAdd / vSdbAdd)
+ *   เวอร์ชัน 4.9: ปรับหน้าจอ — ขั้นที่ 3 ตั้งค่าเฉพาะไฟล์พับไว้ (CKX) ปุ่มเติมอยู่ล่างจอ (fillgo) คำอธิบายซ่อนได้ (HLP) • ควรตรวจแบ่ง ต้องแก้ / แจ้งให้ทราบ (isMust / isNote) • น้องโฟกัสเล็กลง • ตัวหนังสือเล็กอ่านง่ายขึ้น
  * ======================================================================
  */
 
@@ -6894,7 +6895,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.8.1 (2 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 4.9 (2 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -7848,9 +7849,12 @@ function vCk(f, r, i, rk) {
       .map(x => `<span class="need miss">ไม่พบจอ ${esc(x)}</span>`)
       .join(
         '',
-      )}${r.nf.length > 12 ? `<span class="need miss">และอีก ${r.nf.length - 12} จอ</span>` : ''}</div>${r.warn.length ? `<p class="nfline">ใช้รายการแทน (จะขึ้นใน “ควรตรวจ”): ${esc(r.warn.join(', '))}</p>` : ''}${r.skip.length ? `<p class="hint" style="margin-top:6px">ข้าม ${r.skip.length} จอตามตัวเลือก “สื่อ” (จะขึ้นใน “ควรตรวจ” ว่าไม่พบจอ)</p>` : ''}`;
+      )}${r.nf.length > 12 ? `<span class="need miss">และอีก ${r.nf.length - 12} จอ</span>` : ''}</div>${r.warn.length ? `<p class="nfline">ใช้รายการแทน (จะขึ้นใน “ต้องแก้”): ${esc(r.warn.join(', '))}</p>` : ''}${r.skip.length ? `<p class="hint" style="margin-top:6px">ข้าม ${r.skip.length} จอตามตัวเลือก “สื่อ” (จะขึ้นใน “ต้องแก้” ว่าไม่พบจอ)</p>` : ''}`;
   }
-  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}${r && !r.bad && !r.empty ? sel + psel + (rk === 2 && OP.r2 !== 'new' ? `<div class="f16"><label class="fcol"><span>แถวเดิมของหนังต่อสัญญาวันที่ 16</span><select data-f16="${esc(f.name)}" aria-label="แถวเดิมของหนังต่อสัญญาวันที่ 16 ใน ${esc(f.name)}"><option value="0" ${fcol(f.name).k16 ? '' : 'selected'}>เขียน “ออก 16” (ปกติ)</option><option value="1" ${fcol(f.name).k16 ? 'selected' : ''}>ไม่ต้องเขียน</option></select></label><small>หนังที่ต่อสัญญาวันที่ 16 ระบบลงแถวใหม่ใต้แถบ 16 ให้อยู่แล้ว ช่องนี้คือแถวเดิมของเรื่องนั้น เลือกให้ตรงกับที่ใบนี้ทำ (ระบบจำไว้สำหรับไฟล์นี้)</small></div>` : '') : ''}</div>`;
+  const fx = fcol(f.name),
+    chg = !!(fx[rk] || fx.p || (rk === 2 && fx.k16)),
+    op = CKX.has(f.name);
+  return `<div class="ck"><div class="ckh"><span class="nm">${esc(f.name)}${r && !r.bad && !r.empty ? `<small>${r.sheets} ชีต ใช้ Playlist ${r.items.length} แบบ</small>` : ''}</span>${pill}${rm}</div>${body}${r && !r.bad && !r.empty ? `<div class="ckx"><button class="linkb" data-a="ckx" data-k="${esc(f.name)}" aria-expanded="${op}">${op ? 'ซ่อนการตั้งค่าของไฟล์นี้' : 'ตั้งค่าเฉพาะไฟล์นี้'}${chg ? ' <em class="chg">ตั้งไว้แล้ว</em>' : ''}</button>${op ? `<div class="ckxb">${sel + psel + (rk === 2 && OP.r2 !== 'new' ? `<div class="f16"><label class="fcol"><span>แถวเดิมของหนังต่อสัญญาวันที่ 16</span><select data-f16="${esc(f.name)}" aria-label="แถวเดิมของหนังต่อสัญญาวันที่ 16 ใน ${esc(f.name)}"><option value="0" ${fcol(f.name).k16 ? '' : 'selected'}>เขียน “ออก 16” (ปกติ)</option><option value="1" ${fcol(f.name).k16 ? 'selected' : ''}>ไม่ต้องเขียน</option></select></label><small>หนังที่ต่อสัญญาวันที่ 16 ระบบลงแถวใหม่ใต้แถบ 16 ให้อยู่แล้ว ช่องนี้คือแถวเดิมของเรื่องนั้น เลือกให้ตรงกับที่ใบนี้ทำ (ระบบจำไว้สำหรับไฟล์นี้)</small></div>` : '')}</div>` : ''}</div>` : ''}</div>`;
 }
 function vFl() {
   const ms = ['ทั้งหมด', ...new Set(DB.filter(s => /^(40|80|CITY|Spare)/.test(s.m)).map(s => s.m))];
@@ -7891,7 +7895,7 @@ function vFl() {
         alertHTML(
           'wr',
           `ใบเช็ค ${nMiss} ไฟล์ยังขาด Playlist หรือหาจอไม่พบ`,
-          '<p>กดเติมได้เลย แต่จอที่ไม่มีใน Playlist จะไม่ถูกเติม และจะขึ้นในรายการ “ควรตรวจ” ถ้าต้องการให้ครบ กลับไปใส่ Playlist ที่ขาดในขั้นที่ 1 ก่อน</p>',
+          '<p>กดเติมได้เลย แต่จอที่ไม่มีใน Playlist จะไม่ถูกเติม และจะขึ้นในรายการ “ต้องแก้” ถ้าต้องการให้ครบ กลับไปใส่ Playlist ที่ขาดในขั้นที่ 1 ก่อน</p>',
         ),
       );
     if (nOk && !nBad && !nMiss)
@@ -7991,7 +7995,7 @@ function vFl() {
       alertHTML(
         'info',
         'เปิด “เพิ่มหนังกันตกหล่นให้เอง” อยู่',
-        '<p>หนังที่ยังไม่เคยลงใบเช็คแต่วันนี้ไม่ได้ “ขึ้นใหม่” ระบบจะลงให้ใต้แถบวันที่ที่เติม และบอกใน “ควรตรวจ” ปิดได้ที่สวิตช์ด้านบน</p>',
+        '<p>หนังที่ยังไม่เคยลงใบเช็คแต่วันนี้ไม่ได้ “ขึ้นใหม่” ระบบจะลงให้ใต้แถบวันที่ที่เติม และบอกใน “แจ้งให้ทราบ” ปิดได้ที่สวิตช์ด้านบน</p>',
       ),
     ); /* 4.5 */
   if (OP.media !== 'ทั้งหมด')
@@ -8014,14 +8018,15 @@ function vFl() {
       : '<small>ไม่พบวันที่ใน Playlist กรุณาใส่เอง เช่น 12-Oct-26</small>';
   return `${shead('เติมใบเช็ครูป', 'ใส่ใบเช็ครูปของวันก่อนหน้า จะใส่ของทุกคนพร้อมกัน หรือเฉพาะของคุณก็ได้ ระบบจะเติมรายชื่อหนังของวันนี้ลงไป')}
  <div class="s3"><div class="col">${drop('ck', C.length ? 'เพิ่มใบเช็ครูป' : 'ลากไฟล์ใบเช็ครูปมาวางที่นี่', 'ใบเช็คของวันก่อนหน้า (.xlsm หรือ .xlsx) หรือคลิกเพื่อเลือกไฟล์ เลือกหลายไฟล์ได้ ไฟล์ชื่อซ้ำจะแทนที่ของเดิม', '.xlsx,.xlsm', 'drop-ck', C.length > 0)}${FSA ? `<button class="btn quiet ckdir" data-a="ckdir">${IC.folder}เปิดใบเช็คทั้งโฟลเดอร์${CKDIR ? ` (ล่าสุด: ${esc(CKDIR.name)})` : ''}</button>` : ''}
+ ${lines.length ? `<div class="stack">${lines.join('')}</div>` : ''}
  <section class="panel" data-tour="ready"><h3 class="sec-t">ใบเช็ครูปที่ใส่แล้ว<small>${C.length} ไฟล์</small></h3>
- ${C.length ? `<div class="ckl">${C.map((f, i) => vCk(f, R[i], i, wd && per(wd).two ? 2 : 1)).join('')}</div>` : '<p class="empty">ยังไม่มีใบเช็ครูป ลากไฟล์มาวางในกล่องด้านบน แล้วระบบจะบอกว่าแต่ละไฟล์ต้องใช้ Playlist แบบไหน</p>'}</section>${FSA && C.length ? tlinkHTML('c', 'สร้างโฟลเดอร์แยกรูป / ใส่วันที่ถ่าย', 'ย้ายไปอยู่หน้า “งานโฟลเดอร์และรูป” แล้ว (ปุ่มด้านบน) ใช้ใบเช็คชุดนี้ได้เลย', 'quiet') : ''}</div>
- <aside class="panel set" data-tour="settings"><h3 class="sec-t">การตั้งค่า</h3>
+ ${C.length ? `<div class="ckl">${C.map((f, i) => vCk(f, R[i], i, wd && per(wd).two ? 2 : 1)).join('')}</div>` : '<p class="empty">ยังไม่มีใบเช็ครูป ลากไฟล์มาวางในกล่องด้านบน แล้วระบบจะบอกว่าแต่ละไฟล์ต้องใช้ Playlist แบบไหน</p>'}</section></div>
+ <aside class="panel set${HLP ? ' hlp' : ''}" data-tour="settings"><div class="seth"><h3 class="sec-t">การตั้งค่า</h3><button class="linkb" data-a="hlp" aria-pressed="${HLP}">${HLP ? 'ซ่อนคำอธิบาย' : 'แสดงคำอธิบาย'}</button></div>
  ${MD ? `<div class="date"><span>วันที่ทำงาน</span><b class="mdays">${rngTxt(MD)} • ${MD.length} วัน</b><small>เติมต่อกันทีละวัน ตามวันที่ในไฟล์ Playlist (${MD.map(g => thdS(new Date(g.d))).join(' → ')}) ถ้าจะเติมวันเดียว เอาวันอื่นออกในขั้นที่ 1</small>${rndHTML(new Date(MD[MD.length - 1].d))}</div>` : `<label class="date"><span>วันที่ทำงาน (วันของ Playlist)</span><input id="o_base" class="${BASEERR ? 'bad' : ''}" placeholder="${end(ab) || 'เช่น 12-Oct-26'}" autocomplete="off" aria-invalid="${!!BASEERR}">${dmsg}${wd && !BASEERR ? rndHTML(wd) + (wd.getUTCDate() === 1 ? '<small>วันที่ 1 ยังไม่ใส่ “ออกวันที่”</small>' : '') : ''}</label>`}
  <label class="tgl"><span>จัดรูปแบบตามใบเช็คจริง <em class="rec">แนะนำ: เปิด</em><small><b>เปิด</b> = ทำแบบที่ทีมทำมือ: มีแถบวันที่ หนัง # ขึ้นก่อน (ไฮไลต์เหลือง) แล้วเรียง A–Z หนังใหม่ลงใต้วันที่ของวันนั้น ใส่ “ออกวันที่” และย้ายวันที่ถ่าย (ช่องหลังชื่อหนัง ทุกจอ) ตามชื่อหนังให้</small><small><b>ปิด</b> = ลบรายชื่อเดิม แล้ววางรายชื่อหนังเรียงลงมาอย่างเดียว ไม่เหมาะกับไฟล์ส่งงาน</small></span><span class="sw"><input type="checkbox" id="o_hand"${OP.hand ? '' : ' aria-describedby="o_hand_d"'}><span></span></span></label>
  ${OP.hand ? '' : alertHTML('wr', 'ปิดการจัดรูปแบบอยู่', '<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และวันที่ถ่าย (ช่องหลังชื่อหนัง) จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
  <label class="tgl"><span>จัดจอเข้าชีตตามแพค <em class="rec">แนะนำ: เปิด</em><small>จอที่ Playlist วันนี้ย้ายแพค (เช่น Spare → 40 RED) ระบบย้ายจอไปชีตของแพคนั้นให้ หนัง วันที่ถ่าย และ “ออกวันที่” ไปด้วยครบ • ป้ายแพคที่เขียนผิดแก้ให้ • บอกในผลการเติมว่าย้ายอะไรไปไหน</small>${OP.arr && !arrOn(OP) ? `<small class="wrn">ตอนนี้ยังไม่จัดจอ — ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง” และเลือกสื่อ “ทั้งหมด”</small>` : ''}</span><span class="sw"><input type="checkbox" id="o_arr"><span></span></span></label>
- <label class="tgl"><span>เพิ่มหนังกันตกหล่นให้เอง <em class="rec">ค่าเริ่มต้น: ปิด</em><small>หนังที่มีใน Playlist แต่ยังไม่เคยลงใบเช็คของจอนั้น และวันนี้ไม่ได้ “ขึ้นใหม่” (ปกติขึ้นเป็น “กันตกหล่น” ให้ลงเอง) <b>เปิด</b> = ระบบลงให้ใต้แถบวันที่ที่เติม แล้วบอกใน “ควรตรวจ” ว่าเพิ่มเรื่องไหนในจอไหน ถ้าไม่ต้องมี ลบแถวนั้นออก • ระบบจำไว้ในเครื่องนี้</small>${OP.nostAdd && !OP.hand ? `<small class="wrn">ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง”</small>` : ''}</span><span class="sw"><input type="checkbox" id="o_nost"><span></span></span></label>
+ <label class="tgl"><span>เพิ่มหนังกันตกหล่นให้เอง <em class="rec">ค่าเริ่มต้น: ปิด</em><small>หนังที่มีใน Playlist แต่ยังไม่เคยลงใบเช็คของจอนั้น และวันนี้ไม่ได้ “ขึ้นใหม่” (ปกติขึ้นเป็น “กันตกหล่น” ให้ลงเอง) <b>เปิด</b> = ระบบลงให้ใต้แถบวันที่ที่เติม แล้วบอกใน “แจ้งให้ทราบ” ว่าเพิ่มเรื่องไหนในจอไหน ถ้าไม่ต้องมี ลบแถวนั้นออก • ระบบจำไว้ในเครื่องนี้</small>${OP.nostAdd && !OP.hand ? `<small class="wrn">ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง”</small>` : ''}</span><span class="sw"><input type="checkbox" id="o_nost"><span></span></span></label>
  ${vFrz()}
  <div class="cols"><p class="cl">สีแถบวันที่</p><div class="crow"><span>รอบ 1–15</span>${vColPick(1)}</div><div class="crow"><span>รอบ 16–สิ้นเดือน</span>${vColPick(2)}</div><small>“ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ (รอบ 16 ถ้าชีตยังไม่มีแถบรอบ 2 ใช้สีฟ้า) เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <div class="cols"><p class="cl">สีช่องว่างเหนือแถบวันที่</p><div class="crow">${vPadPick()}</div><small>แถบสีในช่องว่างใต้รายการของจอที่หนังน้อยกว่า ก่อนถึงแถบวันที่ถัดไป (ปกติสีฟ้าอ่อน) “ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
@@ -8036,7 +8041,7 @@ function vFl() {
  <div class="opt"><label class="cb"><input type="checkbox" id="o_arrsort" aria-describedby="d_arrsort" ${OP.arr ? '' : 'disabled'}> เรียงจอในชีตตามเลขจอ</label><small id="d_arrsort">จัดจอเข้าชีตตามแพค: จอที่ย้ายเข้ามาวางตามลำดับเลขจอ (ชีตที่จอยังไม่เรียงจะถูกเรียงให้ด้วย) ถ้าไม่ติ๊ก จอที่ย้ายเข้ามาต่อท้ายทางขวา <b>แนะนำ: ติ๊ก</b></small></div>
  <div class="opt"><label class="cb"><input type="checkbox" id="o_off" aria-describedby="d_off"> รวมรายการปลดต่อท้าย</label><small id="d_off">เขียนรายชื่อหนังที่ปลด/ถอดแล้วต่อท้ายตาราง ใช้ตรวจว่าเรื่องไหนถอดไปแล้ว อย่าใช้กับไฟล์ที่จะส่งงาน <b>แนะนำ: ไม่ติ๊ก</b></small></div>
  <button class="btn quiet" data-a="optreset" ${optChanged().length ? '' : 'disabled'}>คืนค่าแนะนำทั้งหมด</button></div></aside></div>
- <div class="fillbar">${lines.join('')}<button class="btn primary big" data-a="fill" data-tour="fill" ${can ? '' : 'disabled'}>เติมใบเช็ครูป${C.length ? ` ${C.length} ไฟล์` : ''}${MD ? ` • ${MD.length} วัน` : ''}</button>${BASEERR && !MD ? '<p class="hint">แก้วันที่ทำงานให้ถูกต้องก่อน แล้วปุ่มนี้จะกดได้</p>' : DB.length && !C.length ? '<p class="hint">ใส่ใบเช็ครูปอย่างน้อย 1 ไฟล์ แล้วปุ่มนี้จะกดได้</p>' : ''}</div>`;
+ <div class="fillbar fillgo">${C.length && can ? `<span class="fgs">${nOk === C.length ? `พร้อมเติมทั้ง ${C.length} ไฟล์` : `พร้อมเติม ${nOk} จาก ${C.length} ไฟล์`}</span>` : ''}<button class="btn primary big" data-a="fill" data-tour="fill" ${can ? '' : 'disabled'}>เติมใบเช็ครูป${C.length ? ` ${C.length} ไฟล์` : ''}${MD ? ` • ${MD.length} วัน` : ''}</button>${BASEERR && !MD ? '<p class="hint">แก้วันที่ทำงานให้ถูกต้องก่อน แล้วปุ่มนี้จะกดได้</p>' : DB.length && !C.length ? '<p class="hint">ใส่ใบเช็ครูปอย่างน้อย 1 ไฟล์ แล้วปุ่มนี้จะกดได้</p>' : ''}</div>`;
 }
 
 /* ----- ขั้นที่ 4 ----- */
@@ -8053,7 +8058,7 @@ const fillSum = (res, n, sec) => {
   return [
     '',
     'สรุป',
-    `  เติมแล้ว ${res.filter(r => r.blob).length} จาก ${n} ไฟล์ • ${A.filter(isFilled).length.toLocaleString()} จอ • ควรตรวจ ${A.filter(isWarn).length} รายการ`,
+    `  เติมแล้ว ${res.filter(r => r.blob).length} จาก ${n} ไฟล์ • ${A.filter(isFilled).length.toLocaleString()} จอ • ควรตรวจ ${A.filter(isWarn).length} รายการ (ต้องแก้ ${A.filter(isMust).length} • แจ้งให้ทราบ ${A.filter(isNote).length})`,
     `  กันตกหล่น ${g.length} จอ (${nl(g)} เรื่อง) • ขึ้นซ้ำ / ต่อสัญญา ใช้แถวเดิม ${m.length} จอ (${nl(m)} เรื่อง)`,
     ...(bk.length ? [`  ⚠ ข้ามชีตที่เติมไปแล้ว ${bk.length} ชีต (Playlist ย้อนหลัง)`] : []),
     `  ⏱ ใช้เวลารวม ${sec} วินาที`,
@@ -8063,6 +8068,11 @@ const isWarn = x =>
   isFilled(x)
     ? /ใช้รายการ/.test(x[2]) && !/จอ (Spare|CITY) ใช้รายการ/.test(x[2])
     : !isInfo(x) && (x[1] !== 'รูปแบบ' || /^ตรวจ/.test(x[2]));
+/* 4.9: ควรตรวจ แบ่ง 2 กลุ่ม — แจ้งให้ทราบ = ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น • ต้องแก้ = ที่เหลือ (เติมไม่ได้ ใช้รายการอื่นแทน จอขาด ชีตที่ข้าม ฯลฯ) */
+const isNote = x =>
+    isWarn(x) &&
+    /^ตรวจ: (กันตกหล่น|ยังไม่ใส่ เพราะวันเริ่ม|ไม่ใส่ตามหมายเหตุ|ไม่ใส่เพราะจำนวนครั้ง)/.test(x[2]),
+  isMust = x => isWarn(x) && !isNote(x);
 let PICR = 'cur',
   PICU = 0,
   PICX = null,
@@ -8602,11 +8612,15 @@ function mqShow(pose, text) {
   const m = $('#msg');
   if (m) m.classList.remove('show');
   d.innerHTML = `<div class="mqdock" role="status" aria-live="polite"><div class="mqt"><p>${esc(text)}</p><button type="button" class="mqx" data-a="mqx" aria-label="ปิดข้อความของน้องโฟกัส">ปิด</button></div><span class="mq" aria-hidden="true">${mqPic(pose)}</span></div>`;
+  {
+    const fb = $('.fillgo');
+    d.style.bottom = fb && innerWidth > 560 ? fb.offsetHeight + 20 + 'px' : '';
+  }
   MQT = setTimeout(
     () => {
       d.innerHTML = '';
     },
-    /^(catch|catchck|idle)$/.test(pose) ? 4000 : 8000,
+    /^(catch|catchck|idle)$/.test(pose) ? 3500 : 6000,
   );
 }
 IC.bot =
@@ -8772,6 +8786,10 @@ function vSdb() {
   return `<section class="pic cmp"><h3>${IC.clip}ตรวจจอกับฐานข้อมูล</h3>${b}</section>`;
 }
 /* ===== การ์ดเครื่องมือ (3.14): สรุปสถานะ 3 เครื่องมือ เปิดทีละอย่าง (TOOLV) ===== */
+let CKX = new Set(),
+  HLP =
+    store.get('ps_hlp') ===
+    '1'; /* 4.9: CKX = ไฟล์ที่เปิดการตั้งค่าเฉพาะไฟล์ไว้ • HLP = แสดงคำอธิบายในการตั้งค่าขั้นที่ 3 */
 let BLK = null; /* 4.8: ผลทำใบเปล่า {sig,res,ok,mx,mon,sv} */
 let TOOLV = 'pic';
 function tcStat() {
@@ -8964,7 +8982,8 @@ function vHome() {
     LF = L && L.csig === sigOf(C) ? L : null,
     R = C.map(readyOf),
     nOk = R.filter(r => r && r.ok).length,
-    nw = L ? L.res.reduce((t, r) => t + r.rep.filter(isWarn).length, 0) : 0,
+    nw = L ? L.res.reduce((t, r) => t + r.rep.filter(isMust).length, 0) : 0,
+    nn = L ? L.res.reduce((t, r) => t + r.rep.filter(isNote).length, 0) : 0,
     nf = L ? L.res.filter(r => r.blob).length : 0,
     ns = L ? L.res.reduce((t, r) => t + r.rep.filter(isFilled).length, 0) : 0;
   /* สถานะของวันนี้ = สิ่งที่ควรทำต่อ */
@@ -9010,7 +9029,14 @@ function vHome() {
     kp('k1', IC.mon, 'จอใน Playlist', has ? DB.length.toLocaleString() : '—', 'จอ') +
     kp('k2', IC.layers, 'Playlist', nk + '/11', 'แบบ') +
     kp('k3', IC.clip, 'ใบเช็ครูป', C.length, 'ไฟล์') +
-    kp('k4', IC.shield, 'ควรตรวจ', L ? nw : '—', 'รายการ', L && nw ? 'wr' : '');
+    kp(
+      'k4',
+      IC.shield,
+      'ต้องแก้',
+      L ? nw : '—',
+      L && nn ? `รายการ • แจ้ง ${nn}` : 'รายการ',
+      L && nw ? 'wr' : '',
+    );
   const now = `<div class="hnow kst ${st[0]}" role="status">${ring}<span><small>ตอนนี้</small><b class="${st[0]}">${st[1]}</b><span class="kss">${st[2]}</span></span></div>`;
   /* ตารางใบเช็ครูปวันนี้ */
   const rows = C.map((f, i) => {
@@ -9024,7 +9050,7 @@ function vHome() {
       sub = '';
     if (r && !r.bad && !r.empty) sub = `${r.sheets} ชีต • ใช้ Playlist ${r.items.length} แบบ`;
     if (x) {
-      const w = x.rep.filter(isWarn).length;
+      const w = x.rep.filter(isMust).length;
       sc = x.rep.filter(isFilled).length;
       wn = w;
       if (!x.blob) {
@@ -9033,7 +9059,7 @@ function vHome() {
         note = (x.rep.find(isWarn) || [])[2] || 'ดูรายละเอียดในผลการเติม';
       } else if (w) {
         k = 'warn';
-        chip = ['wr', 'ควรตรวจ'];
+        chip = ['wr', 'ต้องแก้'];
       } else {
         k = 'done';
         chip = ['ok', 'เติมแล้ว'];
@@ -9073,7 +9099,7 @@ function vHome() {
   const T = [
       ['all', 'ทั้งหมด'],
       ['ready', 'พร้อมเติม'],
-      ['warn', 'ควรตรวจ'],
+      ['warn', 'ต้องแก้'],
       ['done', 'เติมแล้ว'],
       ['wait', 'ยังไม่พร้อม'],
     ],
@@ -9083,7 +9109,7 @@ function vHome() {
   const shown = rows.filter(r => HTAB === 'all' || r.k === HTAB);
   const table = C.length
     ? `<div class="htabs" role="tablist" aria-label="กรองใบเช็ครูป">${T.map(([k, t]) => `<button role="tab" aria-selected="${HTAB === k}" class="${HTAB === k ? 'on' : ''}" data-a="htab" data-k="${k}">${t}<em>${cnt[k]}</em></button>`).join('')}</div>
-  <div class="htw"><div role="table" aria-label="ใบเช็ครูปวันนี้"><div class="hrw th" role="row"><span role="columnheader">#</span><span role="columnheader">ไฟล์ใบเช็ค</span><span role="columnheader">จอที่เติม</span><span role="columnheader">ควรตรวจ</span><span role="columnheader">สถานะ</span><span role="columnheader">หมายเหตุ</span></div>${shown.map(r => r.h).join('')}</div></div>`
+  <div class="htw"><div role="table" aria-label="ใบเช็ครูปวันนี้"><div class="hrw th" role="row"><span role="columnheader">#</span><span role="columnheader">ไฟล์ใบเช็ค</span><span role="columnheader">จอที่เติม</span><span role="columnheader">ต้องแก้</span><span role="columnheader">สถานะ</span><span role="columnheader">หมายเหตุ</span></div>${shown.map(r => r.h).join('')}</div></div>`
     : `<div class="hempty"><b>ยังไม่มีใบเช็ครูป</b><span>ใส่ใบเช็คของวันก่อนหน้าในขั้นที่ 3 หรือลากไฟล์ .xlsm มาวางที่หน้านี้</span><button class="btn secondary" data-a="tab" data-k="fl">${IC.fillI}ไปใส่ใบเช็ครูป</button></div>`;
   /* คอลัมน์ขวา */
   const fl = (() => {
@@ -9105,10 +9131,11 @@ function vHome() {
   }</section>`;
   const resCard = `<section class="hcard" aria-labelledby="hrs"><h2 id="hrs">ผลการเติมล่าสุด</h2>${
     L
-      ? `<div class="hfile"><span class="xi z" aria-hidden="true">${IC.fillI}</span><span><b>ใบเช็ครูป_เติมแล้ว.zip</b><small>${nf} ไฟล์ • ${ns.toLocaleString()} จอ${nw ? ` • ควรตรวจ ${nw}` : ''}</small></span><button class="ib" data-a="dlz" aria-label="ดาวน์โหลดใบเช็คที่เติมแล้ว (.zip)" title="ดาวน์โหลด (.zip)">${IC.dl}</button></div>${L.saved ? '<p class="hint">บันทึก / ดาวน์โหลดแล้ว</p>' : ''}<div class="hbtns">${FSA && !L.saved ? `<button class="btn primary" data-a="savedir">${IC.save}บันทึกทับไฟล์เดิม</button>` : ''}<button class="btn secondary" data-a="tab" data-k="res">ดูผลการเติม</button></div>`
+      ? `<div class="hfile"><span class="xi z" aria-hidden="true">${IC.fillI}</span><span><b>ใบเช็ครูป_เติมแล้ว.zip</b><small>${nf} ไฟล์ • ${ns.toLocaleString()} จอ${nw ? ` • ต้องแก้ ${nw}` : ''}</small></span><button class="ib" data-a="dlz" aria-label="ดาวน์โหลดใบเช็คที่เติมแล้ว (.zip)" title="ดาวน์โหลด (.zip)">${IC.dl}</button></div>${L.saved ? '<p class="hint">บันทึก / ดาวน์โหลดแล้ว</p>' : ''}<div class="hbtns">${FSA && !L.saved ? `<button class="btn primary" data-a="savedir">${IC.save}บันทึกทับไฟล์เดิม</button>` : ''}<button class="btn secondary" data-a="tab" data-k="res">ดูผลการเติม</button></div>`
       : '<p class="hint" style="margin-top:0">ยังไม่ได้เติมใบเช็คในรอบนี้ เติมเสร็จแล้วไฟล์จะขึ้นที่นี่</p>'
   }</section>`;
-  const hero = `<section class="hhero" data-tour="hhero" aria-labelledby="hht"><div class="ht"><small>ยินดีต้อนรับสู่</small><h1 id="hht">PHOTO CHECK STUDIO</h1><p>เติมใบเช็ครูปของทุกคนจาก Playlist ของวันนี้ สร้างโฟลเดอร์แยกรูป และใส่วันที่ถ่าย ในที่เดียว • ลากไฟล์ Playlist และใบเช็คมาวางที่หน้านี้ได้เลย ระบบแยกให้เอง</p><button class="btn primary" data-a="tab" data-k="${st[3]}">${st[4]}<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>${mqOn() ? `<div class="hmq" aria-hidden="true"><i></i><span class="mq">${mqPic(!has ? 'idle' : st[0] === 'wr' ? 'warn' : !C.length && st[3] === 'fl' ? 'catchck' : LF ? 'party' : 'list')}</span></div>` : ''}</section>`;
+  const exp = Object.keys(thruAll() || {}).length > 0;
+  const hero = `<section class="hhero${exp ? ' mini' : ''}" data-tour="hhero" aria-labelledby="hht"><div class="ht"><small>ยินดีต้อนรับสู่</small><h1 id="hht">PHOTO CHECK STUDIO</h1><p>เติมใบเช็ครูปของทุกคนจาก Playlist ของวันนี้ สร้างโฟลเดอร์แยกรูป และใส่วันที่ถ่าย ในที่เดียว • ลากไฟล์ Playlist และใบเช็คมาวางที่หน้านี้ได้เลย ระบบแยกให้เอง</p><button class="btn primary" data-a="tab" data-k="${st[3]}">${st[4]}<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>${mqOn() ? `<div class="hmq" aria-hidden="true"><i></i><span class="mq">${mqPic(!has ? 'idle' : st[0] === 'wr' ? 'warn' : !C.length && st[3] === 'fl' ? 'catchck' : LF ? 'party' : 'list')}</span></div>` : ''}</section>`;
   return `<div class="hgrid">${hero}<section class="hflow" data-tour="hflow" aria-labelledby="hfw"><h2 id="hfw">ขั้นตอนการทำงาน</h2><ol class="hfl">${flow}</ol>${now}</section></div>
  <div class="hkpi" data-tour="hkpi">${kpis}</div>
  <div class="hrow"><section class="hcard htbl" data-tour="htbl" aria-labelledby="htt"><div class="hch"><h2 id="htt">ใบเช็ครูปวันนี้</h2>${C.length ? '<button class="linkb" data-a="tab" data-k="fl">ไปขั้นเติมใบเช็ครูป</button>' : ''}</div>${table}</section><div class="hside" data-tour="hside">${plCard}${resCard}</div></div>`;
@@ -9117,7 +9144,8 @@ function vRes() {
   if (!last) return vFl();
   const R = last.res.map(r => ({
     ok: r.rep.filter(isFilled).length,
-    bad: r.rep.filter(isWarn),
+    bad: r.rep.filter(isMust),
+    nts: r.rep.filter(isNote),
     inf: r.rep.filter(x => x[1] === 'รูปแบบ' && !/^ตรวจ/.test(x[2])),
     info: r.rep.filter(isInfo),
     scr: r.rep.filter(isFilled),
@@ -9128,30 +9156,30 @@ function vRes() {
     nf = last.res.filter(r => r.blob).length,
     ne = last.res.length - nf;
   return `${shead('ผลการเติม', last.saved ? 'บันทึกใบเช็คที่เติมแล้ว ใส่ Playlist ของวันถัดไปต่อได้เลย (กด “ใช้ผลนี้เติมวันถัดไป” ด้านล่าง)' : FSA ? 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กด “บันทึกทับไฟล์เดิม” หรือดาวน์โหลดก่อนปิดหน้านี้' : 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กดดาวน์โหลดก่อนปิดหน้านี้', `<div class="go"><button class="btn secondary" data-a="tab" data-k="fl">${IC.back}กลับไปเติมใหม่</button></div>`)}
- <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span>${last.days ? `<span><b>${last.days.length}</b>วัน</span>` : ''}<span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ควรตรวจ</span>${last.sec ? `<span><b>${last.sec}</b>วินาที</span>` : ''}<span class="sp"></span>${FSA ? `<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf ? '' : 'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>` : `<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
+ <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span>${last.days ? `<span><b>${last.days.length}</b>วัน</span>` : ''}<span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ต้องแก้</span><span class="smu"><b>${R.reduce((n, r) => n + r.nts.length, 0)}</b>แจ้งให้ทราบ</span>${last.sec ? `<span><b>${last.sec}</b>วินาที</span>` : ''}<span class="sp"></span>${FSA ? `<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf ? '' : 'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>` : `<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
  ${
    last.days
      ? `<div class="dstrip" aria-label="เติมต่อกันทีละวัน">${last.days
          .map(x => {
            const D = new Date(x.d);
-           return `<span class="dst"><b>${THW[D.getUTCDay()]} ${thdS(D)}</b><small>เติม ${x.n.toLocaleString()} จอ${x.w ? ` • ควรตรวจ ${x.w}` : ''} • ${x.sec} วิ</small></span>`;
+           return `<span class="dst"><b>${THW[D.getUTCDay()]} ${thdS(D)}</b><small>เติม ${x.n.toLocaleString()} จอ${x.m ? ` • ต้องแก้ ${x.m}` : ''} • ${x.sec} วิ</small></span>`;
          })
          .join('<span class="dar" aria-hidden="true">→</span>')}</div>`
      : ''
  }
  <div class="stack">${last.sv ? (last.sv.bad.length ? alertHTML('er', `บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`, `<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`) : alertHTML('ok', `บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`, `<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu ? ` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่` : ''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)) : ''}
  ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}
- ${nb ? alertHTML('wr', '“ควรตรวจ” คืออะไร', '<p>จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน หรือหนังที่ระบบตั้งใจไม่ใส่ เปิดดูในแต่ละไฟล์แล้วตรวจในใบเช็คก่อนใช้งาน ความหมายของข้อความที่พบบ่อยอยู่ในปุ่ม “วิธีใช้”</p>') : alertHTML('ok', 'ไม่มีรายการที่ต้องตรวจเพิ่ม', '<p>ดาวน์โหลดแล้วเปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p>')}</div>
+ ${nb ? alertHTML('wr', `ต้องแก้ ${nb} รายการ`, '<p>จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน จอที่ขาดตามฐานข้อมูล หรือชีตที่ระบบข้าม — เปิดดูในแต่ละไฟล์ (กล่องสีส้ม) แล้วแก้ในใบเช็คก่อนใช้งาน</p>' + (R.reduce((n, r) => n + r.nts.length, 0) ? `<p>อีก ${R.reduce((n, r) => n + r.nts.length, 0)} รายการเป็น “แจ้งให้ทราบ” (ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น) ไม่ต้องแก้ เปิดดูได้ในแต่ละไฟล์</p>` : '')) : alertHTML('ok', 'ไม่มีเรื่องต้องแก้', (R.reduce((n, r) => n + r.nts.length, 0) ? `<p>มี “แจ้งให้ทราบ” ${R.reduce((n, r) => n + r.nts.length, 0)} รายการ (ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น) เปิดดูได้ในแต่ละไฟล์ • ` : '<p>') + 'เปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p>')}
  ${vArr()}<div class="rlist" data-tour="rlist">${last.res
    .map((r, i) => {
      const o = R[i],
        open = RO.has(i),
        am = r.arr && r.arr.moves ? r.arr.moves.length : 0;
-     return `<div class="rfile"><div class="rhead"><span class="fn"><b>${esc(r.name)}</b><small>${r.blob ? o.sh + ' ชีต' : 'ไม่ได้เติม'}</small></span>${r.blob ? `<span class="pill ok">เติมแล้ว ${o.ok} จอ</span>` : '<span class="pill er">ไม่ได้เติม</span>'}${am ? `<span class="pill ac">ย้ายจอ ${am}</span>` : ''}${o.bad.length ? `<span class="pill wr">ควรตรวจ ${o.bad.length}</span>` : ''}
+     return `<div class="rfile"><div class="rhead"><span class="fn"><b>${esc(r.name)}</b><small>${r.blob ? o.sh + ' ชีต' : 'ไม่ได้เติม'}</small></span>${r.blob ? `<span class="pill ok">เติมแล้ว ${o.ok} จอ</span>` : '<span class="pill er">ไม่ได้เติม</span>'}${am ? `<span class="pill ac">ย้ายจอ ${am}</span>` : ''}${o.bad.length ? `<span class="pill wr">ต้องแก้ ${o.bad.length}</span>` : ''}${o.nts.length ? `<span class="pill mu">แจ้ง ${o.nts.length}</span>` : ''}
  <button class="ib" data-a="dlf" data-k="${i}" aria-label="ดาวน์โหลด ${esc(r.name)}" title="ดาวน์โหลดไฟล์นี้" ${r.blob ? '' : 'disabled'}>${IC.dl}</button><button class="ib tog" data-a="rx" data-k="${i}" aria-expanded="${open}" aria-label="ดูรายละเอียด ${esc(r.name)}" title="ดูรายละเอียด">${IC.chev}</button></div>
  ${
    open
-     ? `<div class="issues">${o.bad.map(x => `<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}${
+     ? `<div class="issues">${o.bad.map(x => `<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}${o.nts.length ? `<details class="isn"><summary>แจ้งให้ทราบ ${o.nts.length} รายการ <small>ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น — ไม่ต้องแก้</small></summary>${o.nts.map(x => `<div class="iss nt"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}</details>` : ''}${
          o.scr.length
            ? `<p class="ish">สรุปการจัดแต่ละชีต</p>${[...new Set(o.scr.map(x => x[0]))]
                .map(sn => {
@@ -9289,6 +9317,7 @@ const vHelp =
 <li>Metro LED: สถานะอ่านจากสีแถว (เหลือง = ขึ้นใหม่, ส้ม = ขึ้นใหม่ไฟล์เดิม, ฟ้าอ่อน = ต่อสัญญา) และอ่านระยะสัญญา — วันเริ่มใช้วันที่ช้ากว่าระหว่างเริ่มออกอากาศกับเริ่มสัญญา</li>
 <li>แถว #FAST_ADS / FastAd ไม่ใช่หนังโฆษณา: ไม่ใส่จาก Playlist และลบออกจากใบเช็คตอนเติม</li><li>Playlist Rama9 Connect / Digital MRT / Gateway X (ไม่มีช่องสถานะ): ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม กลุ่ม AD.ออก / Ads ถอด = หนังที่ถอด • Content อาคาร / Content Plan B ไม่ลงใบเช็ค Content อื่น (เช่น Content กทพ.) ลงเป็นหนัง # • MRT ส่วนต่อขยาย 20 สถานี (ท่าพระ–หลักสอง, เตาปูน–ท่าพระ) ใช้รายการส่วนต่อขยาย สถานีอื่นใช้ 18 สถานีเดิม</li><li>Air Traveller (IN = To Airport, OUT = To City) และ The 20 อ่านแบบ Signature Max แต่แยกเป็นสื่อของตัวเอง ไม่ใส่โฆษณา Programmatic (Vistar)</li><li>ใบเช็คแบบใหม่ (CCTV / MRT / Gateway X / Rama9 Connect / Air Traveller / THE 20): ช่องหมายเหตุต่อท้ายจอสุดท้ายย้ายตามชื่อหนัง และ “ออก N” เขียนแบบเดียวกับที่ชีตใช้อยู่</li><li>LA PlanB: Playlist ส่งเฉพาะวันที่รายการเปลี่ยน ใส่ฉบับล่าสุดที่มีได้ทุกวัน (เช็กลิสต์ขึ้น “ใช้ฉบับล่าสุดที่มี”) • ชีต LA PLANB จอ LA PlanB 1 และ 2 ใช้รายการเดียวกัน หนังใน “รายการปลด” ใส่ออกวันที่เป็นวันที่ไฟล์ใหม่เริ่ม หนังใหม่ลงใต้แถบวันนั้น</li><li>แถบวันที่ทำตามแบบของแต่ละใบ: ใบที่ใส่แถบวันถัดไปรอไว้ท้ายตาราง ระบบใส่ให้ ใบที่ไม่ใส่ ระบบก็ไม่ใส่ • วันที่ในแถบของจอที่ 2 เป็นต้นไปเป็นสูตร (=C25) หรือตัวเลขตามที่ใบนั้นใช้ • หนังต่อสัญญาวันที่ 16 ปกติแถวเดิมเขียน “ออก 16” ถ้าใบไหนไม่เขียน เลือก “ไม่ต้องเขียน” ที่ช่อง “แถวเดิมของหนังต่อสัญญาวันที่ 16” ใต้ชื่อไฟล์ในขั้นที่ 3 (ระบบจำไว้ตามชื่อไฟล์)</li><li>สีช่องว่างเหนือแถบวันที่ (แถบสีฟ้าอ่อนใต้รายการของจอที่หนังน้อยกว่า): เลือกได้ในขั้นที่ 3 ข้างสีแถบวันที่ และเลือกแยกรายไฟล์ได้ในรายการใบเช็ค • “ตามชีต” = ใช้สีที่ชีตใช้อยู่ (ปกติฟ้าอ่อน) ใบที่ไม่ได้เลือกสีได้ผลเหมือนเดิม</li><li>คำในช่องออกเขียนแบบเดียวกับที่ใบเช็คใช้อยู่ (“ออก 5” หรือ “ออกวันที่ 5”) ชีตที่ยังไม่มีหมายเหตุใช้แบบของชีตอื่นในไฟล์เดียวกัน • รหัสจอที่ขีดต่างจาก Playlist (ใบเช็ค DGT-174 / Playlist DGT174) จับคู่ให้ในสื่อเดียวกัน • หนัง Content ที่ใบเช็คเขียนไว้แบบไม่มี # ใช้แถวเดิม ไม่เพิ่มแถว # ซ้ำ</li></ul>
 <h3>ข้อความ “ควรตรวจ” ที่พบบ่อย</h3><ul class="hr2">
+<li><b>ต้องแก้ / แจ้งให้ทราบ</b> (4.9) ผลการเติมแบ่งรายการควรตรวจเป็น 2 กลุ่ม: <b>ต้องแก้</b> = จอที่เติมไม่ได้ เติมจากรายการอื่นแทน จอที่ขาดตามฐานข้อมูล หรือชีตที่ระบบข้าม (ต้องดูทุกครั้ง) • <b>แจ้งให้ทราบ</b> = หนังที่ระบบตั้งใจไม่ใส่ (จำนวนครั้ง = 0 / ไม่ออน / ยกเว้น) ยังไม่ถึงวันเริ่ม หรือกันตกหล่น (พับไว้ ไม่ต้องแก้)</li>
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
 <li><b>รหัสนี้อยู่ในหลายสื่อ</b> ตั้งชื่อชีตในใบเช็คให้มี 40/80 + Blue/Red, CITY หรือ Spare แล้วเติมใหม่</li>
@@ -10265,12 +10294,13 @@ async function fillDays(G, list) {
         f: x.R.filter(r => r.blob).length,
         n: B.filter(isFilled).length,
         w: B.filter(isWarn).length,
+        m: B.filter(isMust).length,
       };
     });
   L.push(
     '',
     `สรุปรวม ${D.length} วัน (${rngTxt(D)})`,
-    `  เติมแล้ว ${res.filter(r => r.blob).length} จาก ${list.length} ไฟล์ • ควรตรวจ ${A.filter(isWarn).length} รายการ (เรื่องเดียวกันหลายวันนับครั้งเดียว)`,
+    `  เติมแล้ว ${res.filter(r => r.blob).length} จาก ${list.length} ไฟล์ • ควรตรวจ ${A.filter(isWarn).length} รายการ (ต้องแก้ ${A.filter(isMust).length} • แจ้งให้ทราบ ${A.filter(isNote).length} • เรื่องเดียวกันหลายวันนับครั้งเดียว)`,
     ...dd.map(
       x =>
         `  ${thd(new Date(x.d))}: ${x.f} ไฟล์ • ${x.n.toLocaleString()} จอ • ควรตรวจ ${x.w} • ${x.sec} วินาที`,
@@ -10289,14 +10319,14 @@ async function fillDays(G, list) {
     sec: SEC,
   };
   {
-    const _w = A.filter(isWarn).length,
+    const _w = A.filter(isMust).length,
       _f = res.filter(r => r.blob).length;
     MQN = _w ? 'warn' : 'party';
     {
       const _b = A.filter(x => /^ตรวจ: ข้ามวันย้อนหลัง/.test(x[2])).length;
       note =
         `เติมเสร็จแล้ว ${_f} ไฟล์ ${D.length} วัน` +
-        (_w ? ` • ควรตรวจ ${_w} รายการ` : '') +
+        (_w ? ` • ต้องแก้ ${_w} รายการ` : ' • ไม่มีเรื่องต้องแก้') +
         (_b ? ` • ข้ามชีตที่เติมไปแล้ว ${_b} ชีต` : '');
     }
   }
@@ -10305,7 +10335,7 @@ async function fillDays(G, list) {
   cs = null;
   RO.clear();
   window.scrollTo(0, 0);
-  const fi = res.findIndex(r => r.rep.some(isWarn));
+  const fi = res.findIndex(r => r.rep.some(isMust));
   if (fi >= 0) RO.add(fi);
 }
 const ACT = {
@@ -10922,6 +10952,13 @@ const ACT = {
       ? `ทำใบเปล่าแล้ว ${BLK.ok} ไฟล์ — ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใหม่`
       : 'ทำใบเปล่าไม่ได้ — ดูรายละเอียดด้านล่าง';
   },
+  ckx: k => {
+    CKX.has(k) ? CKX.delete(k) : CKX.add(k);
+  },
+  hlp: () => {
+    HLP = !HLP;
+    store.set('ps_hlp', HLP ? '1' : '0');
+  },
   blkadd: async () => {
     const B = BLK;
     if (!B || !B.plan || BUSY || FILLING) return;
@@ -11518,7 +11555,7 @@ const ACT = {
         sec: SEC,
       };
       {
-        const _w = res.reduce((t, r) => t + r.rep.filter(isWarn).length, 0),
+        const _w = res.reduce((t, r) => t + r.rep.filter(isMust).length, 0),
           _f = res.filter(r => r.blob).length;
         MQN = _w ? 'warn' : 'party';
         {
@@ -11528,7 +11565,7 @@ const ACT = {
           );
           note =
             `เติมเสร็จแล้ว ${_f} ไฟล์` +
-            (_w ? ` • ควรตรวจ ${_w} รายการ` : '') +
+            (_w ? ` • ต้องแก้ ${_w} รายการ` : ' • ไม่มีเรื่องต้องแก้') +
             (_b ? ` • ข้ามชีตที่เติมไปแล้ว ${_b} ชีต` : '');
         }
       }
@@ -11537,7 +11574,7 @@ const ACT = {
       cs = null;
       RO.clear();
       window.scrollTo(0, 0);
-      const fi = res.findIndex(r => r.rep.some(isWarn));
+      const fi = res.findIndex(r => r.rep.some(isMust));
       if (fi >= 0) RO.add(fi);
     } finally {
       FILLING = false;
