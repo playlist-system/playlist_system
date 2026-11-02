@@ -96,6 +96,7 @@
  *   เวอร์ชัน 4.9: ปรับหน้าจอ — ขั้นที่ 3 ตั้งค่าเฉพาะไฟล์พับไว้ (CKX) ปุ่มเติมอยู่ล่างจอ (fillgo) คำอธิบายซ่อนได้ (HLP) • ควรตรวจแบ่ง ต้องแก้ / แจ้งให้ทราบ (isMust / isNote) • น้องโฟกัสเล็กลง • ตัวหนังสือเล็กอ่านง่ายขึ้น
  *   เวอร์ชัน 5.0: หน้าตาใหม่รอบ 1 — CSS ชั้น 5.0 (โหมดมืดดำ แสงเรืองม่วง-ฟ้า / โหมดสว่างพาสเทล, ปุ่มไล่สี --grad, ฟอนต์ Space Grotesk + Noto Sans Thai, โลโก้ .logo5) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.1: หน้าตาใหม่รอบ 2 — หน้าหลักใหม่ (h5hero / h5box / h5must / h5log) • คำเตือนขั้นที่ 3 แยกเป็น flAlerts() ใช้ร่วมกับหน้าหลัก • บันทึกการทำงาน logTick() • ค้นหา Ctrl K (FIND / findRes / vFind) • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.2: หน้าตาใหม่รอบ 3 — หน้าผลการเติมใหม่ (r5hero / r5rep / r5side) • ต้องแก้เรียงเป็นข้อ (rx5 เปิดไฟล์) • แจ้งให้ทราบแยกประเภท • ไม่แก้ส่วนเติม
  * ======================================================================
  */
 
@@ -6897,7 +6898,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.1 (2 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.2 (2 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -9273,22 +9274,84 @@ function vRes() {
     nb = R.reduce((n, r) => n + r.bad.length, 0),
     nf = last.res.filter(r => r.blob).length,
     ne = last.res.length - nf;
-  return `${shead('ผลการเติม', last.saved ? 'บันทึกใบเช็คที่เติมแล้ว ใส่ Playlist ของวันถัดไปต่อได้เลย (กด “ใช้ผลนี้เติมวันถัดไป” ด้านล่าง)' : FSA ? 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กด “บันทึกทับไฟล์เดิม” หรือดาวน์โหลดก่อนปิดหน้านี้' : 'ไฟล์ที่เติมแล้วยังไม่ถูกบันทึกลงเครื่อง กดดาวน์โหลดก่อนปิดหน้านี้', `<div class="go"><button class="btn secondary" data-a="tab" data-k="fl">${IC.back}กลับไปเติมใหม่</button></div>`)}
- <div class="sum" data-tour="sum"><span class="k">เติมเสร็จ</span>${last.days ? `<span><b>${last.days.length}</b>วัน</span>` : ''}<span><b>${nf}</b>ไฟล์</span><span><b>${tot.toLocaleString()}</b>จอ</span><span><b>${nb}</b>ต้องแก้</span><span class="smu"><b>${R.reduce((n, r) => n + r.nts.length, 0)}</b>แจ้งให้ทราบ</span>${last.sec ? `<span><b>${last.sec}</b>วินาที</span>` : ''}<span class="sp"></span>${FSA ? `<button class="btn secondary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary big" data-a="savedir" ${nf ? '' : 'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>` : `<button class="btn primary big" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`}</div>
- ${
-   last.days
-     ? `<div class="dstrip" aria-label="เติมต่อกันทีละวัน">${last.days
-         .map(x => {
-           const D = new Date(x.d);
-           return `<span class="dst"><b>${THW[D.getUTCDay()]} ${thdS(D)}</b><small>เติม ${x.n.toLocaleString()} จอ${x.m ? ` • ต้องแก้ ${x.m}` : ''} • ${x.sec} วิ</small></span>`;
-         })
-         .join('<span class="dar" aria-hidden="true">→</span>')}</div>`
-     : ''
- }
+  const nn = R.reduce((n, r) => n + r.nts.length, 0),
+    cut = (t, n) => {
+      t = String(t || '');
+      return t.length > n ? t.slice(0, n - 1) + '…' : t;
+    },
+    g = t => `<span class="g5">${t}</span>`;
+  const dtx =
+    last.W0 && last.W0 !== last.W
+      ? `${thdS(new Date(last.W0))} – ${thd(new Date(last.W))}`
+      : last.W
+        ? thd(new Date(last.W))
+        : '';
+  const MU = last.res.flatMap((r, i) =>
+    R[i].bad.map(x => ({
+      i,
+      t: esc(cut(String(x[2]).replace(/^ตรวจ:\s*/, ''), 170)),
+      p: esc([r.name, x[0], x[1]].filter(Boolean).join(' › ')),
+    })),
+  );
+  const NC = [
+    ['ยังไม่ใส่ เพราะวันเริ่ม', /^ตรวจ: ยังไม่ใส่ เพราะวันเริ่ม/],
+    ['กันตกหล่น', /^ตรวจ: กันตกหล่น/],
+    ['ไม่ใส่ตามหมายเหตุ', /^ตรวจ: ไม่ใส่ตามหมายเหตุ/],
+    ['ไม่ใส่เพราะจำนวนครั้ง = 0', /^ตรวจ: ไม่ใส่เพราะจำนวนครั้ง/],
+  ];
+  const AN = R.flatMap(r => r.nts),
+    NG = NC.map(([t, re]) => [t, AN.filter(x => re.test(x[2])).length]).filter(x => x[1]);
+  {
+    const o = nn - NG.reduce((q, x) => q + x[1], 0);
+    if (o > 0) NG.push(['อื่น ๆ', o]);
+  }
+  const allBad = ne > 0 && !nf,
+    pill = (c, t, v) => `<span class="r5p${c ? ' ' + c : ''}">${t} <b>${v}</b></span>`;
+  const btns = FSA
+    ? `<button class="btn secondary" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลด (.zip)</button><button class="btn primary" data-a="savedir" ${nf ? '' : 'disabled'}>${IC.save}บันทึกทับไฟล์เดิม</button>`
+    : `<button class="btn primary" data-a="dlz" data-tour="dlz" ${nf ? '' : 'disabled'}>${IC.dl}ดาวน์โหลดทั้งหมด (.zip)</button>`;
+  const mx = last.days ? Math.max(1, ...last.days.map(x => x.sec || 0)) : Math.max(1, ...R.map(o => o.ok));
+  const bars = last.days
+    ? last.days.map(x => {
+        const D = new Date(x.d);
+        return [
+          `${THW[D.getUTCDay()]} ${thdS(D)}`,
+          `เติม ${x.n.toLocaleString()} จอ${x.m ? ` • ต้องแก้ ${x.m}` : ''} • ${x.sec} วิ`,
+          (x.sec || 0) / mx,
+        ];
+      })
+    : last.res.map((r, i) => [
+        r.name,
+        r.blob
+          ? `เติม ${R[i].ok.toLocaleString()} จอ${R[i].bad.length ? ` • ต้องแก้ ${R[i].bad.length}` : ''}`
+          : 'ไม่ได้เติม',
+        R[i].ok / mx,
+      ]);
+  return `<section class="r5hero" data-tour="sum"><div class="r5h"><span class="r5ring${allBad ? ' er' : nb ? ' wr' : ''}" aria-hidden="true"><span>${allBad ? IC.warn : IC.check}</span></span><div><small>ผลการเติม${dtx ? ' · ' + dtx : ''}${last.days ? ` · ${last.days.length} วัน` : ''}</small><h1>${allBad ? 'เติมไม่ได้' : `เติมเสร็จ ${g(tot.toLocaleString() + ' จอ')}`}</h1></div></div>
+ <div class="r5act"><span class="r5sv ${last.saved ? 'ok' : 'wr'}">${last.saved ? 'บันทึก / ดาวน์โหลดแล้ว' : 'ยังไม่ได้บันทึก'}</span>${btns}</div></section>
  <div class="stack">${last.sv ? (last.sv.bad.length ? alertHTML('er', `บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`, `<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`) : alertHTML('ok', `บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`, `<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu ? ` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่` : ''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)) : ''}
- ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}
- ${nb ? alertHTML('wr', `ต้องแก้ ${nb} รายการ`, '<p>จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน จอที่ขาดตามฐานข้อมูล หรือชีตที่ระบบข้าม — เปิดดูในแต่ละไฟล์ (กล่องสีส้ม) แล้วแก้ในใบเช็คก่อนใช้งาน</p>' + (R.reduce((n, r) => n + r.nts.length, 0) ? `<p>อีก ${R.reduce((n, r) => n + r.nts.length, 0)} รายการเป็น “แจ้งให้ทราบ” (ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น) ไม่ต้องแก้ เปิดดูได้ในแต่ละไฟล์</p>` : '')) : alertHTML('ok', 'ไม่มีเรื่องต้องแก้', (R.reduce((n, r) => n + r.nts.length, 0) ? `<p>มี “แจ้งให้ทราบ” ${R.reduce((n, r) => n + r.nts.length, 0)} รายการ (ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น) เปิดดูได้ในแต่ละไฟล์ • ` : '<p>') + 'เปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p>')}
- ${vArr()}<div class="rlist" data-tour="rlist">${last.res
+ ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}</div>
+ <div class="r5grid"><article class="r5rep" aria-label="สรุปผลการเติม"><div class="r5top"><p class="r5s">เติมรายชื่อหนังลงใบเช็ค <b>${nf} ไฟล์</b>${last.days ? ` (${last.days.length} วัน)` : ''} รวม <b>${tot.toLocaleString()} จอ</b>${last.sec ? ` ใช้เวลา ${last.sec} วินาที` : ''} ${nb ? `มี <b class="wr">${nb} เรื่องที่ต้องแก้</b>` : '<b class="ok">ไม่มีเรื่องต้องแก้</b>'}${nn ? ` และ ${nn} เรื่องแจ้งให้ทราบ` : ''}${ne ? ` • ${ne} ไฟล์ไม่ได้เติม` : ''}</p>
+  <div class="r5ps">${pill('', 'ไฟล์', nf)}${pill('', 'จอ', tot.toLocaleString())}${pill(nb ? 'wr' : '', 'ต้องแก้', nb)}${pill(nn ? 'nt' : '', 'แจ้งให้ทราบ', nn)}${last.sec ? pill('', 'เวลา', last.sec + ' วินาที') : ''}</div></div>
+  ${
+    nb
+      ? `<div class="r5sec"><h2><i class="h5d wr" aria-hidden="true"></i>ต้องแก้ ${nb} เรื่อง</h2><ol class="r5ml">${MU.slice(
+          0,
+          8,
+        )
+          .map(
+            (x, k) =>
+              `<li><span class="r5n">${k + 1}</span><span class="r5mt"><b>${x.t}</b><small>${x.p}</small></span><button class="r5go" data-a="rx5" data-k="${x.i}">ดูในไฟล์</button></li>`,
+          )
+          .join(
+            '',
+          )}</ol>${MU.length > 8 ? `<p class="hint">และอีก ${MU.length - 8} เรื่อง — เปิดดูในแต่ละไฟล์ด้านล่าง</p>` : ''}<p class="hint">แก้ในใบเช็คก่อนใช้งาน (จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน จอที่ขาดตามฐานข้อมูล หรือชีตที่ระบบข้าม)</p></div>`
+      : `<div class="r5sec"><h2><i class="h5d ok" aria-hidden="true"></i>ไม่มีเรื่องต้องแก้</h2><p class="hint">เปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p></div>`
+  }
+  ${nn ? `<div class="r5sec"><h2><i class="h5d nt" aria-hidden="true"></i>แจ้งให้ทราบ ${nn} เรื่อง<small>· ไม่ต้องแก้</small></h2><div class="r5ng">${NG.map(([t, v]) => `<span class="r5nc">${t}<b>${v}</b></span>`).join('')}</div><p class="hint">ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น — ดูทีละจอได้ในแต่ละไฟล์ด้านล่าง</p></div>` : ''}</article>
+ <aside class="r5side"><section class="hcard r5do"><h2>${last.days ? 'เติมทีละวัน' : 'เติมแต่ละไฟล์'}</h2><small class="h5lt">${last.sec ? 'รวม ' + last.sec + ' วินาที' : ''}</small><ol class="r5bars">${bars.map(([q, b, w]) => `<li><span class="r5bl"><b title="${esc(q)}">${esc(q)}</b><small>${b}</small></span><span class="r5bt"><i style="width:${Math.max(3, Math.round(w * 100))}%"></i></span></li>`).join('')}</ol></section>
+  <section class="hcard r5next"><h2>ทำต่อ</h2><div class="r5nx"><button class="h5s" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button>${FSA ? '<button class="h5s" data-a="tools" data-k="last" data-tour="tlink">งานโฟลเดอร์และรูป</button>' : ''}<button class="h5s" data-a="tab" data-k="fl">กลับไปเติมใหม่</button></div></section></aside></div>
+ ${vArr()}<h2 class="r5lh">ไฟล์ทั้งหมด<small>${last.res.length} ไฟล์</small></h2><div class="rlist" data-tour="rlist">${last.res
    .map((r, i) => {
      const o = R[i],
        open = RO.has(i),
@@ -9327,7 +9390,7 @@ function vRes() {
  }</div>`;
    })
    .join('')}</div>
- ${FSA ? tlinkHTML('last', 'งานโฟลเดอร์และรูป', 'สร้างโฟลเดอร์แยกรูปของหนังใหม่ • ใส่วันที่ถ่าย • ตรวจโฟลเดอร์เทียบจอ — ใช้ใบเช็คที่เพิ่งเติมนี้ได้เลย', 'secondary') : ''}<div class="nextday"><p>${FSA ? '“บันทึกทับไฟล์เดิม” เขียนใบเช็คที่เติมแล้วทับไฟล์ในโฟลเดอร์เดิม (เลือกโฟลเดอร์ครั้งแรกครั้งเดียว) และเก็บไฟล์ก่อนเติมไว้ใน สำรองก่อนเติม ส่วน zip มีใบเช็คทุกไฟล์และ รายงาน.txt' : 'ไฟล์ zip มีใบเช็ครูปทุกไฟล์ที่เติมได้ (ชื่อเดิม) และ รายงาน.txt'} ใบเช็คที่ได้วันนี้คือไฟล์ตั้งต้นของวันพรุ่งนี้</p><button class="btn secondary" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button></div>`;
+ <p class="hint r5foot">${FSA ? '“บันทึกทับไฟล์เดิม” เขียนใบเช็คที่เติมแล้วทับไฟล์ในโฟลเดอร์เดิม (เลือกโฟลเดอร์ครั้งแรกครั้งเดียว) และเก็บไฟล์ก่อนเติมไว้ใน สำรองก่อนเติม ส่วน zip มีใบเช็คทุกไฟล์และ รายงาน.txt' : 'ไฟล์ zip มีใบเช็ครูปทุกไฟล์ที่เติมได้ (ชื่อเดิม) และ รายงาน.txt'} ใบเช็คที่ได้วันนี้คือไฟล์ตั้งต้นของวันพรุ่งนี้</p>`;
 }
 
 /* ----- จัดจอเข้าชีตตามแพค (4.1): สรุปในผลการเติม และในรายงาน.txt ----- */
@@ -9572,11 +9635,15 @@ const TOURS = {
     { t: 'fill', h: 'กดเติม', p: 'ระบบเติมทุกไฟล์ในครั้งเดียว ใช้เวลาไม่กี่วินาที แล้วพาไปหน้าผลการเติม' },
   ],
   res: [
-    { t: 'sum', h: 'สรุปผล', p: 'จำนวนไฟล์ จำนวนจอที่เติมแล้ว และจำนวนรายการที่ควรตรวจ' },
+    {
+      t: 'sum',
+      h: 'สรุปผล',
+      p: 'เติมไปกี่จอ บันทึกแล้วหรือยัง • ปุ่มดาวน์โหลด / บันทึกทับไฟล์เดิมอยู่ตรงนี้ • การ์ดด้านล่างสรุปเป็นประโยค รายการ “ต้องแก้” เรียงเป็นข้อ (กด “ดูในไฟล์”) และ “แจ้งให้ทราบ” แยกตามประเภท',
+    },
     {
       t: 'rlist',
-      h: 'ดูรายการ “ควรตรวจ”',
-      p: 'กดลูกศรท้ายแต่ละไฟล์เพื่อดูรายละเอียด แล้วตรวจในใบเช็คให้เรียบร้อยก่อนใช้งาน',
+      h: 'ไฟล์ทั้งหมด',
+      p: 'กดลูกศรท้ายแต่ละไฟล์เพื่อดูรายละเอียด (ต้องแก้ / แจ้งให้ทราบ / สรุปแต่ละชีต) แล้วตรวจในใบเช็คให้เรียบร้อยก่อนใช้งาน • ดาวน์โหลดทีละไฟล์ได้',
     },
     {
       t: 'dlz',
@@ -11567,6 +11634,13 @@ const ACT = {
     FIND = !FIND;
     HELP = HOW = false;
   },
+  rx5: k => {
+    RO.add(+k);
+    setTimeout(() => {
+      const e = document.querySelectorAll('.rfile')[+k];
+      if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  } /* 5.2 */,
   fgo: k => {
     FIND = false;
     if (BUSY || FILLING) return;
