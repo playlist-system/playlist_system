@@ -99,6 +99,7 @@
  *   เวอร์ชัน 5.2: หน้าตาใหม่รอบ 3 — หน้าผลการเติมใหม่ (r5hero / r5rep / r5side) • ต้องแก้เรียงเป็นข้อ (rx5 เปิดไฟล์) • แจ้งให้ทราบแยกประเภท • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.3: หน้าตาใหม่รอบ 4 — CSS ชั้น 5.3 (ปุ่มทรงเม็ดยา กล่องลากไฟล์ การ์ดเครื่องมือ สวิตช์ไล่สี) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.3.1: ลากโฟลเดอร์มาวางได้ (walkEntries) • ปุ่มเลือกทั้งโฟลเดอร์ (#pickdir) • ไฟล์ที่เปิดไม่ได้ขึ้นข้อความ • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.3.2: แบ่งวันจาก Playlist เพิ่มเติม (pfX) เมื่อไม่มีไฟล์ 6 สื่อหลักและไฟล์ห้าง • กล่องวันบอก “Playlist เพิ่มเติม” • ไม่แก้ส่วนเติม
  * ======================================================================
  */
 
@@ -481,7 +482,12 @@ const workDate = () => parseD(OP.base) || PLD || autoBase();
 /* 4.3: เติมหลายวันต่อกัน — วันทำงาน = วันที่มีไฟล์ สรุปรายการหนังแยกจอ (6 แพค) • ไฟล์แบบอื่น (Show DC, Metro LED, BKJ …) อยู่กับวันแรกที่ไม่ก่อนวันของไฟล์ (ไม่มี → วันล่าสุด)
    แต่ละวันใช้ไฟล์ของวันนั้น แบบที่วันนั้นไม่มี ใช้ของวันก่อนหน้าทั้งแบบ — ถ้าทุกวันมีครบ ผลเหมือนเติมทีละวัน */
 const pfG = e => e.d > 0 && e.p.some(s => KINDS.some(K => K.g && K.has(s))),
-  pfV = e => e.d > 0 && e.p.some(s => KINDS.some(K => K.day && K.has(s)));
+  pfV = e => e.d > 0 && e.p.some(s => KINDS.some(K => K.day && K.has(s))),
+  pfX = e =>
+    e.d > 0 &&
+    e.p.some(s =>
+      KINDS.some(K => K.x && !K.v && !K.latest && K.has(s)),
+    ); /* 5.3.2: Playlist เพิ่มเติม (CCTV / MRT) */
 const pfPut = (db, p) => {
   if (p.every(x => x.rep === 'screen')) {
     const ks = new Set(p.map(x => x.m + '|' + x.c));
@@ -497,11 +503,13 @@ function plDays() {
   if (PDC && PDC.sig === sig) return PDC.G;
   let G = null;
   const vd = !PFS.some(pfG),
-    pfFull = vd ? pfV : pfG,
+    xm = vd && !PFS.some(pfV),
+    pfFull = !vd ? pfG : xm ? pfX : pfV,
     ds = [...new Set(PFS.filter(pfFull).map(e => e.d))].sort((a, b) => a - b);
   if (ds.length > 1) {
     G = ds.map(d => ({ d, E: [] }));
-    G.v = vd;
+    G.v = vd && !xm;
+    G.x = xm;
     for (const e of PFS) {
       let i = pfFull(e) ? ds.indexOf(e.d) : e.d > 0 ? ds.findIndex(d => d >= e.d) : -1;
       if (i < 0) i = ds.length - 1;
@@ -6913,7 +6921,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3.1 (2 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.3.2 (2 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -7575,7 +7583,11 @@ async function busyStep(t, i, n, f) {
 /* 4.3: Playlist หลายวัน — รายการวัน แบบที่ขาด และวันที่ขาดไป */
 function vDays(G) {
   if (!G) return '';
-  const core = G.v ? KINDS.filter(K => K.day) : KINDS.filter(K => !K.x && !K.latest),
+  const core = G.x
+      ? KINDS.filter(K => K.x && !K.v && !K.latest && PFS.some(e => e.p.some(K.has)))
+      : G.v
+        ? KINDS.filter(K => K.day)
+        : KINDS.filter(K => !K.x && !K.latest),
     gaps = [];
   for (let i = 1; i < G.length; i++) for (let t = G[i - 1].d + 864e5; t < G[i].d; t += 864e5) gaps.push(t);
   const row = (g, i) => {
@@ -7584,8 +7596,8 @@ function vDays(G) {
       miss = core.filter(K => !own.has(K.k)),
       car = miss.filter(K => g.db.some(K.has)).map(K => K.k),
       non = miss.filter(K => !g.db.some(K.has)).map(K => K.k),
-      n = KINDS.filter(K => (G.v ? K.v : !K.x) && g.db.some(K.has)).length;
-    return `<li class="drow${non.length ? ' wr' : ''}"><span class="dn">${i + 1}</span><span class="dd"><b>${THW[D.getUTCDay()]} ${thd(D)}</b><small>${g.E.length} ไฟล์ • ${G.v ? n + ' แบบ (ห้าง / อาคาร)' : n + ' จาก 11 แบบ'}</small></span><span class="dk">${car.length ? `<span>ใช้ของวันก่อนหน้า: ${esc(car.join(', '))}</span>` : ''}${non.length ? `<span class="no">ไม่มี: ${esc(non.join(', '))}</span>` : ''}${!car.length && !non.length ? '<span class="okk">ครบ</span>' : ''}</span><button class="ib" data-a="plday" data-k="${g.d}" aria-label="เอา Playlist วันที่ ${thd(D)} ออก" title="เอาวันนี้ออก">${IC.x}</button></li>`;
+      n = KINDS.filter(K => (G.x ? K.x && !K.v : G.v ? K.v : !K.x) && g.db.some(K.has)).length;
+    return `<li class="drow${non.length ? ' wr' : ''}"><span class="dn">${i + 1}</span><span class="dd"><b>${THW[D.getUTCDay()]} ${thd(D)}</b><small>${g.E.length} ไฟล์ • ${G.x ? n + ' แบบ (Playlist เพิ่มเติม)' : G.v ? n + ' แบบ (ห้าง / อาคาร)' : n + ' จาก 11 แบบ'}</small></span><span class="dk">${car.length ? `<span>ใช้ของวันก่อนหน้า: ${esc(car.join(', '))}</span>` : ''}${non.length ? `<span class="no">ไม่มี: ${esc(non.join(', '))}</span>` : ''}${!car.length && !non.length ? '<span class="okk">ครบ</span>' : ''}</span><button class="ib" data-a="plday" data-k="${g.d}" aria-label="เอา Playlist วันที่ ${thd(D)} ออก" title="เอาวันนี้ออก">${IC.x}</button></li>`;
   };
   return `<section class="panel days" aria-label="Playlist หลายวัน"><h3 class="sec-t">${IC.cal}ใส่ Playlist ไว้ ${G.length} วัน — ระบบจะเติมต่อกันทีละวัน</h3><p class="dsub">เรียงจากวันแรกไปวันล่าสุด ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไปให้เอง กดเติมครั้งเดียว บันทึกครั้งเดียว • ใส่วันไหนผิด กด × เพื่อเอาออก</p><ol class="dlist">${G.map(row).join('')}</ol>${
     gaps.length
