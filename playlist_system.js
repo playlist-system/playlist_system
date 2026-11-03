@@ -108,6 +108,7 @@
  *   เวอร์ชัน 5.5.3: ย้ายจอสุดท้ายของชีตได้ (arrangeWb opt.empty, ซ่อนชีตว่าง) • แก้ชีต Analysis ตอนย้าย / เพิ่มจอ (wbPost) • ไม่แก้ส่วนเติม (ยกเว้นไม่เตือนชีตซ่อนที่ไม่มีจอ)
  *   เวอร์ชัน 5.5.4: ย้ายจอได้โดยไม่ต้องมีใบของคนใหม่ (sdbMovePlan out = เอาออกอย่างเดียว) • ชีตที่จอจะหมดแต่ใบนี้ยังขาดจอแพคเดียวกัน เพิ่มจอที่ขาดในรอบเดียวกัน • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.5: ย้าย / เพิ่มจอในใบเปล่าแบบเก่า (readSheet r10 เฉพาะตอนเพิ่ม / ย้ายตามฐานข้อมูล) • Analysis แบบเก่า (anaGeo ไม่มี TOTAL, แถว % 9/10) • ปุ่มย้ายขึ้นเมื่อมีใบเปล่าอย่างน้อย 1 ไฟล์ • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.5.6: จอที่ย้ายเข้า / เพิ่ม ใส่ตามลำดับเลขจอ (arrangeWb opt.ins, Analysis แทรกตามเลขจอ) • ช่วงคะแนนเฉลี่ยครอบแถวจอที่อยู่ติดกัน • บอกจอที่ไม่มีในฐานข้อมูล • ไม่แก้ส่วนเติม
  * ======================================================================
  */
 
@@ -3967,7 +3968,12 @@ const arrangeWb = (() => {
       const t = I.blocks[I.blocks.length - 1],
         k = '\u0001add:' + A.code;
       ADD[k] = I;
-      plan[A.sn].push({ code: A.code, from: k, s: t.s, add: A });
+      const e = { code: A.code, from: k, s: t.s, add: A },
+        gi = opt.ins
+          ? plan[A.sn].findIndex(x => cmpN(x.code, A.code) > 0)
+          : -1; /* 5.5.6: opt.ins = แทรกก่อนจอแรกที่เลขมากกว่า (ไม่เรียงจอเดิมใหม่) */
+      if (gi >= 0) plan[A.sn].splice(gi, 0, e);
+      else plan[A.sn].push(e);
     }
     /* 5.4: เอาจอออกจากชีต (ย้ายไปใบของคนอื่นตามฐานข้อมูลจอ) — เฉพาะชีตที่ยังไม่มีแถบวันที่ (ใบเปล่า) • ไม่เอาจอสุดท้ายของชีตออก */
     const removed = [];
@@ -5782,6 +5788,7 @@ async function sdbMoveApply(files, mv) {
           dels,
           empty: true,
           r10: true,
+          ins: true,
         });
       } catch (e) {
         return null;
@@ -5951,6 +5958,14 @@ function anaGeo(ws) {
     }
   }
   if (!F || F.b < F.a) return null;
+  {
+    const isS = r => {
+      const y = ws[F.cA + r];
+      return !!(y && y.f && /!\$?[A-Z]+\$?\d+$/.test(String(y.f)));
+    };
+    while (F.a > 1 && isS(F.a - 1)) F.a--;
+    while (F.b + 1 < tr && isS(F.b + 1)) F.b++;
+  } /* 5.5.6 */
   const hd = F.a - 1,
     col = re => {
       for (const k in ws) {
@@ -6164,7 +6179,14 @@ async function wbPost(buf, o) {
           g = !same.length && gone.get(A.sheet),
           gi = g && g.next ? L.indexOf(g.next) : -1;
         let tp, at, ix;
-        if (same.length) {
+        const gt = same.find(
+          x => x.code && cmpN(x.code, A.code) > 0,
+        ); /* 5.5.6: ตามลำดับเลขจอในกลุ่มชีตเดียวกัน */
+        if (gt) {
+          tp = gt;
+          at = gt.r;
+          ix = L.indexOf(gt);
+        } else if (same.length) {
           tp = same[same.length - 1];
           at = tp.r + 1;
           ix = L.indexOf(tp) + 1;
@@ -6272,7 +6294,7 @@ async function sdbApply(files, plan) {
     await new Promise(r => setTimeout(r, 30));
     let A = null;
     try {
-      A = await arrangeWb(f.buf, new Map(), { mk: false, sort: false, adds: P0.adds, r10: true });
+      A = await arrangeWb(f.buf, new Map(), { mk: false, sort: false, adds: P0.adds, r10: true, ins: true });
     } catch (e) {
       A = null;
     }
@@ -7983,7 +8005,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.5 (3 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.6 (3 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -9959,21 +9981,22 @@ function vSdb() {
     : `<p class="hint">ใส่ไฟล์ฐานข้อมูลจอ (Excel ที่มีชีต Data Base: Code / Location / New package / Format / รายชื่อคนรับผิดชอบ) ครั้งเดียว ระบบจำไว้ในเครื่องนี้ มีไฟล์ใหม่ก็เปลี่ยนได้</p>${drop('sdb', 'ลากไฟล์ฐานข้อมูลจอมาวางที่นี่', 'ไฟล์ Excel (.xlsx) หรือคลิกเพื่อเลือกไฟล์', '.xlsx,.xlsm,.xls', 'drop-sdb', true)}`;
   if (D && Q) {
     const M = Q.filter(x => x.who),
-      bad = M.filter(x => x.miss.length || x.moved.length),
-      ok = M.filter(x => !x.miss.length && !x.moved.length),
+      bad = M.filter(x => x.miss.length || x.moved.length || (x.unk || []).length),
+      ok = M.filter(x => !x.miss.length && !x.moved.length && !(x.unk || []).length),
+      nu = M.reduce((t, x) => t + (x.unk || []).length, 0),
       un = Q.filter(x => !x.who),
       nm = bad.reduce((t, x) => t + x.miss.length, 0),
       nv = bad.reduce((t, x) => t + x.moved.length, 0);
     const seen = new Set(M.map(x => sdbP(x.name))),
       left = [...new Map(D.rows.filter(r => !seen.has(r.p)).map(r => [r.p, sdbW(r.w)])).values()];
     const li = x =>
-      `<li><b>${esc(x.name)}</b> <small>${esc(x.who)} • จอในใบ ${x.n}</small><span class="do">${[...x.miss.map(r => `ขาด ${esc(r.c)} ${esc(r.loc)} (${esc(r.pk || 'ไม่ระบุแพค')})${r.at ? ` — อยู่ในใบ ${esc(r.at)}` : pl && r.pl ? ' — มีหนังใน Playlist วันนี้' : ''}`), ...x.moved.map(r => `มี ${esc(r.c)} (ชีต ${esc(r.sn)}) แต่ฐานข้อมูลบอกว่าเป็นของ${esc(r.to)}`)].join('<br>')}</span></li>`;
+      `<li><b>${esc(x.name)}</b> <small>${esc(x.who)} • จอในใบ ${x.n}</small><span class="do">${[...x.miss.map(r => `ขาด ${esc(r.c)} ${esc(r.loc)} (${esc(r.pk || 'ไม่ระบุแพค')})${r.at ? ` — อยู่ในใบ ${esc(r.at)}` : pl && r.pl ? ' — มีหนังใน Playlist วันนี้' : ''}`), ...x.moved.map(r => `มี ${esc(r.c)} (ชีต ${esc(r.sn)}) แต่ฐานข้อมูลบอกว่าเป็นของ${esc(r.to)}`), ...(x.unk || []).map(r => `มี ${esc(r.c)} (ชีต ${esc(r.sn)}) แต่ไม่มีในฐานข้อมูล — ดูว่ายังใช้จอนี้อยู่ไหม (ระบบไม่ย้าย ไม่เอาออก)`)].join('<br>')}</span></li>`;
     b +=
       (bad.length
         ? alertHTML(
             'wr',
-            `ต้องดู ${(nm + nv).toLocaleString()} จอ ใน ${bad.length} ไฟล์`,
-            `<p>${nm ? `ขาด ${nm} จอ = ฐานข้อมูลบอกว่าเป็นจอของคนนี้ แต่ใบเช็คไม่มี (จอนี้จะไม่ถูกเติม) ` : ''}${nv ? `${nm ? '• ' : ''}อยู่ผิดคน ${nv} จอ = ใบเช็คมีจอนี้ แต่ฐานข้อมูลบอกว่าเป็นของคนอื่น` : ''}</p>`,
+            `ต้องดู ${(nm + nv + nu).toLocaleString()} จอ ใน ${bad.length} ไฟล์`,
+            `<p>${nm ? `ขาด ${nm} จอ = ฐานข้อมูลบอกว่าเป็นจอของคนนี้ แต่ใบเช็คไม่มี (จอนี้จะไม่ถูกเติม) ` : ''}${nv ? `${nm ? '• ' : ''}อยู่ผิดคน ${nv} จอ = ใบเช็คมีจอนี้ แต่ฐานข้อมูลบอกว่าเป็นของคนอื่น` : ''}${nu ? `${nm || nv ? ' • ' : ''}ไม่มีในฐานข้อมูล ${nu} จอ = ใบเช็คมีจอนี้ แต่ฐานข้อมูลไม่มีรหัสนี้` : ''}</p>`,
           )
         : alertHTML(
             'ok',
