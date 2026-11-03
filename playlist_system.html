@@ -1913,7 +1913,7 @@ const arrangeWb = (() => {
       const nc0 = R.blocks[0].s;
       let hr = 0;
       for (let r = 14; r <= 40 && !hr; r++) if (numV(wsv, nc0, r)) hr = r;
-      const filled = !!hr;
+      const filled = !!hr && R.blocks.some(b => { for (let r = hr + 1; r <= hr + 600; r++) { const t = strV(wsv, b.s + 1, r); if (t && !FIXR.test(t)) return true } return false }); /* 5.5.2: ใบเปล่าที่แถบแรกมีวันที่ 1 แล้ว (ยังไม่มีหนัง) ยังนับเป็นใบเปล่า */
       if (!hr && ((opt.adds && opt.adds.length) || (opt.dels && opt.dels.length))) hr = blankHr(wsv); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย */
       if (!ok || !hr) {
         notes.push([sn, 'ไม่ได้จัด (รูปแบบชีตไม่ตรงแบบบล็อก 3 คอลัมน์)']);
@@ -2349,6 +2349,16 @@ const arrangeWb = (() => {
         txtCell(doc, c, lab(L.media));
         if (!moves.some(m => m.code === x.code && m.from === x.from)) relabeled.push({ sheet: sn, code: x.code, from: cur, to: lab(L.media) });
       });
+      /* 5.5.2: ใบเปล่าที่แถบแรกมีวันที่แล้ว — หลังเพิ่ม / เอาจอออก สูตรต่อกันของแถบแรก (=C21, =F21 …) อ้างจอก่อนหน้าตามลำดับใหม่ */
+      if ((opt.adds || opt.dels) && !I.filled && I.hr && grid.get(I.hr)) {
+        const brow = grid.get(I.hr);
+        plan[sn].forEach((x, i) => {
+          if (!i) return;
+          const c = brow.get(L.base + 3 * i),
+            f = c && c.getElementsByTagNameNS(NS, 'f')[0];
+          if (f && /^\$?[A-Z]{1,3}\$?\d+$/.test(f.textContent.trim().replace(/^=/, ''))) f.textContent = n2col(L.base + 3 * (i - 1)) + I.hr;
+        });
+      }
       /* sheetData ใหม่ */
       while (sd.firstChild) sd.removeChild(sd.firstChild);
       const rowsAll = new Set([...grid.keys()]);
@@ -2831,11 +2841,18 @@ async function fillWb(f,on,metro,o){const rep=[],FOLD=[];const buf=f.buf.slice(0
    หัวตาราง (ชื่อจอ รหัส Format สถานที่ สูตรแถว 6–10) ชีต Analysis และชีตอื่นที่ไม่ใช่ชีตจอ ไม่แตะ • ไฟล์เดิมไม่ถูกแก้ ===== */
 const FIXR=/^#\s*(BANGKOK\s*JAM|TRAFFIC\s*MTP|PLACE(\s*MTP)?|ETA(\s*MTP)?|EDA)(?![A-Za-z])/i,DSER=v=>typeof v==='number'&&v>=43831&&v<=54789; /* วันที่ 2020–2049 ในรูปเลขวันของ Excel */
 const bandRow=(ws,ca,cb)=>{let r0=0;for(const k of Object.keys(ws)){if(k[0]==='!')continue;const m=k.match(/^([A-Z]+)(\d+)$/);if(!m)continue;const r=+m[2],cn=col2n(m[1]);if(r<12||r>200||(r0&&r>=r0)||cn<ca||cn>cb)continue;const x=ws[k];if(x.t==='n'&&DSER(x.v))r0=r}return r0};
-async function blankWb(f){const wb=XLSX.read(f.buf,{type:'array'}),zip=await JSZip.loadAsync(f.buf.slice(0));
+/* 5.5.2: วันที่ 1 ของเดือนใหม่ (serial) จากวันที่ล่าสุดในใบเดิม — ถึงวันที่ 5 = เดือนเดียวกัน (แบบเดียวกับชื่อเดือนในการ์ด) */
+const blkD1=mx=>{if(!mx)return 0;const D=s2d(mx),t=D.getUTCDate()<=5?Date.UTC(D.getUTCFullYear(),D.getUTCMonth(),1):Date.UTC(D.getUTCFullYear(),D.getUTCMonth()+1,1);return Math.round(t/864e5)+25569};
+/* 5.5.2: ช่องวันที่ของแถบแรก = ช่องที่เดิมเป็นวันที่ หรือสูตรอ้างช่องในแถวเดียวกัน (เช่น =C21) */
+const blkDc=(c,ws,r0)=>{const x=ws[c.getAttribute('r')],f=c.getElementsByTagNameNS(NS,'f')[0],ft=f&&!f.getAttribute('t')?f.textContent.trim().replace(/^=/,''):'',rf=new RegExp('^\\$?[A-Z]{1,3}\\$?'+r0+'$').test(ft);return rf?{f:ft}:(!!x&&x.t==='n'&&DSER(x.v))?{f:''}:null}; /* {f: สูตรเดิม (=C21) เก็บไว้ หรือ '' = ใส่ค่าวันที่} */
+async function blankWb(f,d1f){ /* 5.5.2: d1f = วันที่ 1 ที่ใช้ทุกไฟล์ (ไม่ส่ง = ตามวันที่ล่าสุดของไฟล์นี้) */const wb=XLSX.read(f.buf,{type:'array'}),zip=await JSZip.loadAsync(f.buf.slice(0));
  const P=new DOMParser(),wx=P.parseFromString(await zip.file('xl/workbook.xml').async('string'),'application/xml'),rels=P.parseFromString(await zip.file('xl/_rels/workbook.xml.rels').async('string'),'application/xml'),rid={},path={};
  for(const r of rels.getElementsByTagName('Relationship'))rid[r.getAttribute('Id')]=r.getAttribute('Target');
  for(const x of wx.getElementsByTagNameNS(NS,'sheet')){const t=rid[x.getAttributeNS(RNS,'id')];if(t)path[x.getAttribute('name')]=t.startsWith('/')?t.slice(1):'xl/'+t}
- const ST=mkStyles(P.parseFromString(await zip.file('xl/styles.xml').async('string'),'application/xml')),rep=[];let n=0,mx=0;
+ const ST=mkStyles(P.parseFromString(await zip.file('xl/styles.xml').async('string'),'application/xml')),rep=[];let n=0,mx=0,d1n=0;
+ let mxP=0;for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];if(!ws||notChk(sn)||!path[sn]||!avCols(ws).length)continue;const av=avCols(ws),q0=bandRow(ws,Math.max(1,Math.min(...av)-2),Math.max(...av)+1);if(!q0)continue;
+  for(const k in ws){if(k[0]==='!')continue;const m=k.match(/^[A-Z]+(\d+)$/),x=ws[k];if(m&&+m[1]>=q0&&x&&x.t==='n'&&DSER(x.v)&&x.v>mxP)mxP=x.v}}
+ const d1=d1f!=null?d1f:blkD1(mxP);
  for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];if(!ws||notChk(sn)||!path[sn]||!zip.file(path[sn])||!avCols(ws).length)continue;
   const av=avCols(ws);let ca=Math.max(1,Math.min(...av)-2),cb=Math.max(...av);
   const r0=bandRow(ws,ca,cb+1);if(!r0){rep.push([sn,'ไม่มีแถบวันที่ (เป็นใบเปล่าอยู่แล้ว) — ไม่ได้แก้']);continue}
@@ -2843,17 +2860,21 @@ async function blankWb(f){const wb=XLSX.read(f.buf,{type:'array'}),zip=await JSZ
   for(const k of Object.keys(ws)){if(k[0]==='!')continue;const m=k.match(/^[A-Z]+(\d+)$/);if(!m)continue;const r=+m[1];if(r<r0-1)continue;const x=ws[k];
    if(x.t==='n'&&DSER(x.v)){if(r>=r0){DR.add(r);if(x.v>mx)mx=x.v}continue}const t=cl(x.v);if(t)(RT.get(r)||RT.set(r,[]).get(r)).push(t)}
   let fe=r0;while(RT.has(fe+1)&&RT.get(fe+1).some(t=>FIXR.test(t)))fe++;
-  const fixed=fe>r0,keepB=fixed||!RT.has(r0-1); /* แถบแรกเก็บสีไว้ (ล้างแค่วันที่) ถ้าแถวบนว่าง • แถว #BANGKOK JAM ใต้แถบแรก (ทีมใส่ไว้ทุกเดือน) เก็บไว้ทั้งแถว */
-  const sh=new Sheet(await zip.file(path[sn]).async('string')),BF=new Set(),rr=sh.rows.get(r0),cnOf=c=>col2n(c.getAttribute('r').match(/[A-Z]+/)[0]),hasF=c=>c.getElementsByTagNameNS(NS,'f').length>0;
+  const fixed=fe>r0,keepB=fixed||!RT.has(r0-1)||(d1>0&&RT.get(r0-1).some(t=>FIXR.test(t))); /* 5.5.2: แถวบนเป็น #BANGKOK JAM / #Traffic MTP ที่ทีมใส่ไว้ทุกเดือน → แถบแรกอยู่ใต้แถวนั้น เก็บแถบไว้ */ /* แถบแรกเก็บสีไว้ (ล้างแค่วันที่) ถ้าแถวบนว่าง • แถว #BANGKOK JAM ใต้แถบแรก (ทีมใส่ไว้ทุกเดือน) เก็บไว้ทั้งแถว */
+  let n1=0;const sh=new Sheet(await zip.file(path[sn]).async('string')),BF=new Set(),rr=sh.rows.get(r0),cnOf=c=>col2n(c.getAttribute('r').match(/[A-Z]+/)[0]),hasF=c=>c.getElementsByTagNameNS(NS,'f').length>0;
   if(rr){let bfk='';for(const c of rr.children){const x=ws[c.getAttribute('r')];if(x&&x.t==='n'&&DSER(x.v)){bfk=ST.fillKey(c.getAttribute('s')||0);break}}
    for(const c of rr.children){const cn=cnOf(c),st=c.getAttribute('s'),x=ws[c.getAttribute('r')];if(hasF(c)||(x&&x.t==='n'&&DSER(x.v))||(bfk&&st&&ST.fillKey(st)===bfk)){if(cn<ca)ca=cn;if(cn>cb)cb=cn}}} /* ช่วงคอลัมน์ของตาราง = ความกว้างแถบวันที่แรก (ไม่แตะคำอธิบายสี / คอลัมน์อื่นด้านข้าง) */
   for(const r of DR){const row=sh.rows.get(r);if(row)for(const c of row.children){const st=c.getAttribute('s'),fk=st?ST.fillKey(st):'';if(fk)BF.add(fk)}}
   const rmC=new Map(),rm=st=>{if(rmC.has(st))return rmC.get(st);const fk=ST.fillKey(st),h=(fk.match(/rgb="([0-9A-Fa-f]{6,8})"/)||[])[1]||'',v=!!fk&&!/theme="0"(?![^>]*tint)|rgb="(FF)?FFFFFF"/i.test(fk)&&(BF.has(fk)||(!!h&&MARK.test(h))||/^(FF)?000000$/i.test(h)||/theme="1"/.test(fk));rmC.set(st,v);return v}; /* เอาออกเฉพาะสีแถบวันที่ ไฮไลต์ และช่องจำนวนครั้งสีดำ — สีพื้นที่เป็นแบบของชีตเก็บไว้ */
+  const NSC=new Map();{const pl=st=>st!=null&&st!=='0'&&rm(st)?String(ST.plain(st)):st,cnt=new Map(); /* 5.5.2: แบบช่องของแถวปกติ (ไม่ใช่แถบวันที่) ของแต่ละคอลัมน์ */
+   for(const[r,row]of sh.rows){if(r<=r0||DR.has(r)||(fixed&&r<=fe))continue;for(const c of row.children){const cn=cnOf(c);if(cn<ca||cn>cb)continue;const s=pl(c.getAttribute('s'));if(s==null)continue;const m=cnt.get(cn)||cnt.set(cn,new Map()).get(cn);m.set(s,(m.get(s)||0)+1)}}
+   for(const[cn,m]of cnt){let b=null,k=0;for(const[s,v]of m)if(v>k){k=v;b=s}if(b!=null)NSC.set(cn,b)}}
   for(const[r,row]of sh.rows){if(r<r0||(fixed&&r>r0&&r<=fe))continue;
    for(const c of[...row.children]){const cn=cnOf(c);if(cn<ca||cn>cb||(!DR.has(r)&&hasF(c)))continue; /* สูตรที่ไม่ได้อยู่ในแถบวันที่ (สูตรช่วยของชีต) เก็บไว้ */
-    while(c.firstChild)c.removeChild(c.firstChild);c.removeAttribute('t');if(r===r0&&keepB)continue;const st=c.getAttribute('s');if(st!=null&&st!=='0'&&rm(st)){const p=ST.plain(st);if(String(p)!==st)c.setAttribute('s',p)}}}
-  zip.file(path[sn],sh.xml(),{createFolders:false});n++;rep.push([sn,'ล้างตั้งแต่แถว '+r0+' ลงไป'+(fixed?` (เก็บแถว #BANGKOK JAM ใต้แถบแรกไว้ ${fe-r0} แถว)`:'')])}
- if(!n)return{rep,n:0,mx,blob:null};
+    const dc=r===r0&&keepB&&d1&&blkDc(c,ws,r0);while(c.firstChild)c.removeChild(c.firstChild);c.removeAttribute('t');if(dc){if(dc.f){const e=sh.doc.createElementNS(NS,'f');e.textContent=dc.f;c.appendChild(e)}const v=sh.doc.createElementNS(NS,'v');v.textContent=String(d1);c.appendChild(v);n1++}if(r===r0&&keepB)continue;const st=c.getAttribute('s');if(st!=null&&st!=='0'&&rm(st)){const p=ST.plain(st);if(String(p)!==st)c.setAttribute('s',p)}if(r>r0&&NSC.has(cn))c.setAttribute('s',NSC.get(cn))}}
+  for(const[r,row]of sh.rows){if(r<=r0||(fixed&&r<=fe))continue;const have=new Set();for(const c of row.children){const cn=cnOf(c);if(cn>=ca&&cn<=cb)have.add(cn)}if(!have.size)continue;for(const[cn,s]of NSC)if(!have.has(cn)&&s!=null&&s!=='0')sh.cell(n2col(cn),r).setAttribute('s',s)} /* 5.5.2: ช่องที่หายไปในแถวของตาราง ใส่แบบช่องเดียวกับคอลัมน์ */
+  zip.file(path[sn],sh.xml(),{createFolders:false});n++;d1n+=n1?1:0;rep.push([sn,'ล้างตั้งแต่แถว '+r0+' ลงไป'+(fixed?` (เก็บแถว #BANGKOK JAM ใต้แถบแรกไว้ ${fe-r0} แถว)`:'')+(n1?' • แถบแรกใส่วันที่ '+thd(s2d(d1)):'')])}
+ if(!n)return{rep,n:0,mx,blob:null,d1,d1n:0};
  zip.file('xl/styles.xml',ST.xml(),{createFolders:false});
  let cp=wx.getElementsByTagNameNS(NS,'calcPr')[0];if(!cp){cp=wx.createElementNS(NS,'calcPr');let after=null;for(const q of['sheets','functionGroups','externalReferences','definedNames']){const e=wx.getElementsByTagNameNS(NS,q)[0];if(e)after=e}if(after)after.parentNode.insertBefore(cp,after.nextSibling);else wx.documentElement.appendChild(cp)}
  cp.setAttribute('fullCalcOnLoad','1');
@@ -2861,7 +2882,7 @@ async function blankWb(f){const wb=XLSX.read(f.buf,{type:'array'}),zip=await JSZ
   zip.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(rels.documentElement),{createFolders:false});
   const ct=zip.file('[Content_Types].xml');if(ct)zip.file('[Content_Types].xml',(await ct.async('string')).replace(/<Override[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/gi,''),{createFolders:false})}
  zip.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(wx.documentElement),{createFolders:false});
- return{rep,n,mx,blob:await zip.generateAsync({type:'uint8array',compression:'DEFLATE'})}}
+ return{rep,n,mx,d1,d1n,blob:await zip.generateAsync({type:'uint8array',compression:'DEFLATE'})}}
 /* 4.8.1: แถวแถบวันที่แรกของใบเปล่า (สูตรเดียวกับ layoutChk ตอนเติมใบเปล่า) */
 function blankHr(wsv){let cs=0;{const M=new Map();for(const k in wsv||{}){const m=k.match(/^[A-Z]{1,3}(\d+)$/);if(!m||+m[1]>10)continue;const f=wsv[k]&&wsv[k].f,x=f&&String(f).match(/COUNTA?\(\$?[A-Z]{1,3}\$?(\d+)\s*:/);if(x)M.set(+x[1],(M.get(+x[1])||0)+1)}let bn=0;for(const[v,n]of M)if(n>bn&&v>=13&&v<=40){bn=n;cs=v}}
  let lh=0;for(const k in wsv||{}){const m=k.match(/^[A-Z]{1,3}(\d+)$/);if(!m)continue;const r=+m[1];if(r<11||r>20||r<=lh)continue;const x=wsv[k];if(x&&!x.f&&cl(x.v))lh=r}
@@ -3222,7 +3243,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.1 (2 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.2 (3 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -3705,9 +3726,9 @@ function busyPaint(){const b=$('#busy');if(!b)return;if(!BUSY){if(b.innerHTML)b.
 
 /* ===== 4.8: หน้ารายละเอียด ใบเปล่าเดือนใหม่ / ตรวจจอกับฐานข้อมูล ===== */
 function vBlank(){const B=BLK&&BLK.sig===ckSig()?BLK:null;let b='';
- if(!B)b=`<p class="hint">ใช้ตอนขึ้นเดือนใหม่: เลือกใบเช็คเดือนล่าสุดของทุกคนในกล่อง “ใบเช็คที่ใช้” ด้านบน (เช่น เปิดทั้งโฟลเดอร์ 10 OCT 26 / 16-30) แล้วกดปุ่มด้านล่าง ระบบทำสำเนาใหม่ทุกไฟล์ ชื่อไฟล์เดิม — ทุกชีตจอล้างตั้งแต่แถบวันที่แถวแรกลงไป (รายชื่อหนัง แถบวันที่ “ออกวันที่” วันที่ถ่าย และสีพื้น) เก็บหัวตาราง จอ รหัส Format สถานที่ และสูตรไว้ แบบเดียวกับใบเปล่าที่ทำเอง • ชีต Analysis และชีตอื่นไม่แตะ • ไฟล์เดิมไม่ถูกแก้</p><div class="picb"><button class="btn primary" data-a="blkmake">${IC.fillI}ทำใบเปล่าจากใบเช็ค ${TC.length} ไฟล์</button></div><p class="hint">จอของแต่ละคนเป็นไปตามใบเช็คที่เลือก ถ้ามีจอย้ายคนหรือจอใหม่ ตรวจได้ที่ “ตรวจจอกับฐานข้อมูล”</p>`;
+ if(!B)b=`<p class="hint">ใช้ตอนขึ้นเดือนใหม่: เลือกใบเช็คเดือนล่าสุดของทุกคนในกล่อง “ใบเช็คที่ใช้” ด้านบน (เช่น เปิดทั้งโฟลเดอร์ 10 OCT 26 / 16-30) แล้วกดปุ่มด้านล่าง ระบบทำสำเนาใหม่ทุกไฟล์ ชื่อไฟล์เดิม — ทุกชีตจอล้างตั้งแต่แถบวันที่แถวแรกลงไป (รายชื่อหนัง แถบวันที่ “ออกวันที่” วันที่ถ่าย และสีพื้น) เก็บหัวตาราง จอ รหัส Format สถานที่ และสูตรไว้ แบบเดียวกับใบเปล่าที่ทำเอง • <b>แถบวันที่แรกใส่วันที่ 1 ของเดือนใหม่ให้</b> (เช่น 1/11/2026) ไม่ต้องตั้งเอง • ชีต Analysis และชีตอื่นไม่แตะ • ไฟล์เดิมไม่ถูกแก้</p><div class="picb"><button class="btn primary" data-a="blkmake">${IC.fillI}ทำใบเปล่าจากใบเช็ค ${TC.length} ไฟล์</button></div><p class="hint">จอของแต่ละคนเป็นไปตามใบเช็คที่เลือก ถ้ามีจอย้ายคนหรือจอใหม่ ตรวจได้ที่ “ตรวจจอกับฐานข้อมูล”</p>`;
  else{const rows=B.res.map(r=>{const nt=r.rep.filter(x=>!/^ล้างตั้งแต่/.test(x[1])).map(x=>x[0]+': '+x[1]).join(' • ');return`<tr><td>${esc(r.name)}</td><td>${r.blob?r.n:'–'}</td><td>${r.mx?thd(s2d(r.mx)):'–'}</td><td class="${r.blob?'':'bad'}">${esc(nt||(r.blob?'ล้างครบทุกชีตจอ':'ไม่พบชีตจอที่มีแถบวันที่ — ไม่ได้ทำ'))}</td></tr>`}).join('');
-  b=`${vBlankAdd(B)}${B.sv?alertHTML('ok',`บันทึกใบเปล่า ${B.sv.ok} ไฟล์ลงโฟลเดอร์ “${esc(B.sv.dir)}” แล้ว`,`<p>${B.sv.ow?`เขียนทับ ${B.sv.ow} ไฟล์ (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ สำรองก่อนทำใบเปล่า) • `:''}เริ่มเดือนใหม่: ใส่ใบเช็คจากโฟลเดอร์นี้ในขั้นที่ 3 แล้วเติมตามปกติ</p>`):B.ok?alertHTML('wr',`ใบเปล่า${B.mon?'เดือน '+esc(B.mon):''} พร้อมแล้ว ${B.ok} ไฟล์ — ยังไม่ได้บันทึก`,`<p>${FSA?'กด “บันทึกลงโฟลเดอร์ใหม่” แล้วเลือกโฟลเดอร์ของเดือนใหม่ (สร้างโฟลเดอร์ว่างไว้ก่อน เช่น 11 NOV 26 / 1-15) หรือ':'กด'}ดาวน์โหลดเป็น .zip</p>`):alertHTML('er','ทำใบเปล่าไม่ได้','<p>ไม่พบชีตจอที่มีแถบวันที่ในไฟล์ที่เลือก</p>')}
+  b=`${vBlankAdd(B)}${B.sv?alertHTML('ok',`บันทึกใบเปล่า ${B.sv.ok} ไฟล์ลงโฟลเดอร์ “${esc(B.sv.dir)}” แล้ว`,`<p>${B.sv.ow?`เขียนทับ ${B.sv.ow} ไฟล์ (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ สำรองก่อนทำใบเปล่า) • `:''}เริ่มเดือนใหม่: ใส่ใบเช็คจากโฟลเดอร์นี้ในขั้นที่ 3 แล้วเติมตามปกติ</p>`):B.ok?alertHTML('wr',`ใบเปล่า${B.mon?'เดือน '+esc(B.mon):''} พร้อมแล้ว ${B.ok} ไฟล์ — ยังไม่ได้บันทึก`,`${B.d1?`<p>แถบวันที่แรกของทุกชีตจอใส่วันที่ <b>${thd(s2d(B.d1))}</b> แล้ว</p>`:''}<p>${FSA?'กด “บันทึกลงโฟลเดอร์ใหม่” แล้วเลือกโฟลเดอร์ของเดือนใหม่ (สร้างโฟลเดอร์ว่างไว้ก่อน เช่น 11 NOV 26 / 1-15) หรือ':'กด'}ดาวน์โหลดเป็น .zip</p>`):alertHTML('er','ทำใบเปล่าไม่ได้','<p>ไม่พบชีตจอที่มีแถบวันที่ในไฟล์ที่เลือก</p>')}
  <div class="cmpw"><table class="cmpt"><thead><tr><th>ไฟล์</th><th>ชีตที่ล้าง</th><th>วันที่ล่าสุดในใบเดิม</th><th>หมายเหตุ</th></tr></thead><tbody>${rows}</tbody></table></div>
  <div class="picb">${B.ok&&FSA?`<button class="btn primary" data-a="blksave">${IC.save}บันทึกลงโฟลเดอร์ใหม่</button>`:''}${B.ok?`<button class="btn ${FSA?'secondary':'primary'}" data-a="blkdl">${IC.dl}ดาวน์โหลดใบเปล่า (.zip)</button>`:''}<button class="linkb" data-a="blkmake">ทำใหม่</button></div>`}
  return`<section class="pic cmp"><h3>${IC.fillI}ใบเปล่าเดือนใหม่</h3>${b}</section>`}
@@ -4288,7 +4309,9 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
   for(const f of TC){i++;note=`กำลังทำใบเปล่า ${i} / ${TC.length} — ${f.name}`;view();await new Promise(r=>setTimeout(r,30));
    let x;try{x=await blankWb(f)}catch(e){x={rep:[['ทั้งไฟล์','ทำไม่ได้ (ไฟล์เสีย หรือไม่ใช่ใบเช็ครูป)']],n:0,mx:0,blob:null}}res.push({name:f.name,...x})}
   const mx=Math.max(0,...res.map(r=>r.mx||0)),D=mx?s2d(mx):null,tg=D?(D.getUTCDate()<=5?D:new Date(Date.UTC(D.getUTCFullYear(),D.getUTCMonth()+1,1))):null;
-  BLK={sig:ckSig(),res,ok:res.filter(r=>r.blob).length,mx,mon:tg?TH[tg.getUTCMonth()]+' '+(tg.getUTCFullYear()+543):'',sv:null};TOOLV='blank';
+  const d1g=tg?Math.round(Date.UTC(tg.getUTCFullYear(),tg.getUTCMonth(),1)/864e5)+25569:0; /* 5.5.2 */
+  for(let j=0;j<res.length;j++)if(res[j].blob&&d1g&&res[j].d1!==d1g){try{const x=await blankWb(TC[j],d1g);if(x.blob)res[j]={name:TC[j].name,...x}}catch(_){}}
+  BLK={sig:ckSig(),res,ok:res.filter(r=>r.blob).length,mx,d1:d1g,mon:tg?TH[tg.getUTCMonth()]+' '+(tg.getUTCFullYear()+543):'',sv:null};TOOLV='blank';
   MQN=BLK.ok?'done':'warn';note=BLK.ok?`ทำใบเปล่าแล้ว ${BLK.ok} ไฟล์ — ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใหม่`:'ทำใบเปล่าไม่ได้ — ดูรายละเอียดด้านล่าง'},
  ckx:k=>{CKX.has(k)?CKX.delete(k):CKX.add(k)},
  hlp:()=>{HLP=!HLP;store.set('ps_hlp',HLP?'1':'0')},
