@@ -105,6 +105,7 @@
  *   เวอร์ชัน 5.5: ดาวน์โหลดโครงโฟลเดอร์แยกรูปเป็น .zip (pzPlan / pzZip) • #Fast Ads ทุกจอ • สร้างโฟลเดอร์จอที่ยังไม่มี (picNew) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.1: ชื่อโฟลเดอร์จอใน .zip เลือกได้ ตามใบเช็ค / ตามโฟลเดอร์ที่มีอยู่ (pzPlan X, อ่านอย่างเดียว) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.2: ใบเปล่าใส่วันที่ 1 ของเดือนใหม่ที่แถบแรก (blankWb d1) • เส้นตารางใบเปล่าเท่ากันทุกแถว • ใบเปล่าที่มีวันที่ 1 ยังเพิ่ม / ย้ายจอได้ • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.5.3: ย้ายจอสุดท้ายของชีตได้ (arrangeWb opt.empty, ซ่อนชีตว่าง) • แก้ชีต Analysis ตอนย้าย / เพิ่มจอ (wbPost) • ไม่แก้ส่วนเติม (ยกเว้นไม่เตือนชีตซ่อนที่ไม่มีจอ)
  * ======================================================================
  */
 
@@ -3981,7 +3982,8 @@ const arrangeWb = (() => {
       }
       const keep = plan[D.sn].filter(x => nk(x.code) !== nk(D.code));
       if (keep.length === plan[D.sn].length) continue;
-      if (!keep.length) {
+      if (!keep.length && !opt.empty) {
+        /* 5.5.3: opt.empty = ย้ายจอสุดท้ายของชีตได้ (ชีตนั้นซ่อนไว้หลังย้าย) */
         notes.push([D.sn, D.code + ' — เอาออกไม่ได้: เป็นจอเดียวในชีตนี้ เอาออกเองในใบเช็ค']);
         continue;
       }
@@ -4831,7 +4833,17 @@ const arrangeWb = (() => {
     }
     const nb = await zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
     const sorted = [...touched].filter(sn => info[sn] && !moves.some(m => m.from === sn || m.to === sn));
-    return { buf: nb, moves, notes, relabeled, sorted, ana, added, removed };
+    return {
+      buf: nb,
+      moves,
+      notes,
+      relabeled,
+      sorted,
+      ana,
+      added,
+      removed,
+      emptied: Object.keys(plan).filter(sn => info[sn] && !plan[sn].length),
+    };
   }
   return arrangeWb;
 })();
@@ -4840,7 +4852,10 @@ async function fillWb(f, on, metro, o) {
     FOLD = [];
   const buf = f.buf.slice(0);
   const wb = XLSX.read(f.buf, { type: 'array' }),
-    zip = await JSZip.loadAsync(buf);
+    zip = await JSZip.loadAsync(buf),
+    HIDN = new Set(
+      ((wb.Workbook || {}).Sheets || []).filter(s => s && s.Hidden).map(s => s.name),
+    ); /* 5.5.3 */
   const wx = new DOMParser().parseFromString(
     await zip.file('xl/workbook.xml').async('string'),
     'application/xml',
@@ -5051,7 +5066,8 @@ async function fillWb(f, on, metro, o) {
         jobs.push([sn, lc, ads, scr, '']);
         rep.push([sn, label + ' → ' + scr.c, 'เติมแล้ว', ads.length]);
       }
-    } else if (!blocks.length && media) rep.push([sn, '-', 'ข้าม (ไม่พบรหัสจอ DGT/ID-xx ในแถว 10-11)', 0]);
+    } else if (!blocks.length && media && !HIDN.has(sn))
+      rep.push([sn, '-', 'ข้าม (ไม่พบรหัสจอ DGT/ID-xx ในแถว 10-11)', 0]);
   }
   for (const j of jobs) {
     if (!j[3] || !j[3].rows) continue;
@@ -5661,14 +5677,6 @@ function sdbMovePlan(files, fail = []) {
       const k = sdbK(r.c),
         T = Q.filter(q => q.who && q.who === r.to && q.name !== x.name),
         src = S0.find(z => z.sn === r.sn);
-      if (src && (src.codes || []).length <= 1) {
-        skip.push({
-          code: r.c,
-          from: x.name,
-          why: `เป็นจอเดียวในชีต ${r.sn} ของใบนี้ (ระบบไม่เอาจอสุดท้ายของชีตออก) — ฐานข้อมูลบอกว่าเป็นของ${r.to}`,
-        });
-        continue;
-      }
       if (!T.length) {
         skip.push({
           code: r.c,
@@ -5693,8 +5701,8 @@ function sdbMovePlan(files, fail = []) {
         const m0 = (S0.find(z => z.sn === r.sn) || {}).media || null;
         if (!m) m = m0; /* ไม่รู้แพคจากฐานข้อมูล → ใช้แพคของชีตเดิม */
         const fy = files.find(z => z.name === y.name),
-          S = (fy && fy.nd && fy.nd.S) || [];
-        let sn = m && (S.find(z => z.media === m) || {}).sn;
+          S = ((fy && fy.nd && fy.nd.S) || []).filter(z => (z.codes || []).length);
+        let sn = m && (S.find(z => z.media === m) || {}).sn; /* 5.5.3: ชีตที่มีจออยู่ */
         if (!sn && m0 && m0 !== m) {
           sn = (S.find(z => z.media === m0) || {}).sn;
           if (sn) m = m0;
@@ -5729,7 +5737,7 @@ async function sdbMoveApply(files, mv) {
   const by = n => files.find(z => z.name === n),
     run = async (f, adds, dels) => {
       try {
-        return await arrangeWb(f.buf, new Map(), { mk: false, sort: false, adds, dels });
+        return await arrangeWb(f.buf, new Map(), { mk: false, sort: false, adds, dels, empty: true });
       } catch (e) {
         return null;
       }
@@ -5782,17 +5790,354 @@ async function sdbMoveApply(files, mv) {
       return { err: n, go: [], no: mv, names: [] };
     R.set(n, A);
   }
+  const AN = new Map();
+  for (const n of new Set(go.map(m => m.from))) {
+    try {
+      for (const [k, v] of anaRead(by(n).buf)) AN.set(k, v);
+    } catch (_) {}
+  } /* 5.5.3: ชื่อ / หมายเหตุ / สถานะของจอในชีต Analysis ของใบเดิม */
+  const post = [];
   for (const [n, A] of R) {
-    const f = by(n);
-    f.buf = A.buf;
+    const f = by(n),
+      add = (A.added || []).map(a => {
+        const m = go.find(q => q.to === n && sdbK(q.code) === sdbK(a.code)) || {},
+          v = AN.get(sdbK(a.code));
+        return {
+          ...a,
+          name: v && v.name ? reTag(v.name, a.sheet) : anaName(a.code, m.loc, m.fmt, a.sheet),
+          note: v ? v.note : '',
+          status: v ? v.status : null,
+        };
+      });
+    let P2 = { buf: A.buf, hid: [], rm: 0, add: 0, ana: '' };
+    try {
+      P2 = await wbPost(A.buf, { hide: A.emptied || [], rm: (A.removed || []).map(d => d.code), add });
+    } catch (_) {}
+    f.buf = P2.buf;
     f.nd = null;
     try {
       f.nd = sheetNeeds(f.buf, f.name);
     } catch (_) {
       f.nd = { S: [] };
     }
+    post.push({ name: n, hid: P2.hid, rm: P2.rm, add: P2.add, ana: P2.ana });
   }
-  return { go, no, names: [...R.keys()] };
+  return { go, no, names: [...R.keys()], post };
+}
+/* 5.5.3: แถวจอในชีต Analysis — แถวตารางอยู่ในช่วง AVERAGE ของแถว TOTAL • คืน รหัสจอ → {ชื่อ, หมายเหตุ, สถานะ} */
+function anaGeo(ws) {
+  if (!ws) return null;
+  const T = Object.keys(ws).find(k => k[0] !== '!' && /^\s*TOTAL\s*$/i.test(cl((ws[k] || {}).v)));
+  if (!T) return null;
+  const tr = +T.match(/\d+$/)[0];
+  let F = null;
+  for (const k in ws) {
+    if (k[0] === '!') continue;
+    const m = k.match(/^([A-Z]+)(\d+)$/);
+    if (!m || +m[2] !== tr) continue;
+    const x = ws[k],
+      q = x && x.f && String(x.f).match(/^AVERAGE\(\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)\)$/i);
+    if (q) {
+      F = { ref: k, cA: q[1], cB: q[3], a: +q[2], b: +q[4] };
+      break;
+    }
+  }
+  if (!F || F.b < F.a) return null;
+  const hd = F.a - 1,
+    col = re => {
+      for (const k in ws) {
+        const m = k.match(/^([A-Z]+)(\d+)$/);
+        if (m && +m[2] === hd && re.test(cl((ws[k] || {}).v))) return m[1];
+      }
+      return '';
+    };
+  let cN = col(/^NAME/i);
+  if (!cN) {
+    const cnt = new Map();
+    for (const k in ws) {
+      const m = k.match(/^([A-Z]+)(\d+)$/);
+      if (m && +m[2] >= F.a && +m[2] <= F.b && codeOf((ws[k] || {}).v))
+        cnt.set(m[1], (cnt.get(m[1]) || 0) + 1);
+    }
+    let b = 0;
+    for (const [c, v] of cnt)
+      if (v > b) {
+        b = v;
+        cN = c;
+      }
+  }
+  return { tr, F, cN, cP: col(/^PACK/i), cS: col(/^STATUS/i), cT: col(/^NOTE/i) };
+}
+function anaRead(buf) {
+  const wb = XLSX.read(buf, { type: 'array', sheetStubs: true }),
+    sn = wb.SheetNames.find(n => /ANALYS|วิเคราะห์/i.test(n)),
+    ws = sn && wb.Sheets[sn],
+    G = anaGeo(ws),
+    M = new Map();
+  if (!G || !G.cN) return M;
+  for (let r = G.F.a; r <= G.F.b; r++) {
+    const nm = cl((ws[G.cN + r] || {}).v),
+      c = codeOf(nm);
+    if (c)
+      M.set(sdbK(c), {
+        name: nm,
+        note: G.cT ? cl((ws[G.cT + r] || {}).v) : '',
+        status: G.cS ? cl((ws[G.cS + r] || {}).v) : '',
+      });
+  }
+  return M;
+}
+const anaName = (code, loc, fmt, sheet) => {
+  const t = pkTag(sheet || ''),
+    fm = String(fmt || '')
+      .replace(/^\(+|\)+$/g, '')
+      .replace(/\s+/g, ''),
+    lc = String(loc || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  return code + (lc ? ' ' + lc : '') + (t ? ' (' + t + ')' : '') + (fm ? ' (' + fm + ')' : '');
+};
+/* 5.5.3: หลังย้าย / เพิ่มจอ — ชีตที่ไม่เหลือจอซ่อนไว้ (ไม่ลบ: มาโครในไฟล์ผูกกับชีต) • Analysis: ลบแถวของจอที่ย้ายออก เพิ่มแถวของจอใหม่ต่อท้ายกลุ่มชีตเดียวกัน แล้วแก้ช่วง TOTAL */
+async function wbPost(buf, o) {
+  const zip = await JSZip.loadAsync(buf),
+    P = new DOMParser(),
+    out = { buf, hid: [], rm: 0, add: 0, ana: '' };
+  const wx = P.parseFromString(await zip.file('xl/workbook.xml').async('string'), 'application/xml'),
+    rels = P.parseFromString(await zip.file('xl/_rels/workbook.xml.rels').async('string'), 'application/xml'),
+    rid = {};
+  for (const r of rels.getElementsByTagName('Relationship'))
+    rid[r.getAttribute('Id')] = r.getAttribute('Target');
+  const SH = [...wx.getElementsByTagNameNS(NS, 'sheet')],
+    pathOf = e => {
+      const t = rid[e.getAttributeNS(RNS, 'id')];
+      return t ? (t.startsWith('/') ? t.slice(1) : 'xl/' + t) : null;
+    };
+  let ch = false;
+  for (const sn of o.hide || []) {
+    const e = SH.find(x => x.getAttribute('name') === sn);
+    if (!e || e.getAttribute('state') || !SH.some(x => x !== e && !x.getAttribute('state'))) continue;
+    e.setAttribute('state', 'hidden');
+    ch = true;
+    out.hid.push(sn);
+    const p = pathOf(e),
+      f = p && zip.file(p);
+    if (f)
+      zip.file(p, (await f.async('string')).replace(/(<sheetView\b[^>]*?)\s+tabSelected="1"/, '$1'), {
+        createFolders: false,
+      });
+  }
+  if (out.hid.length) {
+    const vi = SH.findIndex(x => !x.getAttribute('state'));
+    for (const v of wx.getElementsByTagNameNS(NS, 'workbookView')) {
+      const a = +(v.getAttribute('activeTab') || 0);
+      if (SH[a] && SH[a].getAttribute('state')) {
+        v.setAttribute('activeTab', vi);
+        const p = pathOf(SH[vi]),
+          f = p && zip.file(p);
+        if (f) {
+          const x = await f.async('string');
+          if (!/tabSelected="1"/.test(x))
+            zip.file(p, x.replace(/<sheetView\b/, '<sheetView tabSelected="1"'), { createFolders: false });
+        }
+      }
+      const fs = +(v.getAttribute('firstSheet') || 0);
+      if (SH[fs] && SH[fs].getAttribute('state')) v.setAttribute('firstSheet', vi);
+    }
+  }
+  const AE = SH.find(x => /ANALYS|วิเคราะห์/i.test(x.getAttribute('name') || ''));
+  if (AE && ((o.rm || []).length || (o.add || []).length)) {
+    const p = pathOf(AE),
+      af = p && zip.file(p),
+      an = AE.getAttribute('name');
+    const wb = XLSX.read(buf, { type: 'array', sheets: [an], sheetStubs: true }),
+      ws = wb.Sheets[an],
+      G = anaGeo(ws); /* sheetStubs: ช่องสูตรที่ยังไม่มีค่า (แถวที่ระบบเพิ่ม) */
+    if (!af || !G || !G.cN) out.ana = 'ไม่พบตาราง Analysis (แถว TOTAL) — แก้แถวเอง';
+    else {
+      const sh = new Sheet(await af.async('string')),
+        cnOf = c => c.getAttribute('r').match(/[A-Z]+/)[0];
+      const tc = sh.cell(G.F.ref.match(/[A-Z]+/)[0], G.tr, false);
+      const L = [];
+      for (let r = G.F.a; r <= G.F.b; r++) {
+        const f = ws[G.F.cA + r] && ws[G.F.cA + r].f,
+          q = f && String(f).match(/^'?(.+?)'?!\$?[A-Z]+\$?\d+$/);
+        L.push({
+          r,
+          code: codeOf(cl((ws[G.cN + r] || {}).v)),
+          sheet: q ? q[1].replace(/''/g, "'") : '',
+          pack: G.cP ? cl((ws[G.cP + r] || {}).v) : '',
+        });
+      }
+      const mcs = () => sh.doc.getElementsByTagNameNS(NS, 'mergeCells')[0];
+      const shift = (at, d) => {
+        /* d = -1 ลบแถว at • +1 แทรกแถวว่างที่ at */
+        if (d < 0) {
+          const e = sh.rows.get(at);
+          if (e) {
+            sh.sd.removeChild(e);
+            sh.rows.delete(at);
+          }
+        }
+        const rs = [...sh.rows.keys()]
+          .filter(r => (d < 0 ? r > at : r >= at))
+          .sort((a, b) => (d > 0 ? b - a : a - b));
+        for (const r of rs) {
+          const e = sh.rows.get(r),
+            nr = r + d;
+          e.setAttribute('r', nr);
+          for (const c of e.children) c.setAttribute('r', cnOf(c) + nr);
+          sh.rows.delete(r);
+          sh.rows.set(nr, e);
+        }
+        const M = mcs();
+        if (M) {
+          for (const mc of [...M.getElementsByTagNameNS(NS, 'mergeCell')]) {
+            const m = mc.getAttribute('ref').match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+            if (!m) continue;
+            let a = +m[2],
+              b = +m[4];
+            if (d < 0 && a === at && b === at) {
+              M.removeChild(mc);
+              continue;
+            }
+            const lim = d < 0 ? at + 1 : at;
+            if (a >= lim) a += d;
+            if (b >= lim) b += d;
+            mc.setAttribute('ref', m[1] + a + ':' + m[3] + b);
+          }
+          M.setAttribute('count', M.getElementsByTagNameNS(NS, 'mergeCell').length);
+        }
+        for (const x of L) {
+          if (d < 0 ? x.r > at : x.r >= at) x.r += d;
+        }
+      };
+      const gone = new Map();
+      for (const code of o.rm || []) {
+        const i = L.findIndex(x => x.code && sdbK(x.code) === sdbK(code));
+        if (i < 0) continue;
+        const at = L[i].r;
+        if (!gone.has(L[i].sheet) || !L.some((x, j) => j !== i && x.sheet === L[i].sheet))
+          gone.set(L[i].sheet, { pack: L[i].pack, next: L[i + 1] || null });
+        const xo = L[i];
+        L.splice(i, 1);
+        for (const g of gone.values()) if (g.next === xo) g.next = L[i] || null;
+        shift(at, -1);
+        out.rm++;
+      } /* gone = กลุ่มชีตที่แถวสุดท้ายถูกเอาออก → จอใหม่ของชีตนั้นใส่ที่ตำแหน่งเดิม */
+      const txt = (c, t) => {
+        while (c.firstChild) c.removeChild(c.firstChild);
+        c.removeAttribute('t');
+        if (t == null || t === '') return;
+        c.setAttribute('t', 'inlineStr');
+        const is = sh.doc.createElementNS(NS, 'is'),
+          te = sh.doc.createElementNS(NS, 't');
+        te.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
+        te.textContent = t;
+        is.appendChild(te);
+        c.appendChild(is);
+      };
+      for (const A of o.add || []) {
+        if (L.some(x => x.code && sdbK(x.code) === sdbK(A.code))) continue;
+        const same = L.filter(x => x.sheet === A.sheet),
+          g = !same.length && gone.get(A.sheet),
+          gi = g && g.next ? L.indexOf(g.next) : -1;
+        let tp, at, ix;
+        if (same.length) {
+          tp = same[same.length - 1];
+          at = tp.r + 1;
+          ix = L.indexOf(tp) + 1;
+        } else if (gi >= 0) {
+          tp = L[gi];
+          at = tp.r;
+          ix = gi;
+        } else {
+          tp = L[L.length - 1];
+          if (!tp) continue;
+          at = tp.r + 1;
+          ix = L.length;
+        }
+        shift(at, 1);
+        const te = sh.rows.get(tp.r);
+        if (!te) continue;
+        const ne = te.cloneNode(true);
+        ne.setAttribute('r', at);
+        for (const c of ne.children) c.setAttribute('r', cnOf(c) + at);
+        let nxt = null;
+        for (const e of sh.sd.children) {
+          if (+e.getAttribute('r') > at) {
+            nxt = e;
+            break;
+          }
+        }
+        sh.sd.insertBefore(ne, nxt);
+        sh.rows.set(at, ne);
+        const M = mcs();
+        if (M)
+          for (const mc of [...M.getElementsByTagNameNS(NS, 'mergeCell')]) {
+            const m = mc.getAttribute('ref').match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+            if (m && +m[2] === tp.r && +m[4] === tp.r) {
+              const k = sh.doc.createElementNS(NS, 'mergeCell');
+              k.setAttribute('ref', m[1] + at + ':' + m[3] + at);
+              M.appendChild(k);
+            }
+          }
+        if (M) M.setAttribute('count', M.getElementsByTagNameNS(NS, 'mergeCell').length);
+        const pk = same.length ? same[0].pack : g ? g.pack : A.sheet;
+        for (const c of ne.children) {
+          const cc = cnOf(c);
+          if (cc === G.cN) txt(c, A.name);
+          else if (cc === G.F.cA) {
+            while (c.firstChild) c.removeChild(c.firstChild);
+            c.removeAttribute('t');
+            const f = sh.doc.createElementNS(NS, 'f');
+            f.textContent = "'" + String(A.sheet).replace(/'/g, "''") + "'!$" + A.col + '$9';
+            c.appendChild(f);
+          } else if (G.cP && cc === G.cP) {
+            if (!same.length) txt(c, pk);
+          } else if (G.cT && cc === G.cT) txt(c, A.note || '');
+          else if (G.cS && cc === G.cS) {
+            if (A.status) txt(c, A.status);
+          } else if (cc !== G.cS && cc !== G.cP) {
+            const hv =
+              c.getElementsByTagNameNS(NS, 'v').length ||
+              c.getElementsByTagNameNS(NS, 'is').length ||
+              c.getElementsByTagNameNS(NS, 'f').length;
+            if (hv) txt(c, '');
+          }
+        }
+        L.splice(ix, 0, { r: at, code: A.code, sheet: A.sheet, pack: pk });
+        out.add++;
+      }
+      if ((out.rm || out.add) && tc) {
+        const f = tc.getElementsByTagNameNS(NS, 'f')[0];
+        if (f && L.length) {
+          const a = Math.min(...L.map(x => x.r)),
+            b = Math.max(...L.map(x => x.r));
+          f.textContent = 'AVERAGE(' + G.F.cA + a + ':' + G.F.cB + b + ')';
+          for (const v of [...tc.getElementsByTagNameNS(NS, 'v')]) tc.removeChild(v);
+        }
+      }
+      if (out.rm || out.add) {
+        zip.file(p, sh.xml(), { createFolders: false });
+        ch = true;
+      }
+    }
+  }
+  if (!ch) return out;
+  let cp = wx.getElementsByTagNameNS(NS, 'calcPr')[0];
+  if (!cp) {
+    cp = wx.createElementNS(NS, 'calcPr');
+    wx.documentElement.appendChild(cp);
+  }
+  cp.setAttribute('fullCalcOnLoad', '1');
+  zip.file(
+    'xl/workbook.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      new XMLSerializer().serializeToString(wx.documentElement),
+    { createFolders: false },
+  );
+  out.buf = u8buf(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }));
+  return out;
 }
 async function sdbApply(files, plan) {
   const done = [];
@@ -5814,7 +6159,18 @@ async function sdbApply(files, plan) {
         ? A.notes.filter(n => /เพิ่มให้ไม่ได้/.test(n[1]))
         : [['', 'เพิ่มไม่ได้ (ไฟล์เสีย หรือรูปแบบไม่รองรับ)']];
     if (ok.length) {
-      f.buf = A.buf;
+      let b = A.buf;
+      try {
+        b = (
+          await wbPost(A.buf, {
+            add: ok.map(a => {
+              const q = P0.adds.find(z => sdbK(z.code) === sdbK(a.code)) || {};
+              return { ...a, name: anaName(a.code, q.loc, q.fmt, a.sheet), note: '', status: null };
+            }),
+          })
+        ).buf;
+      } catch (_) {} /* 5.5.3: แถว Analysis */
+      f.buf = b;
       f.nd = null;
       try {
         f.nd = sheetNeeds(f.buf, f.name);
@@ -7505,7 +7861,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.2 (3 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.3 (3 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -9341,6 +9697,23 @@ const blkFiles = B =>
       return { name: r.name, buf: u8buf(r.blob), nd: r.nd };
     });
 /* 5.4: ใบเปล่าเดือนใหม่ — จอที่อยู่ในใบของคนอื่นตามฐานข้อมูลจอ ย้ายให้ก่อนบันทึก */
+/* 5.5.3: สรุปสิ่งที่ระบบแก้ให้หลังย้ายจอ */
+const postTxt = P => {
+  if (!P || !P.length) return '';
+  const h = P.filter(x => x.hid && x.hid.length).map(
+      x => esc(x.name.replace(/\.xls[xm]$/i, '')) + ' › ' + esc(x.hid.join(', ')),
+    ),
+    rm = P.reduce((t, x) => t + (x.rm || 0), 0),
+    ad = P.reduce((t, x) => t + (x.add || 0), 0),
+    bad = P.filter(x => x.ana);
+  return (
+    (h.length ? `<br>ชีตที่ไม่เหลือจอ ซ่อนไว้ให้: ${h.join(' • ')}` : '') +
+    (rm || ad
+      ? `<br>ชีต Analysis แก้ให้แล้ว: เอาแถวจอที่ย้ายออก ${rm} แถว • เพิ่มแถวจอที่ย้ายเข้า ${ad} แถว • ช่วง TOTAL ตามแถวใหม่`
+      : '') +
+    (bad.length ? `<br>${bad.map(x => esc(x.name) + ': ' + esc(x.ana)).join(' • ')}` : '')
+  );
+};
 function vBlankMove(B) {
   if (!sdb() || !B.ok) return '';
   const M = B.mplan || (B.mplan = sdbMovePlan(blkFiles(B), (B.moved && B.moved.no) || [])),
@@ -9350,13 +9723,13 @@ function vBlankMove(B) {
     h += alertHTML(
       D.go.length ? 'ok' : 'wr',
       D.go.length ? `ย้ายจอในใบเปล่าแล้ว ${D.go.length} จอ` : 'ย้ายจอไม่ได้',
-      `<p>${D.go.map(m => `<b>${esc(m.code)}</b> ${esc(m.from)} → ${esc(m.to)} (ชีต ${esc(m.tsn)})`).join('<br>') || '–'}${D.no.length ? `<br>ย้ายไม่ได้: ${D.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}</p>`,
+      `<p>${D.go.map(m => `<b>${esc(m.code)}</b> ${esc(m.from)} → ${esc(m.to)} (ชีต ${esc(m.tsn)})`).join('<br>') || '–'}${D.no.length ? `<br>ย้ายไม่ได้: ${D.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${postTxt(D.post)}</p>`,
     );
   if (M.mv.length || M.skip.length)
     h += alertHTML(
       'wr',
       `มี ${M.mv.length + M.skip.length} จออยู่ในใบของคนอื่นตามฐานข้อมูลจอ`,
-      `<ul>${M.mv.map(m => `<li><b>${esc(m.code)}</b> ${esc(m.loc)} อยู่ใน <b>${esc(m.from)}</b> (ชีต ${esc(m.fsn)}) → ย้ายไปต่อท้ายชีต ${esc(m.tsn)} ใน <b>${esc(m.to)}</b></li>`).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b> ใน <b>${esc(z.from)}</b> — ${esc(z.why)} ย้ายเองในใบเช็ค</li>`).join('')}</ul><p>ระบบเอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต ใส่รหัส Format และสถานที่ของจอ) • ย้ายเฉพาะจอที่ทั้งเอาออกและเพิ่มได้ จอจึงไม่หายและไม่ซ้ำ 2 ใบ</p>${M.mv.length ? `<div class="picb"><button class="btn primary" data-a="blkmove">ย้ายจอตามฐานข้อมูล (${M.mv.length} จอ)</button></div>` : ''}`,
+      `<ul>${M.mv.map(m => `<li><b>${esc(m.code)}</b> ${esc(m.loc)} อยู่ใน <b>${esc(m.from)}</b> (ชีต ${esc(m.fsn)}) → ย้ายไปต่อท้ายชีต ${esc(m.tsn)} ใน <b>${esc(m.to)}</b></li>`).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b> ใน <b>${esc(z.from)}</b> — ${esc(z.why)} ย้ายเองในใบเช็ค</li>`).join('')}</ul><p>ระบบเอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต ใส่รหัส Format และสถานที่ของจอ) • จอสุดท้ายของชีตย้ายได้ ชีตที่ไม่เหลือจอซ่อนไว้ให้ • ชีต Analysis แก้แถวให้ด้วย • ย้ายเฉพาะจอที่ทั้งเอาออกและเพิ่มได้ จอจึงไม่หายและไม่ซ้ำ 2 ใบ</p>${M.mv.length ? `<div class="picb"><button class="btn primary" data-a="blkmove">ย้ายจอตามฐานข้อมูล (${M.mv.length} จอ)</button></div>` : ''}`,
     );
   return h;
 }
@@ -9402,7 +9775,7 @@ function vSdbAdd() {
       A.sv
         ? `บันทึกใบเช็คที่ย้ายจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
         : `ย้ายจอแล้ว ${A.go.length} จอ — ยังไม่ได้บันทึก`,
-      `<p>${A.go.map(m => `<b>${esc(m.code)}</b> ${esc(m.from)} → ${esc(m.to)} (ชีต ${esc(m.tsn)})`).join('<br>') || '–'}${A.no.length ? `<br>ย้ายไม่ได้: ${A.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${A.sv ? ` • ไฟล์ก่อนย้ายเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
+      `<p>${A.go.map(m => `<b>${esc(m.code)}</b> ${esc(m.from)} → ${esc(m.to)} (ชีต ${esc(m.tsn)})`).join('<br>') || '–'}${A.no.length ? `<br>ย้ายไม่ได้: ${A.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${postTxt(A.post)}${A.sv ? ` • ไฟล์ก่อนย้ายเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
     );
   else if (A)
     h += alertHTML(
@@ -9426,7 +9799,7 @@ function vSdbAdd() {
       A && A.kind === 'move' ? A.no : [],
     ); /* 5.4 */
     if (M.mv.length || M.skip.length)
-      h += `<div class="cmpg g-fix"><h4>ย้ายจอตามฐานข้อมูลจอ<span>${M.mv.length}</span></h4><ol class="cmpl">${M.mv.map(m => `<li><b>${esc(m.code)}</b> ${esc(m.loc)}<span class="do">ย้ายจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) ไป ${esc(m.to)} (ต่อท้ายชีต ${esc(m.tsn)})</span></li>`).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b><span class="do">${esc(z.from)}: ${esc(z.why)} — ย้ายเองในใบเช็ค</span></li>`).join('')}</ol>${M.mv.length ? `<div class="picb"><button class="btn primary" data-a="sdbmove">ย้ายจอตามฐานข้อมูล (${M.mv.length} จอ)</button></div><p class="hint">เอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต) • ย้ายเฉพาะจอที่ทั้งเอาออกและเพิ่มได้ จอจึงไม่หายและไม่ซ้ำ 2 ใบ • ยังไม่แก้ไฟล์ในเครื่องจนกว่าจะกดบันทึก (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ)</p>` : ''}</div>`;
+      h += `<div class="cmpg g-fix"><h4>ย้ายจอตามฐานข้อมูลจอ<span>${M.mv.length}</span></h4><ol class="cmpl">${M.mv.map(m => `<li><b>${esc(m.code)}</b> ${esc(m.loc)}<span class="do">ย้ายจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) ไป ${esc(m.to)} (ต่อท้ายชีต ${esc(m.tsn)})</span></li>`).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b><span class="do">${esc(z.from)}: ${esc(z.why)} — ย้ายเองในใบเช็ค</span></li>`).join('')}</ol>${M.mv.length ? `<div class="picb"><button class="btn primary" data-a="sdbmove">ย้ายจอตามฐานข้อมูล (${M.mv.length} จอ)</button></div><p class="hint">เอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต) • จอสุดท้ายของชีตย้ายได้ ชีตที่ไม่เหลือจอซ่อนไว้ให้ • ชีต Analysis แก้แถวให้ด้วย • ย้ายเฉพาะจอที่ทั้งเอาออกและเพิ่มได้ จอจึงไม่หายและไม่ซ้ำ 2 ใบ • ยังไม่แก้ไฟล์ในเครื่องจนกว่าจะกดบันทึก (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ)</p>` : ''}</div>`;
   }
   const P = sdbAddPlan(TC.map(f => ({ name: f.name, buf: f.buf, nd: f.nd || { S: [] } }))),
     n = P.reduce((t, x) => t + x.adds.length, 0),
@@ -12266,7 +12639,7 @@ const ACT = {
     }
     const pv = PICX;
     if (pv) pv.sig = ckSig();
-    SDA = { kind: 'move', go: R.go, no: R.no, names: R.names, sv: null, sig: ckSig() };
+    SDA = { kind: 'move', go: R.go, no: R.no, names: R.names, post: R.post, sv: null, sig: ckSig() };
     SDQ = null;
     await sdbRun();
     MQN = R.go.length ? 'done' : 'warn';
