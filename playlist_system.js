@@ -111,6 +111,7 @@
  *   เวอร์ชัน 5.5.6: จอที่ย้ายเข้า / เพิ่ม ใส่ตามลำดับเลขจอ (arrangeWb opt.ins, Analysis แทรกตามเลขจอ) • ช่วงคะแนนเฉลี่ยครอบแถวจอที่อยู่ติดกัน • บอกจอที่ไม่มีในฐานข้อมูล • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.7: ตรวจ / ย้าย / เพิ่มจอ Bangkok Jams / Metro LED ตามฐานข้อมูล (sdbK BKJ/METRO, sheetNeeds X, colWb, arrX) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.8: เลือกเพิ่ม / ย้าย / เอาออกทีละจอ (SDX, sdbOps) • เอาจอที่ไม่มีในฐานข้อมูลออกได้ • ชีต Bangkok Jams ที่จอจะหมดเติมจอที่ขาดในรอบเดียวกัน • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.5.9: คำอธิบายการ์ดตรวจจอเข้าใจง่าย • สร้างชีตที่ใบเช็คไม่มี (cloneSheet: คัดลอกชีตแบบเดียวกันในใบเดียวกัน) • ไม่แก้ส่วนเติม
  * ======================================================================
  */
 
@@ -5682,6 +5683,29 @@ function sdbAddPlan(files) {
           c = ((f.nd && f.nd.X) || []).filter(z => z.kind.startsWith(kd)),
           ab = /^[AB]$/i.test(r.pk || '') ? String(r.pk).toUpperCase() : '',
           t = xPick(c, kd, ab); /* 5.5.7 */
+        if (!t) {
+          const kind = kd === 'BKJ2' ? (ab ? 'BKJ2' + ab : '') : kd,
+            ex0 = kind && ((f.nd && f.nd.names) || []).find(n => xKindOf(n) === kind),
+            b = kind && !ex0 && !(kd === 'BKJ2' && !ab && c.length) ? xBase(f.nd && f.nd.X, kind) : '';
+          if (ex0) {
+            skip.push({
+              code: r.c,
+              why: `มีชีต ${ex0} อยู่แล้ว แต่ระบบอ่านจอในชีตนั้นไม่ได้ (ชีตว่าง / ซ่อนไว้ หรือแถวเลื่อน) —`,
+            });
+            continue;
+          }
+          if (b) {
+            adds.push({
+              sn: shUniq(xNameFor(kind, b), (f.nd && f.nd.names) || []),
+              code: xName(r.k),
+              fmt: '',
+              loc: r.loc,
+              k: r.k,
+              mk: b,
+            });
+            continue;
+          }
+        } /* 5.5.9: ไม่มีชีต → สร้างจากชีต Bangkok Jams ที่มีอยู่ */
         if (t) adds.push({ sn: t.sn, code: xName(r.k), fmt: '', loc: r.loc, k: r.k });
         else
           skip.push({
@@ -5698,8 +5722,27 @@ function sdbAddPlan(files) {
         const p = DB.find(z => sdbK(z.c) === r.k);
         if (p) m = mediaOf(String(p.m || '')) || (/spare/i.test(p.m || '') ? 'Spare' : null);
       }
-      const sn = m && (S.find(z => z.media === m) || {}).sn;
+      const sn = m && (S.find(z => z.media === m) || {}).sn,
+        ex0 = !sn && m && ((f.nd && f.nd.names) || []).find(n => !notChk(n) && mediaOf(n) === m),
+        b =
+          !sn && !ex0 && m && PKGS.has(m)
+            ? blkBase(S, m)
+            : ''; /* 5.5.9: ไม่มีชีตแพค → สร้างจากชีตแพคที่มีอยู่ */
       if (sn) adds.push({ sn, code: r.c, fmt: r.fmt, loc: r.loc, k: r.k });
+      else if (ex0)
+        skip.push({
+          code: r.c,
+          why: `มีชีต ${ex0} อยู่แล้ว แต่ระบบอ่านจอในชีตนั้นไม่ได้ (ชีตว่าง / ซ่อนไว้ หรือแถวเลื่อน) —`,
+        });
+      else if (b)
+        adds.push({
+          sn: shUniq(blkNameFor(m, (f.nd && f.nd.names) || []), (f.nd && f.nd.names) || []),
+          code: r.c,
+          fmt: r.fmt,
+          loc: r.loc,
+          k: r.k,
+          mk: b,
+        });
       else
         skip.push({
           code: r.c,
@@ -5764,8 +5807,23 @@ function sdbMovePlan(files, fail = []) {
             fy = files.find(z => z.name === y.name),
             c = ((fy && fy.nd && fy.nd.X) || []).filter(z => z.kind.startsWith(kd)),
             sk = (((fx && fx.nd && fx.nd.X) || []).find(z => z.sn === r.sn) || {}).kind || '',
-            ab = /^[AB]$/i.test(mi.pk || '') ? String(mi.pk).toUpperCase() : sk.slice(4),
-            t = xPick(c, kd, ab); /* 5.5.7 */
+            ab = /^[AB]$/i.test(mi.pk || '') ? String(mi.pk).toUpperCase() : sk.slice(4);
+          let t = xPick(c, kd, ab); /* 5.5.7 */
+          let mk = '',
+            ex0 = '';
+          if (!t) {
+            const kind = kd === 'BKJ2' ? (ab ? 'BKJ2' + ab : '') : kd;
+            ex0 = (kind && ((fy && fy.nd && fy.nd.names) || []).find(n => xKindOf(n) === kind)) || '';
+            const b = kind && !ex0 ? xBase(fy && fy.nd && fy.nd.X, kind) : '';
+            if (b) {
+              t = { sn: shUniq(xNameFor(kind, b), (fy && fy.nd && fy.nd.names) || []) };
+              mk = b;
+            }
+          } /* 5.5.9 */
+          if (!t && ex0) {
+            why = `ใบของ${r.to}มีชีต ${ex0} แต่ระบบอ่านจอในชีตนั้นไม่ได้`;
+            continue;
+          }
           if (!t) {
             why =
               kd === 'BKJ2' && c.length && !ab
@@ -5783,6 +5841,7 @@ function sdbMovePlan(files, fail = []) {
             to: y.name,
             tsn: t.sn,
             who: r.to,
+            mk,
           };
           break;
         }
@@ -5800,6 +5859,23 @@ function sdbMovePlan(files, fail = []) {
           sn = (S.find(z => z.media === m0) || {}).sn;
           if (sn) m = m0;
         } /* ใบใหม่ไม่มีชีตแพคตามฐานข้อมูล → ใช้แพคเดียวกับชีตเดิม (ตอนเติม ระบบจัดจอเข้าชีตตามแพคใน Playlist อีกครั้ง) */
+        let mk = '',
+          ex0 = '';
+        if (!sn && m && PKGS.has(m)) {
+          ex0 = ((fy && fy.nd && fy.nd.names) || []).find(n => !notChk(n) && mediaOf(n) === m) || '';
+          const b = ex0 ? '' : blkBase(S, m);
+          if (b) {
+            sn = shUniq(
+              blkNameFor(m, (fy && fy.nd && fy.nd.names) || []),
+              (fy && fy.nd && fy.nd.names) || [],
+            );
+            mk = b;
+          }
+        } /* 5.5.9: ใบใหม่ไม่มีชีตแพค → สร้าง */
+        if (!sn && ex0) {
+          why = `ใบของ${r.to}มีชีต ${ex0} แต่ระบบอ่านจอในชีตนั้นไม่ได้`;
+          continue;
+        }
         if (!sn) {
           why = m ? `ใบของ${r.to}ไม่มีชีตแพค ${m}` : 'ไม่รู้ว่าจอนี้อยู่แพคไหน';
           continue;
@@ -5814,6 +5890,7 @@ function sdbMovePlan(files, fail = []) {
           to: y.name,
           tsn: sn,
           who: r.to,
+          mk,
         };
         break;
       }
@@ -5838,7 +5915,7 @@ async function sdbMoveApply(files, mv, sel) {
         return null;
       }
     },
-    add1 = m => ({ sn: m.tsn, code: m.code, fmt: m.fmt, loc: m.loc, k: m.k }),
+    add1 = m => ({ sn: m.tsn, code: m.code, fmt: m.fmt, loc: m.loc, k: m.k, mk: m.mk }),
     del1 = m => ({ sn: m.fsn, code: m.code }),
     key = (n, c) => n + '|' + sdbK(c);
   /* ลองทีละฝั่งก่อน — ย้ายเฉพาะจอที่ทั้งเอาออกจากใบเดิม และเพิ่มในใบใหม่ได้ (จอจะไม่หาย และไม่ซ้ำ 2 ใบ) */
@@ -5962,6 +6039,7 @@ async function sdbMoveApply(files, mv, sel) {
       add: P2.add,
       fix: P2.fix || 0,
       ana: P2.ana,
+      made: A.made || [],
       ex: (A.added || []).filter(a => EX.has(key(n, a.code))).map(a => ({ code: a.code, sheet: a.sheet })),
     });
   }
@@ -6842,8 +6920,205 @@ async function colWb(buf, o) {
   }
   return out;
 }
+/* ===== 5.5.9: ใบเช็คไม่มีชีตของแพคที่ต้องใส่จอ → สร้างชีตใหม่โดยคัดลอกชีตแบบเดียวกันในไฟล์เดียวกัน (สีเส้น / สูตร / หัวตารางเหมือนใบนั้น) ===== */
+const PKGS = new Set(['40Blue', '40Red', '80Blue', '80Red', 'CITY', 'Spare']);
+const shUniq = (want, names) => {
+  const ex = new Set((names || []).map(n => String(n).toLowerCase()));
+  let nm = want,
+    i = 2;
+  while (ex.has(nm.toLowerCase())) nm = want + ' (' + i++ + ')';
+  return nm;
+};
+/* ชื่อชีตแพคใหม่ตามแบบชื่อในไฟล์นั้น (PBTV 80 Blue → PBTV 40 Red • PBTV80 BLUE → PBTV40 RED) */
+const blkNameFor = (m, names) => {
+  const N = names || [],
+    sib = N.find(n => /40|80/.test(n) && mediaOf(n)),
+    st = N.some(n => /_/.test(n)) ? 'u' : N.some(n => /^PBTV ?\d\d ?[A-Z][a-z]/.test(n)) ? 't' : 'c';
+  if (m === 'CITY') return st === 'u' ? 'CITY_TV_25' : st === 't' ? 'The City 25' : 'CITY TV 25';
+  if (m === 'Spare') return st === 't' ? 'PBTV BKK Spare' : 'Spare';
+  if (sib)
+    return sib.replace(/40|80/, m.slice(0, 2)).replace(/blue|red/i, w => {
+      const t = m.slice(2);
+      return w === w.toUpperCase()
+        ? t.toUpperCase()
+        : w[0] === w[0].toUpperCase()
+          ? t[0].toUpperCase() + t.slice(1).toLowerCase()
+          : t.toLowerCase();
+    });
+  return 'PBTV ' + m.slice(0, 2) + ' ' + m.slice(2);
+};
+/* ชื่อชีต Bangkok Jams ใหม่ตามแบบชื่อชีต Bangkok Jams ที่มีอยู่ (Bangkok Jams 2 A → Bangkok Jams 1 • BANGKOK_JAM2_A → BANGKOK_JAM1) */
+const xNameFor = (kind, base) => {
+  const m = String(base).match(/^(.*?JAMS?)([\s_]*)([12])(?:([\s_]*)([AB]))?(.*)$/i);
+  if (!m) return kind === 'BKJ1' ? 'Bangkok Jams 1' : 'Bangkok Jams 2 ' + kind.slice(4);
+  const s2 = m[4] != null ? m[4] : /_/.test(base) ? '_' : /\s/.test(base) ? ' ' : '';
+  return m[1] + m[2] + (kind === 'BKJ1' ? '1' : '2' + s2 + kind.slice(4)) + m[6];
+};
+const blkBase = (S, m) => {
+  const L = (S || []).filter(z => z.media && PKGS.has(z.media) && (z.codes || []).length);
+  return (
+    (
+      L.find(z => z.media.slice(0, 2) === String(m).slice(0, 2)) ||
+      L.find(z => /^(40|80)/.test(z.media)) ||
+      L[0] ||
+      {}
+    ).sn || ''
+  );
+};
+const xBase = (X, kind) => {
+  if (!/^BKJ/.test(kind || '')) return '';
+  const L = (X || []).filter(z => (z.codes || []).length && z.kind.startsWith('BKJ'));
+  return (L[0] || {}).sn || '';
+}; /* Metro LED ต้องมีชีตอยู่แล้ว */
+/* คัดลอกชีต base เป็นชีตใหม่ name (ต่อจาก base) — ไม่เอาปุ่ม / รูป / มาโครของชีตเดิม • lab = เปลี่ยนป้ายที่เขียนชื่อชีตเดิมเป็นชื่อใหม่ */
+async function cloneSheet(buf, base, name, lab) {
+  const zip = await JSZip.loadAsync(buf),
+    P = new DOMParser(),
+    S = new XMLSerializer(),
+    ser = d =>
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + S.serializeToString(d.documentElement);
+  const wx = P.parseFromString(await zip.file('xl/workbook.xml').async('string'), 'application/xml'),
+    relsX = P.parseFromString(
+      await zip.file('xl/_rels/workbook.xml.rels').async('string'),
+      'application/xml',
+    ),
+    ct = P.parseFromString(await zip.file('[Content_Types].xml').async('string'), 'application/xml'),
+    rid = {};
+  for (const r of relsX.getElementsByTagName('Relationship'))
+    rid[r.getAttribute('Id')] = r.getAttribute('Target');
+  const SH = [...wx.getElementsByTagNameNS(NS, 'sheet')],
+    be = SH.find(e => e.getAttribute('name') === base);
+  if (!be || SH.some(e => e.getAttribute('name').toLowerCase() === String(name).toLowerCase())) return null;
+  const t = rid[be.getAttributeNS(RNS, 'id')],
+    bp = t && (t.startsWith('/') ? t.slice(1) : 'xl/' + t);
+  if (!bp || !zip.file(bp)) return null;
+  let n = 1;
+  for (const k of Object.keys(zip.files)) {
+    const m = k.match(/^xl\/worksheets\/sheet(\d+)\.xml$/);
+    if (m) n = Math.max(n, +m[1] + 1);
+  }
+  const np = 'xl/worksheets/sheet' + n + '.xml';
+  const d = P.parseFromString(await zip.file(bp).async('string'), 'application/xml'),
+    W = d.documentElement,
+    kill = ln => {
+      for (const e of [...W.getElementsByTagNameNS(NS, ln)]) if (e.parentNode) e.parentNode.removeChild(e);
+    };
+  for (const ln of [
+    'legacyDrawing',
+    'legacyDrawingHF',
+    'controls',
+    'picture',
+    'oleObjects',
+    'drawing',
+    'tableParts',
+    'hyperlinks',
+  ])
+    kill(ln);
+  for (const e of [...W.children]) if (e.localName === 'AlternateContent') W.removeChild(e);
+  const sp = W.getElementsByTagNameNS(NS, 'sheetPr')[0];
+  if (sp) sp.removeAttribute('codeName');
+  for (const e of [...W.getElementsByTagName('*')])
+    if (e.hasAttributeNS(RNS, 'id')) e.removeAttributeNS(RNS, 'id');
+  for (const sv of W.getElementsByTagNameNS(NS, 'sheetView')) sv.removeAttribute('tabSelected');
+  if (lab) {
+    const ws = XLSX.read(buf, { type: 'array', sheets: [base] }).Sheets[base] || {},
+      bm = mediaOf(base);
+    for (const k in ws) {
+      if (k[0] === '!') continue;
+      const m = k.match(/^([A-Z]+)(\d+)$/);
+      if (!m || +m[2] > 15) continue;
+      const v = cl((ws[k] || {}).v);
+      if (lab === 'x' ? nrm(v) === nrm(base) : !!bm && v.length <= 24 && mediaOf(v) === bm) {
+        /* ป้ายชื่อชีต / ป้ายแพคของชีตเดิม → ชื่อชีตใหม่ */ const c = [
+          ...W.getElementsByTagNameNS(NS, 'c'),
+        ].find(e => e.getAttribute('r') === k);
+        if (c) {
+          while (c.firstChild) c.removeChild(c.firstChild);
+          c.setAttribute('t', 'inlineStr');
+          const is = d.createElementNS(NS, 'is'),
+            te = d.createElementNS(NS, 't');
+          te.textContent = name;
+          is.appendChild(te);
+          c.appendChild(is);
+        }
+      }
+    }
+  }
+  zip.file(np, ser(d));
+  let ri = 1;
+  const ids = new Set([...relsX.getElementsByTagName('Relationship')].map(r => r.getAttribute('Id')));
+  while (ids.has('rId' + ri)) ri++;
+  const rel = relsX.createElementNS(relsX.documentElement.namespaceURI, 'Relationship');
+  rel.setAttribute('Id', 'rId' + ri);
+  rel.setAttribute('Type', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet');
+  rel.setAttribute('Target', 'worksheets/sheet' + n + '.xml');
+  relsX.documentElement.appendChild(rel);
+  const bo = [...ct.getElementsByTagName('Override')].find(o => o.getAttribute('PartName') === '/' + bp),
+    ov = ct.createElementNS(ct.documentElement.namespaceURI, 'Override');
+  ov.setAttribute('PartName', '/' + np);
+  ov.setAttribute(
+    'ContentType',
+    bo
+      ? bo.getAttribute('ContentType')
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml',
+  );
+  ct.documentElement.appendChild(ov);
+  const ix = SH.indexOf(be) + 1,
+    se = wx.createElementNS(NS, 'sheet');
+  se.setAttribute('name', name);
+  se.setAttribute('sheetId', String(Math.max(0, ...SH.map(e => +e.getAttribute('sheetId') || 0)) + 1));
+  se.setAttributeNS(RNS, 'r:id', 'rId' + ri);
+  be.parentNode.insertBefore(se, be.nextSibling);
+  for (const dn of wx.getElementsByTagNameNS(NS, 'definedName')) {
+    const l = dn.getAttribute('localSheetId');
+    if (l != null && +l >= ix) dn.setAttribute('localSheetId', String(+l + 1));
+  }
+  for (const v of wx.getElementsByTagNameNS(NS, 'workbookView'))
+    for (const a of ['activeTab', 'firstSheet']) {
+      const x = v.getAttribute(a);
+      if (x != null && +x >= ix) v.setAttribute(a, String(+x + 1));
+    }
+  zip.file('xl/workbook.xml', ser(wx));
+  zip.file('xl/_rels/workbook.xml.rels', ser(relsX));
+  zip.file('[Content_Types].xml', ser(ct));
+  return u8buf(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }));
+}
+
 /* เพิ่ม / เอาออกตามฐานข้อมูล: DGT / ID → arrangeWb • Bangkok Jams / Metro LED → colWb */
 async function arrX(buf, opt) {
+  const mkA = (opt.adds || []).filter(a => a.mk),
+    tpl = new Set(),
+    made = [];
+  opt = { ...opt, dels: [...(opt.dels || [])] }; /* 5.5.9 */
+  for (const sn of new Set(mkA.map(a => a.sn))) {
+    const a = mkA.find(z => z.sn === sn),
+      xk = isXk(sdbK(a.code));
+    let b2 = null;
+    try {
+      b2 = await cloneSheet(buf, a.mk, sn, xk ? 'x' : 'b');
+    } catch (_) {
+      b2 = null;
+    }
+    if (!b2) continue;
+    buf = b2;
+    made.push(sn);
+    const ws = XLSX.read(buf, { type: 'array', cellFormula: true, sheets: [sn] }).Sheets[sn];
+    let cs = [];
+    if (ws && xk) cs = xColsOf(ws, xKindOf(sn), avCols(ws)).codes;
+    else if (ws)
+      for (const rw of [11, 10]) {
+        cs = Object.keys(ws)
+          .filter(k => new RegExp('^[A-Z]+' + rw + '$').test(k))
+          .map(k => codeOf(ws[k].v))
+          .filter(Boolean);
+        if (cs.length) break;
+      }
+    for (const c of cs)
+      if (!(opt.adds || []).some(z => z.sn === sn && sdbK(z.code) === sdbK(c))) {
+        tpl.add(sn + '|' + sdbK(c));
+        opt.dels.push({ sn, code: c });
+      }
+  }
   const ia = x => !isXk(sdbK(x.code)),
     A1 = (opt.adds || []).filter(ia),
     D1 = (opt.dels || []).filter(ia),
@@ -6868,6 +7143,10 @@ async function arrX(buf, opt) {
     R.notes.push(...B.notes);
     R.emptied.push(...B.emptied);
   }
+  R.removed = R.removed.filter(d => !tpl.has(d.sheet + '|' + sdbK(d.code)));
+  R.emptied = R.emptied.filter(x => !made.includes(x));
+  R.made = made;
+  R.notes = R.notes.filter(n => !(made.includes(n[0]) && /เอาออกไม่ได้/.test(n[1])));
   return R;
 }
 
@@ -6930,6 +7209,7 @@ async function sdbApply(files, plan) {
         : [['', 'เพิ่มไม่ได้ (ไฟล์เสีย หรือรูปแบบไม่รองรับ)']];
     if (ok.length) {
       let b = A.buf;
+      if ((A.made || []).length) ok.made = A.made;
       try {
         b = (
           await wbPost(A.buf, {
@@ -6948,7 +7228,7 @@ async function sdbApply(files, plan) {
         f.nd = { S: [] };
       }
     }
-    done.push({ name: f.name, ok, bad });
+    done.push({ name: f.name, ok, bad, made: (A && A.made) || [] });
   }
   return done;
 }
@@ -8641,7 +8921,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.8 (3 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.9 (3 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -9101,7 +9381,7 @@ function sheetNeeds(buf, name) {
       });
     }
   }
-  return { S, named, X, sheets: wb.SheetNames.length };
+  return { S, named, X, names: [...wb.SheetNames], sheets: wb.SheetNames.length };
 }
 const guessNamed = b => {
   const n = nrm(b.label + ' ' + b.code + ' ' + b.sn);
@@ -10495,7 +10775,10 @@ const mvLine = m =>
       : `<b>${esc(m.code)}</b> ${esc(m.from)} → ${esc(m.to)} (ชีต ${esc(m.tsn)})`; /* 5.5.4 */
 const postTxt = P => {
   if (!P || !P.length) return '';
-  const ex = P.filter(x => x.ex && x.ex.length).map(
+  const mk = P.filter(x => x.made && x.made.length).map(
+      x => esc(x.name.replace(/\.xls[xm]$/i, '')) + ' › ' + esc(x.made.join(', ')),
+    ),
+    ex = P.filter(x => x.ex && x.ex.length).map(
       x =>
         esc(x.name.replace(/\.xls[xm]$/i, '')) +
         ' › ' +
@@ -10509,6 +10792,9 @@ const postTxt = P => {
     fx = P.reduce((t, x) => t + (x.fix || 0), 0),
     bad = P.filter(x => x.ana);
   return (
+    (mk.length
+      ? `<br>สร้างชีตใหม่ให้ (คัดลอกแบบจากชีตในใบเดียวกัน ไม่มีปุ่ม Add / Send): ${mk.join(' • ')}`
+      : '') +
     (ex.length
       ? `<br>เพิ่มจอที่ขาดลงชีตเดียวกันให้ด้วย (ฐานข้อมูลบอกว่าเป็นจอของคนนี้ • ชีตจึงไม่ว่าง): ${ex.join(' • ')}`
       : '') +
@@ -10589,7 +10875,7 @@ function vSdbAdd() {
       A.sv
         ? `บันทึกใบเช็คที่เพิ่มจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
         : `เพิ่มจอแล้ว ${A.done.reduce((t, d) => t + d.ok.length, 0)} จอ — ยังไม่ได้บันทึก`,
-      `<p>${A.done.map(d => `<b>${esc(d.name)}</b> ${esc(d.ok.map(a => a.code + ' (ชีต ' + a.sheet + ')').join(', ') || '–')}${d.bad.length ? ' • เพิ่มไม่ได้: ' + esc(d.bad.map(z => z[1]).join(' / ')) : ''}`).join('<br>')}${A.sv ? ` • ไฟล์ก่อนเพิ่มเก็บไว้ในโฟลเดอร์ สำรองก่อนเพิ่มจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
+      `<p>${A.done.map(d => `<b>${esc(d.name)}</b> ${esc(d.ok.map(a => a.code + ' (ชีต ' + a.sheet + ')').join(', ') || '–')}${(d.made || []).length ? ' • สร้างชีตใหม่: ' + esc(d.made.join(', ')) : ''}${d.bad.length ? ' • เพิ่มไม่ได้: ' + esc(d.bad.map(z => z[1]).join(' / ')) : ''}`).join('<br>')}${A.sv ? ` • ไฟล์ก่อนเพิ่มเก็บไว้ในโฟลเดอร์ สำรองก่อนเพิ่มจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
     );
   const PX = PICX && PICX.sig === ckSig() ? PICX : null,
     blank = !!PX && PX.res.length < TC.length,
@@ -10609,7 +10895,7 @@ function vSdbAdd() {
       MV = O.mv,
       nNo = M.mv.filter(m => SDX.no.has(sdbKy(m.from, m.code))).length; /* 5.4 • 5.5.8: ตามที่เลือก */
     if (MV.length || M.skip.length || nNo)
-      h += `<div class="cmpg g-fix"><h4>${MV.some(m => m.unk) ? 'ย้าย / เอาจอออก' : 'ย้ายจอตามฐานข้อมูลจอ'}<span>${MV.length}</span></h4><ol class="cmpl">${MV.map(m => (m.unk ? `<li><b>${esc(m.code)}</b><span class="do">เอาออกจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) — ไม่มีในฐานข้อมูล (เลือกเอาออก)</span></li>` : m.out ? `<li><b>${esc(m.code)}</b> ${esc(m.loc)}<span class="do">เอาออกจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) — ฐานข้อมูลบอกว่าเป็นของ${esc(m.who)} • ${esc(m.why0)}</span></li>` : `<li><b>${esc(m.code)}</b> ${esc(m.loc)}<span class="do">ย้ายจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) ไป ${esc(m.to)} (ต่อท้ายชีต ${esc(m.tsn)})</span></li>`)).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b><span class="do">${esc(z.from)}: ${esc(z.why)} — ย้ายเองในใบเช็ค</span></li>`).join('')}</ol>${nNo ? `<p class="hint">เก็บไว้ ไม่ย้าย ${nNo} จอ ตามที่เลือกในรายการไฟล์ด้านบน</p>` : ''}${MV.length ? `<div class="picb"><button class="btn primary" data-a="sdbmove">${MV.some(m => m.unk) ? 'ย้าย / เอาจอออก' : 'ย้ายจอตามฐานข้อมูล'} (${MV.length} จอ)</button></div><p class="hint">เอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต) • ใบของคนใหม่ไม่ต้องอยู่ในชุดนี้ก็ได้: ระบบเอาจอออกจากใบนี้ แล้วใบของคนใหม่ได้จอตอนกด “เพิ่มจอที่ขาด” • จอสุดท้ายของชีตย้ายได้ ชีตที่ไม่เหลือจอซ่อนไว้ให้ • ชีต Analysis แก้แถวให้ด้วย • ยังไม่แก้ไฟล์ในเครื่องจนกว่าจะกดบันทึก (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ)</p>` : ''}</div>`;
+      h += `<div class="cmpg g-fix"><h4>${MV.some(m => m.unk) ? 'ย้าย / เอาจอออก' : 'ย้ายจอตามฐานข้อมูลจอ'}<span>${MV.length}</span></h4><ol class="cmpl">${MV.map(m => (m.unk ? `<li><b>${esc(m.code)}</b><span class="do">เอาออกจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) — ไม่มีในฐานข้อมูล (เลือกเอาออก)</span></li>` : m.out ? `<li><b>${esc(m.code)}</b> ${esc(m.loc)}<span class="do">เอาออกจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) — ฐานข้อมูลบอกว่าเป็นของ${esc(m.who)} • ${esc(m.why0)}</span></li>` : `<li><b>${esc(m.code)}</b> ${esc(m.loc)}<span class="do">ย้ายจาก ${esc(m.from)} (ชีต ${esc(m.fsn)}) ไป ${esc(m.to)} (${m.mk ? `สร้างชีต “${esc(m.tsn)}” ใหม่` : `ต่อท้ายชีต ${esc(m.tsn)}`})</span></li>`)).join('')}${M.skip.map(z => `<li><b>${esc(z.code)}</b><span class="do">${esc(z.from)}: ${esc(z.why)} — ย้ายเองในใบเช็ค</span></li>`).join('')}</ol>${nNo ? `<p class="hint">เก็บไว้ ไม่ย้าย ${nNo} จอ ตามที่เลือกในรายการไฟล์ด้านบน</p>` : ''}${MV.length ? `<div class="picb"><button class="btn primary" data-a="sdbmove">${MV.some(m => m.unk) ? 'ย้าย / เอาจอออก' : 'ย้ายจอตามฐานข้อมูล'} (${MV.length} จอ)</button></div><p class="hint">เอาจอออกจากใบเดิม แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของคนที่ฐานข้อมูลระบุ (หัวตารางใช้แบบของจอสุดท้ายในชีต) • ใบของคนใหม่ไม่ต้องอยู่ในชุดนี้ก็ได้: ระบบเอาจอออกจากใบนี้ แล้วใบของคนใหม่ได้จอตอนกด “เพิ่มจอที่ขาด” • จอสุดท้ายของชีตย้ายได้ ชีตที่ไม่เหลือจอซ่อนไว้ให้ • ชีต Analysis แก้แถวให้ด้วย • ยังไม่แก้ไฟล์ในเครื่องจนกว่าจะกดบันทึก (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ)</p>` : ''}</div>`;
   }
   const O2 = sdbOps(),
     P = O2.P,
@@ -10617,7 +10903,7 @@ function vSdbAdd() {
     n0 = P.reduce((t, x) => t + x.adds.length, 0),
     sk = P.flatMap(x => x.skip.map(z => [x.name, z])); /* 5.5.8: n = ที่เลือกเพิ่ม */
   if (n0 || sk.length)
-    h += `<div class="cmpg g-fix"><h4>เพิ่มจอที่ขาดลงใบเปล่า<span>${n}</span></h4><ol class="cmpl">${P.flatMap(x => x.adds.map(a => `<li><b>${esc(a.code)}</b> ${esc(a.loc)}<span class="do">${SDX.no.has(sdbKy(x.name, a.code)) ? `ไม่เพิ่ม (เลือกไว้) — ${esc(x.name)}` : `เพิ่มต่อท้ายชีต ${esc(a.sn)} ใน ${esc(x.name)}`}</span></li>`)).join('')}${sk.map(([nm, z]) => `<li><b>${esc(z.code)}</b><span class="do">${esc(nm)}: ${esc(z.why)} ใส่เองในใบเช็ค</span></li>`).join('')}</ol>${n ? `<div class="picb"><button class="btn primary" data-a="sdbadd">เพิ่มจอที่ขาดลงใบเปล่า (${n} จอ)</button></div>` : ''}</div>`;
+    h += `<div class="cmpg g-fix"><h4>เพิ่มจอที่ขาดลงใบเปล่า<span>${n}</span></h4><ol class="cmpl">${P.flatMap(x => x.adds.map(a => `<li><b>${esc(a.code)}</b> ${esc(a.loc)}<span class="do">${SDX.no.has(sdbKy(x.name, a.code)) ? `ไม่เพิ่ม (เลือกไว้) — ${esc(x.name)}` : a.mk ? `สร้างชีต “${esc(a.sn)}” ใหม่ใน ${esc(x.name)} (แบบจากชีต ${esc(a.mk)}) แล้วเพิ่มจอ` : `เพิ่มต่อท้ายชีต ${esc(a.sn)} ใน ${esc(x.name)}`}</span></li>`)).join('')}${sk.map(([nm, z]) => `<li><b>${esc(z.code)}</b><span class="do">${esc(nm)}: ${esc(z.why)} ใส่เองในใบเช็ค</span></li>`).join('')}</ol>${n ? `<div class="picb"><button class="btn primary" data-a="sdbadd">เพิ่มจอที่ขาดลงใบเปล่า (${n} จอ)</button></div>` : ''}</div>`;
   return h;
 }
 function vSdb() {
@@ -10653,37 +10939,65 @@ function vSdb() {
           : ''; /* 5.5.8 */
     const canA = (n, c) => O.P.some(x => x.name === n && x.adds.some(a => sdbK(a.code) === sdbK(c))),
       canM = (n, c) => O.M.mv.find(m => m.from === n && sdbK(m.code) === sdbK(c));
+    const getA = (n, c) => {
+        for (const x of O.P)
+          if (x.name === n) {
+            const a = x.adds.find(a => sdbK(a.code) === sdbK(c));
+            if (a) return a;
+          }
+        return null;
+      },
+      tag = (t, c) => `<span class="rtag ${c || ''}">${t}</span>`; /* 5.5.9: คำอธิบายภาษาคน */
+    const atLine = (r, x) => {
+      const m = O.M.mv.find(q => q.from === r.at && sdbK(q.code) === sdbK(r.c));
+      return m && SDX.no.has(sdbKy(r.at, r.c))
+        ? ` — ตอนนี้อยู่ในใบ ${esc(r.at)} (เลือกเก็บไว้ที่ใบนั้น)`
+        : m
+          ? ` — ตอนนี้อยู่ในใบ ${esc(r.at)} จะย้ายมาให้เมื่อกดปุ่มย้ายจอด้านล่าง`
+          : ` — ตอนนี้อยู่ในใบ ${esc(r.at)}`;
+    };
     const li = x =>
       `<li><b>${esc(x.name)}</b> <small>${esc(x.who)} • จอในใบ ${x.n}</small><span class="do">${[
         ...x.miss.map(r => {
-          const k = sdbKy(x.name, r.c);
+          const k = sdbKy(x.name, r.c),
+            a = !r.at && getA(x.name, r.c);
           return (
-            `ขาด ${esc(r.c)} ${esc(r.loc)} (${esc(r.pk || 'ไม่ระบุแพค')})${r.at ? ` — อยู่ในใบ ${esc(r.at)}` : pl && r.pl ? ' — มีหนังใน Playlist วันนี้' : ''}` +
-            (!r.at && canA(x.name, r.c) ? tg('a', k, !SDX.no.has(k), 'เพิ่ม', 'ไม่เพิ่ม') : '')
+            `${tag('ขาด', 'r')} <b>${esc(r.c)}</b> ${esc(r.loc)} (${esc(r.pk || 'ไม่ระบุแพค')}) — ตารางให้${esc(x.who)} แต่ใบนี้ยังไม่มี${r.at ? atLine(r, x) : pl && r.pl ? ' • มีหนังใน Playlist วันนี้' : ''}${a && a.mk ? ` • ใบนี้ไม่มีชีต ${esc(XN[xKd(a.k)] || a.sn)} ระบบสร้างชีต “${esc(a.sn)}” ให้ (แบบจากชีต ${esc(a.mk)})` : ''}` +
+            (a ? tg('a', k, !SDX.no.has(k), 'เพิ่มเข้าใบนี้', 'ไม่เพิ่ม') : '')
           );
         }),
         ...x.moved.map(r => {
           const k = sdbKy(x.name, r.c),
             m = canM(x.name, r.c);
           return (
-            `มี ${esc(r.c)} (ชีต ${esc(r.sn)}) แต่ฐานข้อมูลบอกว่าเป็นของ${esc(r.to)}` +
-            (m ? tg('m', k, !SDX.no.has(k), m.out ? 'เอาออก' : 'ย้าย', 'เก็บไว้') : '')
+            `${tag('เป็นของคนอื่นแล้ว', 'y')} <b>${esc(r.c)}</b> (ชีต ${esc(r.sn)}) — ตารางให้${esc(r.to)}แล้ว${m && m.out ? ` • ไม่ได้เปิดใบ${esc(r.to)} จึงเอาออกจากใบนี้ได้อย่างเดียว` : ''}${m && m.mk ? ` • ใบ${esc(r.to)}ไม่มีชีตนี้ ระบบสร้างชีต “${esc(m.tsn)}” ให้` : ''}` +
+            (m
+              ? tg(
+                  'm',
+                  k,
+                  !SDX.no.has(k),
+                  m.out ? 'เอาออกจากใบนี้' : 'ย้ายไปใบ' + esc(r.to),
+                  'เก็บไว้ในใบนี้',
+                )
+              : '')
           );
         }),
         ...(x.unk || []).map(r => {
           const k = sdbKy(x.name, r.c);
           return (
-            `มี ${esc(r.c)} (ชีต ${esc(r.sn)}) แต่ไม่มีในฐานข้อมูล — ดูว่ายังใช้จอนี้อยู่ไหม` +
-            (O.blank ? tg('u', k, SDX.rm.has(k), 'เอาออก', 'เก็บไว้') : ' (ระบบไม่ย้าย ไม่เอาออก)')
+            `${tag('ไม่มีในตาราง', 'g')} <b>${esc(r.c)}</b> (ชีต ${esc(r.sn)}) — ตารางถ่ายงานไม่มีรหัสนี้ อาจเลิกใช้แล้ว หรือยังไม่ได้ใส่ในตาราง` +
+            (O.blank ? tg('u', k, SDX.rm.has(k), 'เอาออกจากใบนี้', 'เก็บไว้') : ' (ระบบไม่ย้าย ไม่เอาออก)')
           );
         }),
-      ].join('<br>')}</span></li>`;
+      ]
+        .map(t => `<span class="ln">${t}</span>`)
+        .join('')}</span></li>`;
     b +=
       (bad.length
         ? alertHTML(
             'wr',
             `ต้องดู ${(nm + nv + nu).toLocaleString()} จอ ใน ${bad.length} ไฟล์`,
-            `<p>${nm ? `ขาด ${nm} จอ = ฐานข้อมูลบอกว่าเป็นจอของคนนี้ แต่ใบเช็คไม่มี (จอนี้จะไม่ถูกเติม) ` : ''}${nv ? `${nm ? '• ' : ''}อยู่ผิดคน ${nv} จอ = ใบเช็คมีจอนี้ แต่ฐานข้อมูลบอกว่าเป็นของคนอื่น` : ''}${nu ? `${nm || nv ? ' • ' : ''}ไม่มีในฐานข้อมูล ${nu} จอ = ใบเช็คมีจอนี้ แต่ฐานข้อมูลไม่มีรหัสนี้` : ''}</p>`,
+            `<p>${nm ? `ขาด ${nm} จอ = ตารางถ่ายงานให้คนนี้ แต่ใบเช็คยังไม่มี (จอนี้จะไม่ถูกเติม) ` : ''}${nv ? `${nm ? '• ' : ''}เป็นของคนอื่นแล้ว ${nv} จอ = ใบเช็คยังมีจอที่ตารางให้คนอื่นแล้ว` : ''}${nu ? `${nm || nv ? ' • ' : ''}ไม่มีในตาราง ${nu} จอ = ใบเช็คมีจอนี้ แต่ตารางถ่ายงานไม่มีรหัสนี้` : ''}</p>`,
           )
         : alertHTML(
             'ok',
@@ -10691,7 +11005,7 @@ function vSdb() {
             '<p>จอ DGT / ID ของแต่ละคนครบ และไม่มีจอของคนอื่น</p>',
           )) +
       (bad.length
-        ? `<div class="cmpg g-fix"><h4>ไฟล์ที่ต้องดู<span>${bad.length}</span></h4><ol class="cmpl">${bad.map(li).join('')}</ol></div>`
+        ? `<div class="cmpg g-fix"><h4>ไฟล์ที่ต้องดู<span>${bad.length}</span></h4><p class="hint"><b>ทำไมต้องเพิ่ม / ย้าย / เอาจอออก:</b> ตารางถ่ายงาน (ฐานข้อมูลจอ) บอกว่าเดือนนี้ใครดูแลจอไหน เวลาสลับจอกัน ใบเช็คของแต่ละคนต้องเปลี่ยนตาม — <b>ขาด</b> = จอของเราแต่ใบเรายังไม่มี → เพิ่ม • <b>เป็นของคนอื่นแล้ว</b> = ใบเรายังมีจอที่ตารางให้คนอื่นแล้ว → ย้ายไปใบของเขา (ถ้าเปิดใบของเขาไว้ด้วย) หรือเอาออกจากใบเรา (เขาจะได้จอตอนเปิดใบของเขาแล้วกดเพิ่มจอที่ขาด) • <b>ไม่มีในตาราง</b> = ตารางไม่มีรหัสนี้ อาจเลิกใช้แล้ว เลือกเองว่าจะเก็บหรือเอาออก • ทุกข้อเลือกได้ว่าจะทำหรือไม่</p><ol class="cmpl">${bad.map(li).join('')}</ol></div>`
         : '') +
       (ok.length && bad.length
         ? `<p class="hint">ตรงกับฐานข้อมูล ${ok.length} ไฟล์: ${esc(ok.map(x => x.name).join(', '))}</p>`
