@@ -112,6 +112,7 @@
  *   เวอร์ชัน 5.5.7: ตรวจ / ย้าย / เพิ่มจอ Bangkok Jams / Metro LED ตามฐานข้อมูล (sdbK BKJ/METRO, sheetNeeds X, colWb, arrX) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.8: เลือกเพิ่ม / ย้าย / เอาออกทีละจอ (SDX, sdbOps) • เอาจอที่ไม่มีในฐานข้อมูลออกได้ • ชีต Bangkok Jams ที่จอจะหมดเติมจอที่ขาดในรอบเดียวกัน • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.9: คำอธิบายการ์ดตรวจจอเข้าใจง่าย • สร้างชีตที่ใบเช็คไม่มี (cloneSheet: คัดลอกชีตแบบเดียวกันในใบเดียวกัน) • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.5.10: ชีตแพค DGT / ID แบบ 1 คอลัมน์ต่อจอ ย้าย / เพิ่มได้ (colWb kind COL) • ไม่แก้ส่วนเติม
  * ======================================================================
  */
 
@@ -6443,6 +6444,24 @@ const xPick = (c, kd, ab) =>
         ? c[0]
         : null
     : c[0]; /* Bangkok Jams 2 ต้องตรงชีต A / B */
+/* 5.5.10: ชีตแพค (DGT / ID) ที่เป็นแบบ 1 คอลัมน์ต่อจอ — รหัสจอแถวถัดจากแถว % อยู่คอลัมน์ติดกัน */
+const colCodesOf = ws => {
+  const cr = avRowOf(ws) + 1,
+    cols = [],
+    codes = [];
+  for (const c of [...avCols(ws)].sort((a, b) => a - b)) {
+    const v = codeOf((ws[n2col(c) + cr] || {}).v);
+    if (v) {
+      cols.push(c);
+      codes.push(v);
+    }
+  }
+  return { cols, codes, cr };
+};
+const isColLayout = ws => {
+  const { cols } = colCodesOf(ws);
+  return cols.length >= 2 && cols.some((c, i) => i && c - cols[i - 1] === 1);
+};
 const xColsOf = (ws, kind, av) => {
   const cr = avRowOf(ws) + 1,
     cols = [],
@@ -6725,13 +6744,13 @@ async function colWb(buf, o) {
       ws = wb.Sheets[sn],
       myA = adds.filter(x => x.sn === sn),
       myD = dels.filter(x => x.sn === sn),
-      kind = xKindOf(sn);
+      kind = xKindOf(sn) || (ws && isColLayout(ws) ? 'COL' : ''); /* 5.5.10 */
     if (!p || !ws || !zip.file(p) || !kind) {
       myA.forEach(x => bad(x, 1, 'ไม่พบชีต Bangkok Jams / Metro LED'));
       myD.forEach(x => bad(x, 0, 'ไม่พบชีต Bangkok Jams / Metro LED'));
       continue;
     }
-    let { cols, codes } = xColsOf(ws, kind, avCols(ws));
+    let { cols, codes } = kind === 'COL' ? colCodesOf(ws) : xColsOf(ws, kind, avCols(ws));
     if (!cols.length) {
       myA.forEach(x => bad(x, 1, 'ชีตนี้ไม่มีจอให้ใช้เป็นแบบ ใส่เองในใบเช็ค'));
       myD.forEach(x => bad(x, 0, 'ไม่พบจอในชีตนี้'));
@@ -7119,7 +7138,24 @@ async function arrX(buf, opt) {
         opt.dels.push({ sn, code: c });
       }
   }
-  const ia = x => !isXk(sdbK(x.code)),
+  const cS = new Set();
+  {
+    const ns = [
+      ...new Set([...(opt.adds || []), ...(opt.dels || [])].filter(x => !isXk(sdbK(x.code))).map(x => x.sn)),
+    ];
+    if (ns.length) {
+      let wb0 = null;
+      try {
+        wb0 = XLSX.read(buf, { type: 'array', cellFormula: true, sheets: ns });
+      } catch (_) {}
+      if (wb0)
+        for (const sn of ns) {
+          const ws = wb0.Sheets[sn];
+          if (ws && isColLayout(ws)) cS.add(sn);
+        }
+    }
+  } /* 5.5.10 */
+  const ia = x => !isXk(sdbK(x.code)) && !cS.has(x.sn),
     A1 = (opt.adds || []).filter(ia),
     D1 = (opt.dels || []).filter(ia),
     A2 = (opt.adds || []).filter(x => !ia(x)),
@@ -8921,7 +8957,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.9 (3 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.10 (3 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:

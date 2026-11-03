@@ -3022,6 +3022,9 @@ const xName=k=>{const m=String(k).match(/^(BKJ[12]|METRO)-(\d+)$/);return m?m[1]
 const XN={BKJ1:'Bangkok Jams 1',BKJ2:'Bangkok Jams 2',METRO:'Metro LED'};
 const xDisp=(kind,v)=>{const s=cl(v);if(!s||!kind)return'';const kd=xKd(kind),k=sdbK(s);if(isXk(k)){const kk=xKd(k);return kk===kd?xName(k):kk.startsWith('BKJ')&&kd.startsWith('BKJ')?xName(kd+k.slice(4)):''}return/^\d{1,3}$/.test(s)?xName(kd+'-'+(+s)):''}; /* ชนิดชีตสำคัญกว่าตัวเลข 1/2 ในรหัส (BKJ1_14 ในชีต Bangkok Jams 2 = BKJ2_14) */
 const xPick=(c,kd,ab)=>kd==='BKJ2'?(ab?c.find(z=>z.kind==='BKJ2'+ab):(c.length===1?c[0]:null)):c[0]; /* Bangkok Jams 2 ต้องตรงชีต A / B */
+/* 5.5.10: ชีตแพค (DGT / ID) ที่เป็นแบบ 1 คอลัมน์ต่อจอ — รหัสจอแถวถัดจากแถว % อยู่คอลัมน์ติดกัน */
+const colCodesOf=ws=>{const cr=avRowOf(ws)+1,cols=[],codes=[];for(const c of[...avCols(ws)].sort((a,b)=>a-b)){const v=codeOf((ws[n2col(c)+cr]||{}).v);if(v){cols.push(c);codes.push(v)}}return{cols,codes,cr}};
+const isColLayout=ws=>{const{cols}=colCodesOf(ws);return cols.length>=2&&cols.some((c,i)=>i&&c-cols[i-1]===1)};
 const xColsOf=(ws,kind,av)=>{const cr=avRowOf(ws)+1,cols=[],codes=[];for(const c of[...av].sort((a,b)=>a-b)){const d=xDisp(kind,(ws[n2col(c)+cr]||{}).v);if(d){cols.push(c);codes.push(d)}}return{cols,codes,cr}}; /* รหัสจออยู่แถวถัดจากแถว % (แถว 10 • ใบแบบมีแถว None แถว 11) */
 const ndCodesX=nd=>[...ndCodes(nd),...((nd&&nd.X)||[]).flatMap(x=>x.codes.map(c=>[x.sn,c]))];
 /* ชื่อในชีต Analysis → รหัส (DGT / ID / BKJ1_22 / METRO_02) */
@@ -3086,9 +3089,9 @@ async function colWb(buf,o){const out={buf,added:[],removed:[],notes:[],emptied:
  for(const r of rels.getElementsByTagName('Relationship'))rid[r.getAttribute('Id')]=r.getAttribute('Target');
  const SH=[...wx.getElementsByTagNameNS(NS,'sheet')],pathOf=e=>{const t=rid[e.getAttributeNS(RNS,'id')];return t?(t.startsWith('/')?t.slice(1):'xl/'+t):null};
  const wb=XLSX.read(buf,{type:'array',cellFormula:true}),shifts=[],bad=(x,a,w)=>out.notes.push([x.sn,x.code+' — '+(a?'เพิ่มให้ไม่ได้':'เอาออกไม่ได้')+': '+w]);
- for(const sn of[...new Set([...adds,...dels].map(x=>x.sn))]){const e=SH.find(x=>x.getAttribute('name')===sn),p=e&&pathOf(e),ws=wb.Sheets[sn],myA=adds.filter(x=>x.sn===sn),myD=dels.filter(x=>x.sn===sn),kind=xKindOf(sn);
+ for(const sn of[...new Set([...adds,...dels].map(x=>x.sn))]){const e=SH.find(x=>x.getAttribute('name')===sn),p=e&&pathOf(e),ws=wb.Sheets[sn],myA=adds.filter(x=>x.sn===sn),myD=dels.filter(x=>x.sn===sn),kind=xKindOf(sn)||(ws&&isColLayout(ws)?'COL':''); /* 5.5.10 */
   if(!p||!ws||!zip.file(p)||!kind){myA.forEach(x=>bad(x,1,'ไม่พบชีต Bangkok Jams / Metro LED'));myD.forEach(x=>bad(x,0,'ไม่พบชีต Bangkok Jams / Metro LED'));continue}
-  let{cols,codes}=xColsOf(ws,kind,avCols(ws));if(!cols.length){myA.forEach(x=>bad(x,1,'ชีตนี้ไม่มีจอให้ใช้เป็นแบบ ใส่เองในใบเช็ค'));myD.forEach(x=>bad(x,0,'ไม่พบจอในชีตนี้'));continue}
+  let{cols,codes}=kind==='COL'?colCodesOf(ws):xColsOf(ws,kind,avCols(ws));if(!cols.length){myA.forEach(x=>bad(x,1,'ชีตนี้ไม่มีจอให้ใช้เป็นแบบ ใส่เองในใบเช็ค'));myD.forEach(x=>bad(x,0,'ไม่พบจอในชีตนี้'));continue}
   const pr=avRowOf(ws),cr=pr+1,HR=Math.max(cr+3,Math.min(30,blankHr(ws)||21)),nc=cols[0]-1,c0=cols[0];let filled=false;for(let r=HR+1;r<=HR+800&&!filled;r++){const t=cl((ws[n2col(nc)+r]||{}).v);if(t&&/[A-Za-z0-9\u0E00-\u0E7F]/.test(t)&&!FIXR.test(t)&&!/^#/.test(t))filled=true} /* “.” ที่ทีมใส่กันแถวว่าง ไม่นับเป็นหนัง */
   if(filled){myA.forEach(x=>bad(x,1,'ชีตนี้เติมไปแล้ว (เพิ่มได้เฉพาะใบเปล่า) ใส่เองในใบเช็ค'));myD.forEach(x=>bad(x,0,'ชีตนี้เติมไปแล้ว (ย้ายได้เฉพาะใบเปล่า) เอาออกเองในใบเช็ค'));continue}
   const doc=P.parseFromString(await zip.file(p).async('string'),'application/xml');let ch=false;
@@ -3162,7 +3165,8 @@ async function arrX(buf,opt){const mkA=(opt.adds||[]).filter(a=>a.mk),tpl=new Se
   const ws=XLSX.read(buf,{type:'array',cellFormula:true,sheets:[sn]}).Sheets[sn];let cs=[];
   if(ws&&xk)cs=xColsOf(ws,xKindOf(sn),avCols(ws)).codes;else if(ws)for(const rw of[11,10]){cs=Object.keys(ws).filter(k=>new RegExp('^[A-Z]+'+rw+'$').test(k)).map(k=>codeOf(ws[k].v)).filter(Boolean);if(cs.length)break}
   for(const c of cs)if(!(opt.adds||[]).some(z=>z.sn===sn&&sdbK(z.code)===sdbK(c))){tpl.add(sn+'|'+sdbK(c));opt.dels.push({sn,code:c})}}
- const ia=x=>!isXk(sdbK(x.code)),A1=(opt.adds||[]).filter(ia),D1=(opt.dels||[]).filter(ia),A2=(opt.adds||[]).filter(x=>!ia(x)),D2=(opt.dels||[]).filter(x=>!ia(x));
+ const cS=new Set();{const ns=[...new Set([...(opt.adds||[]),...(opt.dels||[])].filter(x=>!isXk(sdbK(x.code))).map(x=>x.sn))];if(ns.length){let wb0=null;try{wb0=XLSX.read(buf,{type:'array',cellFormula:true,sheets:ns})}catch(_){}if(wb0)for(const sn of ns){const ws=wb0.Sheets[sn];if(ws&&isColLayout(ws))cS.add(sn)}}} /* 5.5.10 */
+ const ia=x=>!isXk(sdbK(x.code))&&!cS.has(x.sn),A1=(opt.adds||[]).filter(ia),D1=(opt.dels||[]).filter(ia),A2=(opt.adds||[]).filter(x=>!ia(x)),D2=(opt.dels||[]).filter(x=>!ia(x));
  let R={buf,added:[],removed:[],notes:[],emptied:[]};
  if(A1.length||D1.length){const A=await arrangeWb(buf,new Map(),{...opt,adds:A1,dels:D1});R={buf:A.buf,added:[...(A.added||[])],removed:[...(A.removed||[])],notes:[...(A.notes||[])],emptied:[...(A.emptied||[])]}}
  if(A2.length||D2.length){const B=await colWb(R.buf,{adds:A2,dels:D2,empty:opt.empty});R.buf=B.buf;R.added.push(...B.added);R.removed.push(...B.removed);R.notes.push(...B.notes);R.emptied.push(...B.emptied)}
@@ -3498,7 +3502,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.9 (3 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.10 (3 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
