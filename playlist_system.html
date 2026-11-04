@@ -1000,7 +1000,7 @@ function namedScreen(label,code,sn){if(/^BASE$/.test(nrm(sn||''))){const h=DB.fi
  if(/BIGY/.test(n))return by('The Big Y');if(/SOBANGKOK|SOBKK/.test(n))return by('So BKK -H-V-');
  if(/TWINTUBE|TWT/.test(n))return by('Twin Tube');if(/PLOENCHIT/.test(n))return by('Ploenchit Interchange');
  if(/NARONG/.test(n))return by('At Narong Interchange');if(/AIRTRAVELL/.test(n))return by('Air Traveller Gateway');
- if(/SHOWDC/.test(n))return by('ShowDC');if(/PRUDENTIAL/.test(n))return by('PrudentialSathorn');if(/DUSITCENTRAL/.test(n))return by('Dusit Central Park');
+ if(/BRAVO/.test(n))return by('ShowDC');if(/SATHORN|SAINTLOUIS|STLOUIS/.test(n))return by('PrudentialSathorn'); /* 5.5.14 */if(/SHOWDC/.test(n))return by('ShowDC');if(/PRUDENTIAL/.test(n))return by('PrudentialSathorn');if(/DUSITCENTRAL/.test(n))return by('Dusit Central Park');
  if(/EXCHANGETOWER/.test(n))return by(/SM.*2|2.*SM/.test(n)?'Exchange Tower (SM) 2':/SM/.test(n)?'Exchange Tower (SM)':'Exchange Tower');
  const L=nrm(label);if(L.length>=4){const h=DB.filter(s=>(s.m==='Signature Max'||s.m==='Show DC / Prudential')&&(nrm(s.c).includes(L)||L.includes(nrm(s.c))));if(h.length===1)return h[0]}return null}
 const jamList=(s,o)=>listOf(s,o).filter(a=>!/^BJ\d*_\d+_/i.test(a)&&!/weather/i.test(a)&&!/^เวลารวม|^รวมทุกแพค/.test(a));
@@ -1070,7 +1070,7 @@ function mkStyles(doc){const g=n=>doc.getElementsByTagNameNS(NS,n)[0],cache={},X
    if(!hasF&&!wh)return cache[k]=+base;const xf=x0.cloneNode(true);if(hasF){xf.setAttribute('fillId','0');xf.removeAttribute('applyFill')}
    if(wh){const bf=fo.cloneNode(true);for(const c of[...bf.getElementsByTagNameNS(NS,'color')])bf.removeChild(c);xf.setAttribute('fontId',addU(g('fonts'),bf));xf.setAttribute('applyFont','1')}
    return cache[k]=addU(xfs,xf)}, /* 4.8 */
-  isDate(st){const xf=g('cellXfs').children[+st||0];if(!xf)return false;const id=+xf.getAttribute('numFmtId')||0;if((id>=14&&id<=22)||(id>=27&&id<=36)||(id>=45&&id<=47)||(id>=50&&id<=58))return true;const nf=g('numFmts');if(!nf)return false;for(const e of nf.children)if(+e.getAttribute('numFmtId')===id)return /[dmy]/i.test(String(e.getAttribute('formatCode')||'').replace(/\[[^\]]*\]|"[^"]*"/g,''));return false},
+  fcOf(st){const xf=g('cellXfs').children[+st||0];if(!xf)return'';const fo=g('fonts').children[+xf.getAttribute('fontId')||0],c=fo&&fo.getElementsByTagNameNS(NS,'color')[0];return c?(c.getAttribute('rgb')?String(c.getAttribute('rgb')).toUpperCase():'T'+(c.getAttribute('theme')||'')):''}, /* 5.5.14 */isDate(st){const xf=g('cellXfs').children[+st||0];if(!xf)return false;const id=+xf.getAttribute('numFmtId')||0;if((id>=14&&id<=22)||(id>=27&&id<=36)||(id>=45&&id<=47)||(id>=50&&id<=58))return true;const nf=g('numFmts');if(!nf)return false;for(const e of nf.children)if(+e.getAttribute('numFmtId')===id)return /[dmy]/i.test(String(e.getAttribute('formatCode')||'').replace(/\[[^\]]*\]|"[^"]*"/g,''));return false},
   xml(){return'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(doc.documentElement)}}}
 const modeS=(sh,col,a,b)=>{const c=new Map();for(let r=a;r<=b;r++){const v=sh.getS(col,r);if(v!=null)c.set(v,(c.get(v)||0)+1)}let best=null,bn=0;for(const[k,v]of c)if(v>bn){bn=v;best=k}return best};
 /* สไตล์ของช่องที่มีชื่อหนัง (มีเส้นตาราง) กับช่องว่าง แยกกัน — กันเส้นตารางหายเมื่อรายการสั้น */
@@ -1207,6 +1207,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  const HXA=[...HX,...B.flatMap(b=>b.pcs.slice(1).map((L,i)=>[L,b.hss[i+1]]))].sort((x,y)=>col2n(x[0])-col2n(y[0])); /* แถบวันที่คลุมทุกช่องวันที่ถ่ายของบล็อก (และคอลัมน์หัวสีเข้มอื่นที่เป็นส่วนของแถบ) */
  const hdr=(row,d)=>{const r2=CONTM&&+d>=+P2;for(const[L,st]of HXA){sh.clear(L,row);if(st!=null)sh.setS(L,row,hsx(st,L,r2))}B.forEach((b,i)=>{sh.clear(b.lc,row);if(i===0||BVAL)sh.setNum(b.nc,row,serial(d));else sh.setF(b.nc,row,B[i-1].nc+row,serial(d));if(b.hs[0]!=null)sh.setS(b.nc,row,hsx(b.hs[0],b.nc,r2));if(b.hs[1]!=null)sh.setS(b.lc,row,hsx(b.hs[1],b.lc,r2));sh.clear(b.pc,row);if(b.hs[2]!=null)sh.setS(b.pc,row,hsx(b.hs[2],b.pc,r2));
   if(b.hs[0]==null){const bc=(two||r2)?C2:(o.col1||NAVY);sh.setS(b.nc,row,ST.derive(sh.getS(b.nc,row)||0,'bkd'+bc,{numFmt:14,fill:bc}));for(const L of[b.lc,...b.pcs])if(L)sh.setS(L,row,ST.derive(sh.getS(L,row)||0,'bkf'+bc,{fill:bc}))}else{const sc=sh.getS(b.nc,row);if(!ST.isDate(sc)){const lf=String(ST.fillOf(sh.getS(b.lc,row)||0)||''),nf=String(ST.fillOf(sc)||'');sh.setS(b.nc,row,ST.derive(sc||0,'bkn'+(nf?'':lf),nf||!lf?{numFmt:14}:{numFmt:14,fill:lf}))}} /* 4.8: ช่องวันที่ไม่มีรูปแบบวันที่ → ใส่รูปแบบวันที่ (และสีแถบตามช่องข้าง ๆ) */ /* 4.7: ใบเปล่า (ยังไม่มีแถบให้ดูแบบ) — แถบวันที่สีตามการตั้งค่า (ค่าเริ่มต้นน้ำเงินเข้มแบบที่ทีมใช้) + รูปแบบวันที่ */
+  {const sc=sh.getS(b.nc,row),fl=String(ST.fillOf(sc||0)||'').slice(-6),fc=ST.fcOf(sc||0);if(/^[0-9A-F]{6}$/i.test(fl)&&(0.299*parseInt(fl.slice(0,2),16)+0.587*parseInt(fl.slice(2,4),16)+0.114*parseInt(fl.slice(4,6),16))<128&&!/FFFFFF$/.test(fc)&&fc!=='T0')sh.setS(b.nc,row,ST.derive(sc||0,'wfont',{color:'FFFFFFFF'}))} /* 5.5.14: ตัวเลขวันที่บนแถบสีเข้มเป็นสีขาว */
  })};
  hdr(S,P);
  const pad=(b,a,z)=>{for(let row=a;row<=z;row++){sh.setS(b.lc,row,ST.derive(b.bl,'pad'+PADC,{fill:PADC,border:true}));b.pcs.forEach((L,i)=>sh.setS(L,row,ST.derive(b.bps[i]!=null?b.bps[i]:'0','pad'+PADC,{fill:PADC,border:true})))}}; /* แถบสีฟ้าในช่องว่างต่อจากรายการที่สั้นกว่า */
@@ -2817,7 +2818,7 @@ async function fillWb(f,on,metro,o){const rep=[],FOLD=[];const buf=f.buf.slice(0
   else if(!blocks.length&&!media&&!/^(ANALYSIS|X+)$/.test(sn.toUpperCase().replace(/[^A-Z]/g,''))&&!/^[^\p{L}\p{N}]*$/u.test(sn)){ /* 4.4.1: ชีต ### */
    const av=avCols(ws);av.sort((x,y)=>x-y);
    if(!av.length)rep.push([sn,'-','ข้าม (ไม่พบรหัสจอ และไม่พบคอลัมน์ผลวิเคราะห์ในแถว 9)',0]);
-   const r10=avRowOf(ws)===10;for(const cn of av.filter(c=>!av.includes(c-1))){const lc=n2col(cn-1),label=r10?lab10(ws,sn,cn):cl((ws[lc+'10']||{}).v),code=cl((ws[n2col(cn)+'11']||{}).v)+cl((ws[n2col(cn)+'12']||{}).v),scr=(r10&&screen10(ws,sn,cn))||namedScreen(label,code,sn);
+   const r10=avRowOf(ws)===10;for(const cn of av.filter(c=>!av.includes(c-1))){const lc=n2col(cn-1),label=r10?lab10(ws,sn,cn):cl((ws[lc+'10']||{}).v),code=(cl((ws[n2col(cn)+'11']||{}).v)+cl((ws[n2col(cn)+'12']||{}).v))||cl((ws[n2col(cn)+'10']||{}).v)||cl((ws[n2col(cn)+'13']||{}).v),scr=(r10&&screen10(ws,sn,cn))||namedScreen(label,code,sn);
     if(!scr){const emp=r10&&VKS.has(kind10(ws,sn,cn))&&!Object.keys(ws).some(k=>{const m=k.match(/^([A-Z]+)(\d+)$/);return!!m&&m[1]===lc&&+m[2]>14&&!!cl(ws[k].v)});rep.push([sn,label||code||n2col(cn),emp?'ข้อมูล: ชีตนี้ยังไม่มีรายชื่อหนัง และไม่พบจอนี้ใน Playlist — ข้ามไว้ก่อน':/^BASE$/.test(nrm(sn))?'ไม่พบจอ Base ใน Playlist — นำเข้า Playlist ที่มีจอ Base ก่อน แล้วเติมใหม่':'ไม่พบจอนี้ใน Playlist',0]);continue}
     const ads=listOf(scr,o);jobs.push([sn,lc,ads,scr,'']);rep.push([sn,label+' → '+scr.c,'เติมแล้ว',ads.length])}}
   else if(!blocks.length&&media&&!HIDN.has(sn))rep.push([sn,'-','ข้าม (ไม่พบรหัสจอ DGT/ID-xx ในแถว 10-11)',0])}
@@ -3271,7 +3272,7 @@ const stable=rows=>[...rows.filter(r=>!r.off),...rows.filter(r=>r.off)];
 function fixMetro(s){if(s.m!=='MetroLED')return s;let v=0,ps='',pe='';for(const r of s.rows){if(/^Version$/i.test(r.ad.trim())){v++;continue}if(v>=2)r.off=true;if(r.s||r.e){ps=r.s;pe=r.e}else{r.s=ps;r.e=pe}}s.rows=stable(s.rows.filter(r=>!/^Version$/i.test(r.ad.trim())));return s}
 function fromData(D){const T=D.t;DB=D.s.map(s=>({m:s[0],c:s[1],n:s[2],f:s[3],ed:0,rows:D.r.slice(s[4],s[4]+s[5]+s[6]).map((r,i)=>({ad:T[r[0]],ty:T[r[1]],len:r[2],cnt:r[3],st:T[r[4]],s:T[r[5]],e:T[r[6]],note:T[r[7]],off:i>=s[5]}))}));DB=DB.map(fixMetro)}
 /* ---------- Signature Max / Show DC: กติกาจากหมายเหตุ “ไม่ออน …” และ “ออนเฉพาะ …” ---------- */
-const SIGAL={'So BKK -H-V-':['SO','SOBKK','SOBANGKOK'],'Twin Tube':['TWT','TWINTUBE'],'PrudentialSathorn':['สาทร','สาธร','TWTPLUS','PRUDENTIAL','PRUDENTIALSATHORN'],'Air Traveller Gateway':['AOT'],'The Big Y':['BIGY','THEBIGY'],'Ploenchit Interchange':['PJ','PLOENCHIT'],'At Narong Interchange':['AN','NARONG','ATNARONG'],'Exchange Tower':['EXT'],'Exchange Tower (SM)':['EXT'],'Exchange Tower (SM) 2':['EXT'],'Base':['BASE'],'ShowDC':['SDC','SHOWDC'],'Dusit Central Park':['DS','DUSIT','CENTRALPARKDUSIT']};
+const SIGAL={'So BKK -H-V-':['SO','SOBKK','SOBANGKOK'],'Twin Tube':['TWT','TWINTUBE'],'PrudentialSathorn':['สาทร','สาธร','TWTPLUS','PRUDENTIAL','PRUDENTIALSATHORN','SATHORN','SAINTLOUIS'],'Air Traveller Gateway':['AOT'],'The Big Y':['BIGY','THEBIGY'],'Ploenchit Interchange':['PJ','PLOENCHIT'],'At Narong Interchange':['AN','NARONG','ATNARONG'],'Exchange Tower':['EXT'],'Exchange Tower (SM)':['EXT'],'Exchange Tower (SM) 2':['EXT'],'Base':['BASE'],'ShowDC':['SDC','SHOWDC','BRAVO','BRAVOBKK'],'Dusit Central Park':['DS','DUSIT','CENTRALPARKDUSIT']};
 const ntk=t=>String(t).toUpperCase().replace(/^\s*(จอ|แอร์)+/,'').replace(/[^A-Z0-9฀-๿]/g,'');
 const ntoks=seg=>{const out=[];for(const p of seg.split(/[,\/]+/)){const w=p.trim();if(!w)continue;out.push(ntk(w));for(const x of w.split(/\s+/))out.push(ntk(x))}return out.filter(Boolean)};
 function noteSkip(scr,r){const al=SIGAL[scr.c];if(!al)return false;const n=String(r.note||'');
@@ -3536,7 +3537,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.13 (4 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.14 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -3662,9 +3663,9 @@ function sheetNeeds(buf,name){const u=new Uint8Array(buf,0,Math.min(4,buf.byteLe
   const jm=U.match(/(?:JAMS?|BKJ)([12])([AB]|(?![0-9]))/);if(jm){if(av.length)S.push({sn,kind:'BKJ'+jm[1]});continue}
   if(/^(ANALYSIS|X+)$/.test(sn.toUpperCase().replace(/[^A-Z]/g,'')))continue;
   if(/METRO/i.test(sn.replace(/[^A-Za-z]/g,''))&&av.length){S.push({sn,kind:'Metro LED'});continue}
-  const r10=avRowOf(ws)===10;for(const cn of av.filter(c=>!av.includes(c-1))){const lc=n2col(cn-1);named.push({sn,label:r10?lab10(ws,sn,cn):cl((ws[lc+'10']||{}).v),code:r10?txt10(ws,cn).join(' '):cl((ws[n2col(cn)+'11']||{}).v)+cl((ws[n2col(cn)+'12']||{}).v),k:r10?kind10(ws,sn,cn):''})}}
+  const r10=avRowOf(ws)===10;for(const cn of av.filter(c=>!av.includes(c-1))){const lc=n2col(cn-1);named.push({sn,label:r10?lab10(ws,sn,cn):cl((ws[lc+'10']||{}).v),code:r10?txt10(ws,cn).join(' '):(cl((ws[n2col(cn)+'11']||{}).v)+cl((ws[n2col(cn)+'12']||{}).v))||cl((ws[n2col(cn)+'10']||{}).v)||cl((ws[n2col(cn)+'13']||{}).v),k:r10?kind10(ws,sn,cn):''})}}
  return{S,named,X,names:[...wb.SheetNames],sheets:wb.SheetNames.length,SM:(()=>{try{return scoreMapWb(wb)}catch(_){return null}})()}}
-const guessNamed=b=>{const n=nrm(b.label+' '+b.code+' '+b.sn);return/SHOWDC|SDC|PRUDENTIAL|สาทร|สาธร|TWINTUBE|TWT|DUSIT|CENTRALPARK/.test(n)||(/EXCHANGETOWER/.test(n)&&!/SM/.test(n))?'Show DC':'Signature Max'};
+const guessNamed=b=>{const n=nrm(b.label+' '+b.code+' '+b.sn);return/SHOWDC|SDC|BRAVO|PRUDENTIAL|SATHORN|SAINTLOUIS|สาทร|สาธร|TWINTUBE|TWT|DUSIT|CENTRALPARK/.test(n)||(/EXCHANGETOWER/.test(n)&&!/SM/.test(n))?'Show DC':'Signature Max'};
 function readyOf(f){const nd=f.nd;if(!nd)return null;if(nd.bad)return{bad:nd.bad};
  const on=buildOn(OP),keys=[...on.keys()],all=OP.media==='ทั้งหมด'?on:buildOn({...OP,media:'ทั้งหมด'}),M=new Map(),nf=[],warn=[],skip=[];
  const add=(k,sn,ok)=>{const x=M.get(k)||{k,ok:true,sheets:new Set()};x.sheets.add(sn);x.ok=x.ok&&ok;M.set(k,x)};

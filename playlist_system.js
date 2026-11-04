@@ -116,6 +116,7 @@
  *   เวอร์ชัน 5.5.11: แก้สูตรคะแนน Analysis (#REF! / ชี้ผิดช่อง) อัตโนมัติ • zipTidy (ไฟล์ไม่ต้องซ่อมใน Excel) • unshare สูตรใน colWb / Analysis • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.12: Playlist Rama9 Connect ตัด BMN_ หน้าชื่อหนัง (parseSect + ชื่อเดิมในใบเช็ค Rama9) • ส่วนเติมแก้เฉพาะชื่อของใบ Rama9
  *   เวอร์ชัน 5.5.13: แถว # ของ Bangkok Jams / Metro อยู่เหนือแถบวันแรก • JUNK: On d-d Mon / แจ้งHOLD • nameHit (จอตั้งชื่อเอง) • เติมครั้งแรกของรอบหลังวันที่ 1 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
+ *   เวอร์ชัน 5.5.14: ตัวเลขวันที่บนแถบสีเข้มเป็นสีขาว • Bravo BKK = ShowDC / Sathorn Saint Louise = PrudentialSathorn • ชื่อจอแถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  * ======================================================================
  */
 
@@ -315,7 +316,9 @@ function namedScreen(label, code, sn) {
   if (/PLOENCHIT/.test(n)) return by('Ploenchit Interchange');
   if (/NARONG/.test(n)) return by('At Narong Interchange');
   if (/AIRTRAVELL/.test(n)) return by('Air Traveller Gateway');
-  if (/SHOWDC/.test(n)) return by('ShowDC');
+  if (/BRAVO/.test(n)) return by('ShowDC');
+  if (/SATHORN|SAINTLOUIS|STLOUIS/.test(n)) return by('PrudentialSathorn');
+  /* 5.5.14 */ if (/SHOWDC/.test(n)) return by('ShowDC');
   if (/PRUDENTIAL/.test(n)) return by('PrudentialSathorn');
   if (/DUSITCENTRAL/.test(n)) return by('Dusit Central Park');
   if (/EXCHANGETOWER/.test(n))
@@ -761,7 +764,18 @@ function mkStyles(doc) {
       }
       return (cache[k] = addU(xfs, xf));
     } /* 4.8 */,
-    isDate(st) {
+    fcOf(st) {
+      const xf = g('cellXfs').children[+st || 0];
+      if (!xf) return '';
+      const fo = g('fonts').children[+xf.getAttribute('fontId') || 0],
+        c = fo && fo.getElementsByTagNameNS(NS, 'color')[0];
+      return c
+        ? c.getAttribute('rgb')
+          ? String(c.getAttribute('rgb')).toUpperCase()
+          : 'T' + (c.getAttribute('theme') || '')
+        : '';
+    },
+    /* 5.5.14 */ isDate(st) {
       const xf = g('cellXfs').children[+st || 0];
       if (!xf) return false;
       const id = +xf.getAttribute('numFmtId') || 0;
@@ -1735,6 +1749,21 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
           );
         }
       } /* 4.8: ช่องวันที่ไม่มีรูปแบบวันที่ → ใส่รูปแบบวันที่ (และสีแถบตามช่องข้าง ๆ) */ /* 4.7: ใบเปล่า (ยังไม่มีแถบให้ดูแบบ) — แถบวันที่สีตามการตั้งค่า (ค่าเริ่มต้นน้ำเงินเข้มแบบที่ทีมใช้) + รูปแบบวันที่ */
+      {
+        const sc = sh.getS(b.nc, row),
+          fl = String(ST.fillOf(sc || 0) || '').slice(-6),
+          fc = ST.fcOf(sc || 0);
+        if (
+          /^[0-9A-F]{6}$/i.test(fl) &&
+          0.299 * parseInt(fl.slice(0, 2), 16) +
+            0.587 * parseInt(fl.slice(2, 4), 16) +
+            0.114 * parseInt(fl.slice(4, 6), 16) <
+            128 &&
+          !/FFFFFF$/.test(fc) &&
+          fc !== 'T0'
+        )
+          sh.setS(b.nc, row, ST.derive(sc || 0, 'wfont', { color: 'FFFFFFFF' }));
+      } /* 5.5.14: ตัวเลขวันที่บนแถบสีเข้มเป็นสีขาว */
     });
   };
   hdr(S, P);
@@ -5115,7 +5144,10 @@ async function fillWb(f, on, metro, o) {
       for (const cn of av.filter(c => !av.includes(c - 1))) {
         const lc = n2col(cn - 1),
           label = r10 ? lab10(ws, sn, cn) : cl((ws[lc + '10'] || {}).v),
-          code = cl((ws[n2col(cn) + '11'] || {}).v) + cl((ws[n2col(cn) + '12'] || {}).v),
+          code =
+            cl((ws[n2col(cn) + '11'] || {}).v) + cl((ws[n2col(cn) + '12'] || {}).v) ||
+            cl((ws[n2col(cn) + '10'] || {}).v) ||
+            cl((ws[n2col(cn) + '13'] || {}).v),
           scr = (r10 && screen10(ws, sn, cn)) || namedScreen(label, code, sn);
         if (!scr) {
           const emp =
@@ -7875,7 +7907,7 @@ function fromData(D) {
 const SIGAL = {
   'So BKK -H-V-': ['SO', 'SOBKK', 'SOBANGKOK'],
   'Twin Tube': ['TWT', 'TWINTUBE'],
-  PrudentialSathorn: ['สาทร', 'สาธร', 'TWTPLUS', 'PRUDENTIAL', 'PRUDENTIALSATHORN'],
+  PrudentialSathorn: ['สาทร', 'สาธร', 'TWTPLUS', 'PRUDENTIAL', 'PRUDENTIALSATHORN', 'SATHORN', 'SAINTLOUIS'],
   'Air Traveller Gateway': ['AOT'],
   'The Big Y': ['BIGY', 'THEBIGY'],
   'Ploenchit Interchange': ['PJ', 'PLOENCHIT'],
@@ -7884,7 +7916,7 @@ const SIGAL = {
   'Exchange Tower (SM)': ['EXT'],
   'Exchange Tower (SM) 2': ['EXT'],
   Base: ['BASE'],
-  ShowDC: ['SDC', 'SHOWDC'],
+  ShowDC: ['SDC', 'SHOWDC', 'BRAVO', 'BRAVOBKK'],
   'Dusit Central Park': ['DS', 'DUSIT', 'CENTRALPARKDUSIT'],
 };
 const ntk = t =>
@@ -9218,7 +9250,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.13 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.14 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -9673,7 +9705,9 @@ function sheetNeeds(buf, name) {
         label: r10 ? lab10(ws, sn, cn) : cl((ws[lc + '10'] || {}).v),
         code: r10
           ? txt10(ws, cn).join(' ')
-          : cl((ws[n2col(cn) + '11'] || {}).v) + cl((ws[n2col(cn) + '12'] || {}).v),
+          : cl((ws[n2col(cn) + '11'] || {}).v) + cl((ws[n2col(cn) + '12'] || {}).v) ||
+            cl((ws[n2col(cn) + '10'] || {}).v) ||
+            cl((ws[n2col(cn) + '13'] || {}).v),
         k: r10 ? kind10(ws, sn, cn) : '',
       });
     }
@@ -9695,7 +9729,7 @@ function sheetNeeds(buf, name) {
 }
 const guessNamed = b => {
   const n = nrm(b.label + ' ' + b.code + ' ' + b.sn);
-  return /SHOWDC|SDC|PRUDENTIAL|สาทร|สาธร|TWINTUBE|TWT|DUSIT|CENTRALPARK/.test(n) ||
+  return /SHOWDC|SDC|BRAVO|PRUDENTIAL|SATHORN|SAINTLOUIS|สาทร|สาธร|TWINTUBE|TWT|DUSIT|CENTRALPARK/.test(n) ||
     (/EXCHANGETOWER/.test(n) && !/SM/.test(n))
     ? 'Show DC'
     : 'Signature Max';
