@@ -120,6 +120,7 @@
  *   เวอร์ชัน 5.5.15: Signature Max / Show DC ข้ามแถวที่จำนวนครั้งว่างและไม่มีหมายเหตุ (sigNoCnt) • JUNK: ออนเมื่อ… • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.16: “ออกวันที่ N” แบบเดียวกันทุกใบ • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.17: จอชื่อเฉพาะ (ไม่มีรหัส DGT) ในชีตแพคที่รหัสจออยู่แถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
+ *   เวอร์ชัน 5.5.18: ฟอนต์ Calibri ในส่วนรายการทุกใบที่เติม • ไม่มีรายการโฟลเดอร์ในไฟล์ zip • ชุดทดสอบใหม่ (ใบสำรองก่อนเติม 27 ต.ค.) ผลเหมือน 5.5.10
  * ======================================================================
  */
 
@@ -715,6 +716,31 @@ function mkStyles(doc) {
         xf.setAttribute('fillId', '0');
         xf.removeAttribute('applyFill');
       } /* 5.5.13 */
+      if (opt.fontName) {
+        const fo = g('fonts'),
+          bf = fo.children[+xf.getAttribute('fontId') || 0].cloneNode(true);
+        let nm = bf.getElementsByTagNameNS(NS, 'name')[0];
+        if (!nm) {
+          nm = doc.createElementNS(NS, 'name');
+          bf.insertBefore(
+            nm,
+            bf.getElementsByTagNameNS(NS, 'family')[0] ||
+              bf.getElementsByTagNameNS(NS, 'charset')[0] ||
+              bf.getElementsByTagNameNS(NS, 'scheme')[0] ||
+              null,
+          );
+        }
+        nm.setAttribute('val', opt.fontName);
+        for (const e of [
+          ...bf.getElementsByTagNameNS(NS, 'scheme'),
+          ...bf.getElementsByTagNameNS(NS, 'charset'),
+        ])
+          bf.removeChild(e);
+        const fam = bf.getElementsByTagNameNS(NS, 'family')[0];
+        if (fam) fam.setAttribute('val', '2');
+        xf.setAttribute('fontId', addU(fo, bf));
+        xf.setAttribute('applyFont', '1');
+      } /* 5.5.18 */
       if (opt.right) {
         let al = xf.getElementsByTagNameNS(NS, 'alignment')[0];
         if (!al) {
@@ -1800,6 +1826,27 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       for (const r of b.rows.filter(x => x.off)) sh.setText(b.lc, q++, r.ad);
     }
   }
+  {
+    const cols = new Set();
+    for (const b of B) {
+      cols.add(b.lc);
+      cols.add(b.nc);
+      for (const L of b.pcs) cols.add(L);
+    }
+    for (const [L] of HXA) cols.add(L);
+    const end = Math.max(Z, cur + 2);
+    for (let r = Math.min(hr, FIRST); r <= end; r++) {
+      const R = sh.row(r, false);
+      if (!R) continue;
+      for (const c of R.children) {
+        const L = (c.getAttribute('r') || '').match(/[A-Z]+/);
+        if (!L || !cols.has(L[0])) continue;
+        const st = c.getAttribute('s');
+        if (st == null && !c.firstChild) continue;
+        c.setAttribute('s', ST.derive(st || 0, 'calibri', { fontName: 'Calibri' }));
+      }
+    }
+  } /* 5.5.18: ฟอนต์ Calibri ทุกใบตอนเติม */
   for (const b of B) for (const q of b.cnt.values()) for (const t of q) dropped += t.filter(Boolean).length;
   return {
     hr,
@@ -5441,6 +5488,7 @@ async function fillWb(f, on, metro, o) {
       fold: [],
       blob: new Uint8Array(f.buf.slice(0)),
     }; /* 4.7: ไม่แก้ทั้งไฟล์ */
+  for (const k of Object.keys(zip.files)) if (zip.files[k].dir) delete zip.files[k]; /* 5.5.18 */
   return { rep, fold: FOLD, blob: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }) };
 }
 
@@ -7378,6 +7426,7 @@ async function cloneSheet(buf, base, name, lab) {
   zip.file('xl/workbook.xml', ser(wx));
   zip.file('xl/_rels/workbook.xml.rels', ser(relsX));
   zip.file('[Content_Types].xml', ser(ct));
+  for (const k of Object.keys(zip.files)) if (zip.files[k].dir) delete zip.files[k]; /* 5.5.18 */
   return u8buf(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }));
 }
 
@@ -9269,7 +9318,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.17 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.18 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
