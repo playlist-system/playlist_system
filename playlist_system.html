@@ -1260,6 +1260,7 @@ const PMON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','D
  isMonD=n=>/^\d{1,2}\s*[A-Za-z]{3}[A-Za-z]*\s*\d{2,4}$/.test(String(n).trim()),
  pck=c=>String(c).replace(/-/g,'').toUpperCase(),
  pnm=t=>nrm(t).replace(/^PIC/,'').replace(/^\d+/,'');
+const scrNum=v=>{const q=String(v==null?'':v).replace(/\s+/g,'').match(/^(?:(?:BKJ|BANGKOKJAMS?)[12]?[_.\-]?|(?:LED)?METRO[_.\-]?)?0*(\d{1,3})$/i);return q?+q[1]:null}; /* 5.5.25: 04 / BKJ1_04 / METRO_05 / LEDMETRO_002 / BANGKOKJAM2_01 → เลขจอ */
 function picKey(n){const s=String(n).trim(),c=codeOf(s);let m;
  if(c)return{code:pck(c)};
  if((m=s.match(/^BKJ\s*([12])\s*_\s*(\d+)/i)))return{jam:m[1]+'_'+(+m[2])};
@@ -1267,7 +1268,7 @@ function picKey(n){const s=String(n).trim(),c=codeOf(s);let m;
  return{nm:pnm(s)}}
 function picId(ws,sn,lc){const av=avCols(ws),cs=[];for(let c=col2n(lc)+1;av.includes(c);c++)cs.push(c);
  const g=a=>cl((ws[a]||{}).v),T=[],nums=[];let code='';
- for(const c of cs){const L=n2col(c);for(const r of[10,11,12]){const t=g(L+r);if(!t)continue;T.push(t);if(!code)code=codeOf(t)}const n=g(L+'10')||g(L+'11');if(/^\d{1,3}$/.test(n))nums.push(+n)}
+ for(const c of cs){const L=n2col(c);for(const r of[10,11,12]){const t=g(L+r);if(!t)continue;T.push(t);if(!code)code=codeOf(t)}const n=scrNum(g(L+'10')||g(L+'11'));if(n!=null)nums.push(n)}
  for(const r of[10,11,12]){const t=g(lc+r);if(t)T.push(t)}
  const U=String(sn).toUpperCase().replace(/[^A-Z0-9]/g,''),jm=!code&&U.match(/(?:JAMS?|BKJ)([12])/);
  return{code:code?pck(code):'',jam:jm?jm[1]:'',metro:!code&&!jm&&/METRO/.test(U),nums,labels:[...new Set(T.map(pnm))].filter(t=>t.length>=4),raw:T.find(t=>codeOf(t))||T[0]||'',media:mediaOf(sn)||'',
@@ -1376,7 +1377,7 @@ const pzPack=b=>{if(PZP[b.media])return PZP[b.media];if(b.jam)return'Pic @ Bangk
  const u=nrm(b.sn+' '+((b.px&&b.px.hd)||''));if(/SIGNATURE|SOBANGKOK|TWINTUBE|BIGY|BASE/.test(u))return'Pic @ Signature Max';
  const d=b.code&&pzDb(b.code),md=d&&mediaOf(d.pk||'');return PZP[md]||''}; /* ชีตไม่บอกแพค (เช่น ชีต PBTV) → แพคตามฐานข้อมูลจอ (ถ้าใส่ไว้) */
 /* จอในบล็อก → [[รหัสที่แสดง, คีย์, ชื่อโฟลเดอร์ทีละชั้น]] */
-function pzScr(b,pack){const X=b.px||{hd:'',cols:[]},t=pkTag(pack),num=v=>/^\d{1,3}$/.test(String(v||'').trim())?+v:null,out=[];
+function pzScr(b,pack){const X=b.px||{hd:'',cols:[]},t=pkTag(pack),num=v=>scrNum(v),out=[];
  if(b.code){for(const r of X.cols){const i=r.findIndex((v,j)=>j<3&&codeOf(v));if(i<0)continue;const code=codeOf(r[i]),d=pzDb(code),cf=v=>pzT(v).replace(/^\(+|\)+$/g,'').replace(/\s+/g,''),fm=cf(r[i+1])||cf(d&&d.fmt),lc=pzT(r[i+2])||pzT(d&&d.loc); /* ใบเช็คไม่มีสถานที่ / Format → ใช้จากฐานข้อมูลจอ */
    return[[code,{code:b.code},[code+(lc?' '+lc:'')+(t?' ('+t+')':'')+(fm&&!codeOf(fm)?' ('+fm+')':'')]]]}
   return[[b.code,{code:b.code},[b.code]]]}
@@ -1395,7 +1396,7 @@ function pzPlan(W,res,rs,upto,X){ /* 5.5.1: X = {S, shut, dir} จากโฟ�
  const T=new Map(),skip=[],closed=[];
  for(const r of res||[])for(const b of r.fold||[]){const pack=pzPack(b);
   if(!pack){skip.push({f:r.name,sn:b.sn,id:b.code?codeOf(b.raw)||b.code:''});continue}
-  const fs=RS.map(R=>[...new Set((b.items||[]).filter(([n,g])=>n&&(R.t?g>=cut:g<cut)&&g<capT&&g>=m0&&g<m1).map(([n])=>String(n).trim()).filter(Boolean))]);
+  const fs=RS.map(R=>[...new Set((b.items||[]).filter(([n,g,,,pre])=>n&&(pre||(R.t?g>=cut:g<cut))&&g<capT&&g>=m0&&g<m1).map(([n])=>String(n).trim()).filter(Boolean))]);
   const Ls=pzScr(b,pack),T0=X?picTg(b,X.S):[];
   for(let[id,key,path]of Ls){let ns='ck';
    if(X){const t=T0.find(x=>x[1]&&sameK(x[1],key))||(Ls.length===1&&T0.length===1&&!T0[0][1]?T0[0]:null),z=t&&t[2];
@@ -1433,7 +1434,7 @@ async function picPlan(root, W, res, rs, upto) {
   const T = new Map(), miss = [], closed = [];
   for (const r of res || [])
     for (const b of r.fold || []) {
-      const fs = RS.map(R => [...new Set((b.items || []).filter(([n, g]) => n && (R.t ? g >= cut : g < cut) && g < capT && g >= m0 && g < m1).map(([n]) => String(n).trim()).filter(Boolean))]);
+      const fs = RS.map(R => [...new Set((b.items || []).filter(([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1).map(([n]) => String(n).trim()).filter(Boolean))]);
       for (let [id, k, s] of picTg(b, S)) {
         if (!s) {
           if (k && shut.some(x => sameK(x, k))) { closed.push({ f: r.name, sn: b.sn, id }); continue; }
@@ -1591,7 +1592,7 @@ async function picMake(P) {
    จอ = คอลัมน์ก่อนรหัสจอ DGT / ID (แถว 10–12) และก่อนคอลัมน์ผลวิเคราะห์แรกของแต่ละช่วง (BKJ / Metro / จอที่ไม่มีรหัส) แบบเดียวกับตอนเติม
    หัววันที่ = ตัวเลขแรกในคอลัมน์หน้าชื่อหนัง แถว 14–40 • แถบวันที่ = แถวที่คอลัมน์หน้าชื่อหนังเป็นวันที่ (สูตร =C25 อ่านจากช่องต้นทาง) • หนังใต้แถบ = เริ่มวันนั้น ----- */
 async function chkFold(f){const R=await chkRead(f),fold=[];
- for(const x of R.sheets)for(const b of x.blocks)if(b.items.length)fold.push({sn:x.sn,lc:b.lc,items:b.items,...picId(x.ws,x.sn,b.lc)});
+ for(const x of R.sheets)for(const b of x.blocks)if(b.items.some(i=>!i[4]))fold.push({sn:x.sn,lc:b.lc,items:b.items,...picId(x.ws,x.sn,b.lc)});
  return{fold,mx:R.mx}}
 async function chkRead(f){const sheets=[];let mx=0;
  const wb=XLSX.read(f.buf,{type:'array'}),zip=await JSZip.loadAsync(f.buf.slice(0));
@@ -1603,7 +1604,7 @@ async function chkRead(f){const sheets=[];let mx=0;
   for(const rw of[11,10,12]){let hit=0;for(const k of Object.keys(ws)){const m=k.match(new RegExp('^([A-Z]+)'+rw+'$'));if(m&&codeOf(ws[k].v)){cs.add(col2n(m[1]));hit++}}if(hit)break}
   if(mediaOf(sn))for(const cn of av){const raw=cl((ws[n2col(cn)+'11']||{}).v);if(raw&&nrm(raw).length>=3)cs.add(cn)}
   const L=[...cs].filter(c=>c>2).sort((a,b)=>a-b).map(c=>{const sc=[];for(let k=c;av.includes(k);k++)sc.push(k);if(!sc.length)sc.push(c);
-   return{lc:n2col(c-1),nc:n2col(c-2),items:[],cs:sc,cn:sc.map(k=>{const v=cl((ws[n2col(k)+'10']||{}).v)||cl((ws[n2col(k)+'11']||{}).v);return/^\d{1,3}$/.test(v)?+v:null})}});if(!L.length)continue; /* cs = ช่องวันที่ถ่ายของแต่ละจอ (คอลัมน์ผลวิเคราะห์ติดกันหลังชื่อหนัง) cn = เลขจอที่หัวคอลัมน์ */
+   return{lc:n2col(c-1),nc:n2col(c-2),items:[],cs:sc,cn:sc.map(k=>scrNum(cl((ws[n2col(k)+'10']||{}).v)||cl((ws[n2col(k)+'11']||{}).v)))}});if(!L.length)continue; /* cs = ช่องวันที่ถ่ายของแต่ละจอ (คอลัมน์ผลวิเคราะห์ติดกันหลังชื่อหนัง) cn = เลขจอที่หัวคอลัมน์ */
   const zx=path[sn]&&zip.file(path[sn]),sh=zx?new Sheet(await zx.async('string')):null;
   const fOf=(c,r)=>{const x=ws[c+r];if(x&&typeof x.f==='string')return x.f;const e=sh&&sh.cell(c,r,false),q=e&&e.getElementsByTagNameNS(NS,'f')[0];return q?q.textContent:null};
   const num=(c,r,k=0)=>{const x=ws[c+r];if(x&&typeof x.v==='number')return x.v;const fm=k<4&&fOf(c,r),m=fm&&fm.replace(/^=/,'').match(/^\$?([A-Z]{1,3})\$?(\d+)\s*(?:([+-])\s*(\d+))?$/);if(m){const v=num(m[1],+m[2],k+1);if(v!=null)return v+(m[3]?(m[3]==='-'?-1:1)*+m[4]:0)}return null};
@@ -1611,6 +1612,8 @@ async function chkRead(f){const sheets=[];let mx=0;
   let hr=0;for(const b of L){for(let r=14;r<=40&&!hr;r++){const x=ws[b.nc+r];if(x&&x.t==='n'&&!x.f&&inB(x.v))hr=r}if(hr)break}if(!hr)continue;
   const rg=ws['!ref']?XLSX.utils.decode_range(ws['!ref']):null,end=Math.min(rg?rg.e.r+1:hr+1500,hr+1500),hy=s2d(num(L.find(b=>inB(num(b.nc,hr))).nc,hr)).getUTCFullYear();
   const barD=r=>{let v=num(L[0].nc,r);if(!inB(v)){v=null;if(!L.some(b=>vOf(b.lc,r)))for(const b of L.slice(1)){const n=num(b.nc,r);if(inB(n)){v=n;break}}}if(v==null)return null;const d=s2d(v);return Math.abs(d.getUTCFullYear()-hy)===1?Date.UTC(hy,d.getUTCMonth(),d.getUTCDate()):+d};
+  {let g0=null;for(let r=hr;r<=hr+3&&g0==null;r++)g0=barD(r); /* 5.5.25: แถว # เหนือแถบวันที่แรก (เช่น #BANGKOK JAM_ETA / #Traffic MTP) = รายการประจำของจอ ใช้ทุกรอบ */
+   if(g0!=null)for(let r=hr-1;r>=14;r--){let any=false;for(const b of L){const nm=vOf(b.lc,r);if(nm&&/^#/.test(nm)&&!FASTN.test(nm)&&!/^#\s*module/i.test(nm)){b.items.push([nm,g0,r,0,1]);any=true}}if(!any)break}}
   let g=null;
   for(let r=hr;r<=end;r++){const d=barD(r);if(d!=null){g=d;continue}if(g==null)continue;
    for(const b of L){const nm=vOf(b.lc,r);if(!nm||/^ออก(วันที่)?\s*\d/.test(nm)||FASTN.test(nm))continue;const ox=vOf(b.nc,r).match(/^ออก(?:วันที่)?\s*(\d{1,2})/);let ed=0;
@@ -1660,7 +1663,7 @@ async function shotScan(root,files,prog){
   bi++;if(prog)await prog(bi,tot,f.name);
   for(const x of X.sheets){const stOf=(col,rows)=>{const m=new Map();for(const r of rows){const xv=x.ws[col+r];if(xv&&/^\d{1,2}$/.test(String(xv.v).trim())){const e=x.sh&&x.sh.cell(col,r,false),st=e&&e.getAttribute('s');if(st!=null)m.set(st,(m.get(st)||0)+1)}}let bs=null,bn=0;for(const[k,v]of m)if(v>bn){bs=k;bn=v}return bs};
    let shS;const sheetSt=()=>{if(shS===undefined){const m=new Map();for(const b of x.blocks)for(const c of b.cs){const st=stOf(n2col(c),b.items.map(q=>q[2]));if(st!=null)m.set(st,(m.get(st)||0)+1)}shS=null;let bn=0;for(const[k,v]of m)if(v>bn){shS=k;bn=v}}return shS};
-   for(const b of x.blocks){if(!b.items.length)continue;
+   for(const b of x.blocks){if(!b.items.some(i=>!i[4]))continue;
     for(const cn of b.cs){const L=n2col(cn);for(const it of b.items){const r=it[2],xv=x.ws[L+r];if(!xv||xv.t!=='n'||xv.f||!Number.isInteger(xv.v)||xv.v<1||xv.v>31)continue;const e=x.sh&&x.sh.cell(L,r,false);if(!e||e.getElementsByTagNameNS(NS,'f').length)continue;if(!shotOk(X.sty,e.getAttribute('s')))R.sty.push({f:f.name,sn:x.sn,c:L,r})}} /* 5.5.19: วันที่ถ่ายที่ใส่ไว้แล้ว แต่ยังไม่ใช่พื้นดำตัวเลขขาว → แก้สี (ไม่แตะเลข) */
     const id=picId(x.ws,x.sn,b.lc),bb={...id,sn:x.sn};
    const cols=[];b.cs.forEach((c,i)=>{let tb;if(bb.jam||bb.metro){const n=b.cn[i];if(n==null)return;tb={...bb,nums:[n]}}else{if(i)return;tb=bb}
@@ -3014,7 +3017,7 @@ async function autoMv(list){const E={list,go:[],no:[],add:[],bad:[],names:[]};if
  if(!Q.some(x=>x.who&&((x.moved||[]).length||(x.miss||[]).some(r=>!r.at))))return E; /* ไม่มีจอผิดคน / ขาด → ไม่ต้องอ่านไฟล์ */
  note='กำลังย้ายจอตามฐานข้อมูล …';view();await new Promise(r=>setTimeout(r,30));
  const fs=[],blank=new Set(),RD=new Map();
- for(const f of list){let X=null;try{X=await chkRead(f)}catch(_){X=null}if(!X)continue;if(!X.sheets.some(x=>x.blocks.some(b=>b.items.length)))blank.add(f.name);RD.set(f.name,X);fs.push({name:f.name,buf:f.buf,nd:nd(f)})}
+ for(const f of list){let X=null;try{X=await chkRead(f)}catch(_){X=null}if(!X)continue;if(!X.sheets.some(x=>x.blocks.some(b=>b.items.some(i=>!i[4]))))blank.add(f.name);RD.set(f.name,X);fs.push({name:f.name,buf:f.buf,nd:nd(f)})}
  if(!fs.length)return E;
  /* 5.5.24: หนังเดิมของจอในใบที่เติมแล้ว → [[แถบวันที่ (serial), [{nm, note, ph}]]] ตามลำดับแถว */
  const histOf=(X,sn,code)=>{const x=X&&X.sheets.find(z=>z.sn===sn);if(!x)return null;const k=sdbK(code),b=x.blocks.find(bb=>{try{return sdbK(picId(x.ws,x.sn,bb.lc).code)===k}catch(_){return false}});if(!b)return null;
@@ -3662,7 +3665,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.24 (4 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.25 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
