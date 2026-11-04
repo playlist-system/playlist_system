@@ -1008,7 +1008,7 @@ const jamList=(s,o)=>listOf(s,o).filter(a=>!/^BJ\d*_\d+_/i.test(a)&&!/weather/i.
 const SCR=new Map(),MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 function parseD(t){if(!t)return null;{const x=String(t).trim();let q=x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(q)return new Date(Date.UTC(+q[1],+q[2]-1,+q[3]));q=x.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);if(q){let y=+q[3];if(y<100)y+=2000;if(y>2400)y-=543;if(+q[2]>=1&&+q[2]<=12)return new Date(Date.UTC(y,+q[2]-1,+q[1]))}}const m=String(t).trim().match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ](\d{2,4})$/);if(!m||!(m[2].toLowerCase()in MON))return null;let y=+m[3];if(y<100)y+=2000;if(y>2400)y-=543;return new Date(Date.UTC(y,MON[m[2].toLowerCase()],+m[1]))}
 const serial=d=>Math.round((d-Date.UTC(1899,11,30))/864e5),addD=(d,n)=>new Date(d.getTime()+n*864e5);
-const JUNK=/^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}\s*[A-Za-z]{3}/i,MTP=/^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i,
+const JUNK=/^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s*[A-Za-z]{3}|^แจ้ง\s*HOLD|^HOLD$|^รอ\s*ไฟล์/i,MTP=/^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i,
  FASTN=/(^|[^a-z])Fast[\s_-]*Ads?/i; /* FastAd4-3_V2, #FAST_ADS: ไม่ใช่หนังโฆษณา ไม่ลงใบเช็ค */
 /* เรียงแบบ Excel (A→Z): ไม่สนตัวพิมพ์, ข้าม - และ ', เครื่องหมายอื่น < ตัวเลข < A-Z < ภาษาไทย */
 const xk=s=>{s=s.toLowerCase().replace(/[-']/g,'');let k='';for(const ch of s){const c=ch.codePointAt(0),r=/[0-9]/.test(ch)?1:/[a-z]/.test(ch)?2:/\p{L}/u.test(ch)?3:0;k+=String.fromCharCode(48+r)+String.fromCharCode(c<0xFFFF?c:0xFFFF)}return k};
@@ -1060,6 +1060,7 @@ function mkStyles(doc){const g=n=>doc.getElementsByTagNameNS(NS,n)[0],cache={},X
   if(opt.color){const fo=g('fonts'),bf=fo.children[+xf.getAttribute('fontId')||0].cloneNode(true);for(const c of[...bf.getElementsByTagNameNS(NS,'color')])bf.removeChild(c);const c=doc.createElementNS(NS,'color');c.setAttribute('rgb',opt.color);const sz=bf.getElementsByTagNameNS(NS,'sz')[0];if(sz)bf.insertBefore(c,sz.nextSibling);else bf.appendChild(c);xf.setAttribute('fontId',addU(fo,bf));xf.setAttribute('applyFont','1')}
   if(opt.border){const bs=g('borders'),bo=doc.createElementNS(NS,'border');for(const k of['left','right','top','bottom']){const e=doc.createElementNS(NS,k);e.setAttribute('style','thin');const co=doc.createElementNS(NS,'color');co.setAttribute('indexed','64');e.appendChild(co);bo.appendChild(e)}bo.appendChild(doc.createElementNS(NS,'diagonal'));xf.setAttribute('borderId',addU(bs,bo));xf.setAttribute('applyBorder','1')}
   if(opt.numFmt!=null){xf.setAttribute('numFmtId',String(opt.numFmt));xf.setAttribute('applyNumberFormat','1')} /* 4.7 */
+  if(opt.nofill){xf.setAttribute('fillId','0');xf.removeAttribute('applyFill')} /* 5.5.13 */
   if(opt.right){let al=xf.getElementsByTagNameNS(NS,'alignment')[0];if(!al){al=doc.createElementNS(NS,'alignment');xf.appendChild(al)}al.setAttribute('horizontal','right');xf.setAttribute('applyAlignment','1')}
   return cache[k]=addU(xfs,xf)},
   fillKey(st){const xf=g('cellXfs').children[+st||0];if(!xf)return'';const fl=g('fills').children[+xf.getAttribute('fillId')||0];if(!fl)return'';const pt=fl.getElementsByTagNameNS(NS,'patternFill')[0];return fl.getElementsByTagNameNS(NS,'gradientFill')[0]||(pt&&pt.getAttribute('patternType')&&pt.getAttribute('patternType')!=='none')?ser(fl):''},
@@ -1086,13 +1087,13 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  let hr=0;for(const j of jobs){hr=sh.numRow(pv(j[1]),14,40);if(hr)break}
  if(!hr){let cs=0;{const M=new Map();for(const k in wsv||{}){const m=k.match(/^[A-Z]{1,3}(\d+)$/);if(!m||+m[1]>10)continue;const f=wsv[k]&&wsv[k].f,x=f&&String(f).match(/COUNTA?\(\$?[A-Z]{1,3}\$?(\d+)\s*:/);if(x)M.set(+x[1],(M.get(+x[1])||0)+1)}let bn=0;for(const[v,n]of M)if(n>bn&&v>=13&&v<=40){bn=n;cs=v}}
   let lh=0;for(const k in wsv||{}){const m=k.match(/^[A-Z]{1,3}(\d+)$/);if(!m)continue;const r=+m[1];if(r<11||r>20||r<=lh)continue;const x=wsv[k];if(x&&!x.f&&cl(x.v))lh=r}
-  hr=cs&&cs<=18?Math.max(cs-1,lh+2):Math.max(FIRST-1,cs?cs-1:0,lh+2)} /* 4.7.1: ใบเปล่า (ยังไม่มีหัววันที่) — แถบวันแรกตามช่วงสูตรนับในหัวชีต หนังจะอยู่ในช่วงที่สูตรนับเสมอ */
+  hr=cs&&cs<=18?Math.max(cs-1,lh+2):Math.max(FIRST-1,cs?cs-1:0,lh+2);if(jobs.length&&jobs.every(j=>j[4]==='jam'||j[4]==='metro')){const lc=jobs[0][1];let k=0;while(k<8){const x=wsv&&wsv[lc+(hr+1+k)];if(x&&typeof x.v==='string'&&/^#/.test(x.v.trim()))k++;else break}if(k)hr+=k+1}} /* 5.5.13: แถว # ของ Bangkok Jams / Metro LED อยู่เหนือแถบวันที่แรก */ /* 4.7.1: ใบเปล่า (ยังไม่มีหัววันที่) — แถบวันแรกตามช่วงสูตรนับในหัวชีต หนังจะอยู่ในช่วงที่สูตรนับเสมอ */
  let{two,P1,P,E}=per(W);const P2=two?P:null,SCAN=1500,dd=+W,noNotes=W.getUTCDate()===1;
  const PADK=[...new Set(['8AEDFE','82ECFE',...PADS.slice(1).map(x=>x[0].slice(-6)),...(o.padh||[]).map(c=>String(c).slice(-6).toUpperCase())])],PADO=o.padc?String(o.padc).toUpperCase():'',PADRE=new RegExp('^(FF)?('+PADK.join('|')+')$','i');
  MARK.p=new Set(PADO?[...PADK,PADO.slice(-6)]:PADK); /* สีช่องว่างเหนือแถบวันที่ (3.9): สีที่เลือก / สีชุดให้เลือก / สีที่เคยเลือกในเครื่องนี้ ถือเป็นสีแถบ */
  const B=jobs.map(j=>{const kind=j[4],all=kind==='keep'?[]:chkRows(j[3],{...o,off:true},kind),lc=j[1],nc=pv(lc),pc=nx(lc);return{lc,nc,pc,kind,n:j[5]||1,all,scr:j[3],rows:o.off?all:all.filter(r=>!r.off),
    bl:modeF(sh,lc,hr+1,hr+400,true,ST),be:modeF(sh,lc,hr+1,hr+400,false,ST),bn:modeF(sh,nc,hr+1,hr+400,false,ST,true),bp:modeF(sh,pc,hr+1,hr+400,null,ST),hs:[sh.getS(nc,hr),sh.getS(lc,hr),sh.getS(pc,hr)]}});
- {const any=(B.find(b=>b.bl!=null)||{}).bl;for(const b of B)if(b.bl==null)b.bl=any!=null?any:(b.be||sh.getS(b.lc,hr+1)||'0');for(const b of B)if(!ST.hasBorder(b.bl))b.bl=ST.derive(b.bl,'bord',{border:true})}
+ {const any=(B.find(b=>b.bl!=null)||{}).bl;for(const b of B)if(b.bl==null)b.bl=any!=null?any:(b.be||sh.getS(b.lc,hr+1)||'0');for(const b of B)if(!ST.hasBorder(b.bl))b.bl=ST.derive(b.bl,'bord',{border:true});for(const b of B)if(/FFFF00$/i.test(ST.fillOf(b.bl)||''))b.bl=ST.derive(b.bl,'nofill',{nofill:true})} /* 5.5.13 */
  var PADC=PADO||'FF8AEDFE';if(!PADO){padscan:for(const b of B)for(let r=hr+1;r<=hr+400;r++)for(const L of[b.lc,b.pc]){const st=sh.getS(L,r);if(st==null)continue;const fc=ST.fillOf(st);if(PADRE.test(fc)){PADC=(fc.length===6?'FF'+fc:fc).toUpperCase();break padscan}}} /* เลือกสีไว้ = ใช้สีนั้น • ตามชีต = สีที่ชีตใช้อยู่ ไม่มีใช้ฟ้าอ่อน */
  /* อ่านของเดิมในชีต: แถบวันที่ (คอลัมน์วันที่ของบล็อกแรก) ชื่อหนัง และ “ออกวันที่” */
  const vOf=(c,r)=>{const x=wsv&&wsv[c+r];return x?cl(x.v):''},b0=B[0];
@@ -1149,10 +1150,11 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
    const stl=CONTM&&dd>=+P2&&/ต่อสัญญา/.test(r.st||'')&&r.ed&&+r.ed===+P2-864e5&&!(r.sd&&+r.sd>=+P2);if(stl)g=+P2; /* ต่อสัญญาวันที่ 16 แต่ Playlist ยังลงวันที่สัญญาเดิม (หมด 15) → ถือเป็นสัญญาใหม่เริ่ม 16 */
    const mid=String(r.note||'').match(/(?:ออนแอร์|ขึ้น)ระหว่างวัน\s*(?:วันที่)?\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/),md=mid?+new Date(Date.UTC(yy(mid[3]),+mid[2]-1,+mid[1])):0;
    if(md>=+P&&md<=dd)g=CONTM&&dd>=+P2&&md<+P2&&!b.hist.some(h=>fam(h.nm)===fam(r.ad))?+P2:md; /* หมายเหตุ “ออนแอร์ระหว่างวันวันที่ …” → ลงใต้แถบวันนั้น — ครึ่งเดือนหลัง: หนังใหม่ที่หมายเหตุลงวันที่ 1–15 ลงใต้แถบ 16 (รอบ 1–15 ปิดแล้ว แบบที่ทีมทำ) */
-   else if(NEWST.test(r.st||'')&&g!==dd){if(g>dd)g=Math.max(dd,+P);else if(hb0&&g>+P&&!b.hist.some(h=>h.g===g&&fam(h.nm)===fam(r.ad)))g=dd} /* “ขึ้นใหม่” = ขึ้นวันนี้ */
+   else if(NEWST.test(r.st||'')&&g!==dd){if(g>dd)g=Math.max(dd,+P);else if(hb0&&g>+P&&!b.hist.some(h=>h.g===g&&fam(h.nm)===fam(r.ad)))g=dd;else if(!hb0&&dd>+P&&b.scr.pd&&+b.scr.pd===dd)g=dd} /* 5.5.13: เติมครั้งแรกหลังวันที่ 1 */ /* “ขึ้นใหม่” = ขึ้นวันนี้ */
    if(g>lim){if(!b.hist.some(h=>fam(h.nm)===fam(r.ad)))b.later.push(r);continue}
    const rnw=CONTM&&dd===+P2&&(NEWST.test(r.st||'')||CONT.test(r.st||''))&&(r.sd&&+r.sd===+P2||stl); /* วันที่ 16: ต่อสัญญา/ขึ้นใหม่ที่เริ่ม 16 → แถวใหม่ใต้ 16 แถวเดิมใส่ “ออก 16” */
    pl.push({nm:(r.hash?'#':'')+r.ad,hash:r.hash,g,ed:r.ed&&+r.ed>=dd?+r.ed:Infinity,st:r.st||'',rnw,note:r.note||'',sd:r.sd?+r.sd:0})}
+  if(!hb0&&dd>+P&&b.kind!=='jam'&&b.kind!=='metro')for(const r of b.scr.rows){if(!r.off||!r.ad||JUNK.test(String(r.ad).trim())||FASTN.test(r.ad)||skipRow(b.scr,r))continue;const k=(/^Content/i.test(r.ty||'')?'#':'')+r.ad,x=offEd.get(k);if(!x||x<+P||pl.some(q=>q.nm===k))continue;const s0=parseD(r.s);pl.push({nm:k,hash:k.startsWith('#'),g:s0&&+s0>+P&&+s0<=x?+s0:+P,ed:x,st:'',rnw:false,note:'',sd:s0?+s0:0})} /* 5.5.13: เติมครั้งแรกของรอบหลังวันที่ 1 — หนังที่ออนในรอบนี้แล้วถูกถอดไปก่อน ลงไว้พร้อม “ออกวันที่” */
   pl.sort((x,y)=>x.g-y.g);
   for(const h of b.hist){let x=h.ned||offEd.get(h.nm)||(!h.nm.startsWith('#')&&!offEd.has(h.nm)&&offEd.get('#'+h.nm))||0;if(!h.ned&&x&&h.g>=+P2&&x<h.g)x=Math.max(h.g,(b.scr.pd||dd)-864e5); /* ถอดแล้วแต่วันหมดยังเป็นของสัญญาเดิม (ก่อนแถบนี้) → ออกวันที่ของ Playlist ที่ถอด */
    ent.push({nm:h.nm,hash:h.nm.startsWith('#'),g:h.g,ed:x,raw:h.raw,h:true,m:false})}
@@ -2792,7 +2794,7 @@ async function fillWb(f,on,metro,o){const rep=[],FOLD=[];const buf=f.buf.slice(0
    if(!/<c r="[A-Z]+(?:9|10)"[^>]*>\s*<f[^>]*>\s*AVERAGE/.test(xs)){rep.push([sn,'-','ข้าม (มีรหัสจอแต่ไม่มีคอลัมน์ผลวิเคราะห์ในแถว 9 — ไม่ใช่ชีตจอ)',0]);continue}}
   if(media&&brow===11){const av=avCols(ws);
    for(const cn of av){if(blocks.some(x=>x[0]===cn))continue;const raw=cl((ws[n2col(cn)+'11']||{}).v);if(!raw||nrm(raw).length<3)continue;
-    const hit=[...on.keys()].filter(k=>nrm(k.split('|')[1])===nrm(raw)),own=hit.filter(k=>k.startsWith(media+'|')),pick=own.length===1?own[0]:hit.length===1?hit[0]:null;
+    const hit=nameHit([...on.keys()],raw),own=hit.filter(k=>k.startsWith(media+'|')),pick=own.length===1?own[0]:hit.length===1?hit[0]:null;
     if(pick)blocks.push([cn,pick.split('|')[1]]);else rep.push([sn,raw,hit.length>1?'ชื่อจอนี้อยู่ในหลายสื่อ ('+hit.map(k=>k.split('|')[0]).join(', ')+') — ตั้งชื่อชีตให้ระบุสื่อ':'ไม่พบจอนี้ใน Playlist (ยังไม่ได้เติม)',0])}
    blocks.sort((x,y)=>x[0]-y[0])}
   const mediaB=cn=>media||(avRowOf(ws)===10?mediaOf(cl((ws[n2col(cn-1)+'11']||{}).v)):null)||media;for(const[cn,code]of blocks){const media=mediaB(cn);let key=media+'|'+code,ads=on.get(key);
@@ -3511,6 +3513,8 @@ function noteQ(scr,kind,nums){const out=new Map(),al=SIGAL[scr.c];
 function listOf(s,o){let L=s.rows.filter(r=>o.off||!r.off);if(o.newOnly)L=L.filter(isNew);
  if(o.sort==='az')L=[...L].sort((a,b)=>a.ad.localeCompare(b.ad,'th'));if(o.sort==='new')L=[...L].sort((a,b)=>isNew(b)-isNew(a));
  const n=L.map(r=>r.ad);return o.dedupe?[...new Set(n)]:n}
+/* 5.5.13: ชื่อจอในใบเช็ค → คีย์ media|code (ตรงรหัส หรือชื่อในใบเช็คอยู่ในชื่อจอของ Playlist เช่น The Prime 9 ↔ EkamaiExpressway_ThePrime9) */
+const nameHit=(keys,raw)=>{const q=nrm(raw).toUpperCase();let h=keys.filter(k=>nrm(k.split('|')[1]).toUpperCase()===q);if(!h.length&&q.length>=5)h=keys.filter(k=>{const s=DB.find(z=>z.m+'|'+z.c===k);return!!s&&nrm(s.n||'').toUpperCase().includes(q)});return h};
 function buildOn(o){const on=new Map();for(const s of DB){if(s.m==='MetroLED'||!/^(40|80|CITY|Spare)/.test(s.m))continue;if(o.media!=='ทั้งหมด'&&s.m!==o.media)continue;on.set(s.m+'|'+s.c,listOf(s,o))}return on}
 async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try{arr.push({name:f.name,buf:await f.arrayBuffer()})}catch(_){rb.push(f.name)}} /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
  if(rb.length){say(`เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')} — ถ้าลากจากในไฟล์ .zip ที่เปิดดูใน Windows ให้ลากไฟล์ .zip มาทั้งไฟล์ หรือแตกไฟล์ก่อน`);if(!arr.length)return view()}
@@ -3532,7 +3536,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.12 (4 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.13 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -3672,7 +3676,7 @@ function readyOf(f){const nd=f.nd;if(!nd)return null;if(nd.bad)return{bad:nd.bad
    const h=keys.filter(k=>k.split('|')[1]===code);if(h.length===1){const m=h[0].split('|')[0];add(m,e.sn,true);if(e.media!=='Spare')warn.push(`${code} (${e.sn}) ใช้รายการของ ${m}`);continue}
    if(all!==on&&[...all.keys()].some(k=>k.split('|')[1]===code)){skip.push(code);continue}
    if(e.media&&!kindOn(e.media))add(e.media,e.sn,false);else nf.push(`${code} (${e.sn})`)}
-  for(const raw of e.names){const hit=keys.filter(k=>nrm(k.split('|')[1])===nrm(raw)),own=hit.filter(k=>k.startsWith(e.media+'|')),pick=own.length===1?own[0]:hit.length===1?hit[0]:null;
+  for(const raw of e.names){const hit=nameHit(keys,raw),own=hit.filter(k=>k.startsWith(e.media+'|')),pick=own.length===1?own[0]:hit.length===1?hit[0]:null;
    if(pick)add(pick.split('|')[0],e.sn,true);else if(!kindOn(e.media))add(e.media,e.sn,false);else nf.push(`${raw} (${e.sn})`)}}
  for(const b of nd.named){if(b.k&&b.k!=='Signature Max'){add(b.k,b.sn,kindOn(b.k));continue}const s=namedScreen(b.label,b.code,b.sn);if(s){add(kindOfS(s),b.sn,true);continue}
   const g=guessNamed(b);if(!kindOn(g))add(g,b.sn,false);else nf.push(`${b.label||b.code||b.sn} (${b.sn})`)}
