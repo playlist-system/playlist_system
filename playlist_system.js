@@ -118,6 +118,7 @@
  *   เวอร์ชัน 5.5.13: แถว # ของ Bangkok Jams / Metro อยู่เหนือแถบวันแรก • JUNK: On d-d Mon / แจ้งHOLD • nameHit (จอตั้งชื่อเอง) • เติมครั้งแรกของรอบหลังวันที่ 1 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.14: ตัวเลขวันที่บนแถบสีเข้มเป็นสีขาว • Bravo BKK = ShowDC / Sathorn Saint Louise = PrudentialSathorn • ชื่อจอแถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.15: Signature Max / Show DC ข้ามแถวที่จำนวนครั้งว่างและไม่มีหมายเหตุ (sigNoCnt) • JUNK: ออนเมื่อ… • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
+ *   เวอร์ชัน 5.5.16: “ออกวันที่ N” แบบเดียวกันทุกใบ • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  * ======================================================================
  */
 
@@ -1575,23 +1576,13 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     if (nd > +P && nd <= H) {
       {
         const dn = new Date(nd).getUTCDate();
-        if (OSH.f) {
-          const D = new Date(nd);
-          sh.setText(
-            b.nc,
-            row,
-            'ออก ' + dn + '/' + (D.getUTCMonth() + 1) + '/' + String(D.getUTCFullYear()).slice(2),
-          );
-        } else
-          sh.setText(
-            b.nc,
-            row,
-            AR10
-              ? (OSH.s ? 'ออก ' : 'ออกวันที่ ') + (OSH.p && dn < 10 ? '0' + dn : dn)
-              : (OSH.s ? 'ออก ' : 'ออกวันที่ ') + dn,
-          );
+        sh.setText(b.nc, row, 'ออกวันที่ ' + dn);
       }
-      sh.setS(b.nc, row, ST.derive(b.bn, 'red', { color: 'FFFF0000', right: true }));
+      /* 5.5.16: เขียนแบบเดียวกันทุกใบ */ sh.setS(
+        b.nc,
+        row,
+        ST.derive(b.bn, 'red', { color: 'FFFF0000', right: true }),
+      );
     }
   };
   const put = (b, r, row) => {
@@ -9277,7 +9268,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.15 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.16 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
