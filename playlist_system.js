@@ -117,6 +117,7 @@
  *   เวอร์ชัน 5.5.12: Playlist Rama9 Connect ตัด BMN_ หน้าชื่อหนัง (parseSect + ชื่อเดิมในใบเช็ค Rama9) • ส่วนเติมแก้เฉพาะชื่อของใบ Rama9
  *   เวอร์ชัน 5.5.13: แถว # ของ Bangkok Jams / Metro อยู่เหนือแถบวันแรก • JUNK: On d-d Mon / แจ้งHOLD • nameHit (จอตั้งชื่อเอง) • เติมครั้งแรกของรอบหลังวันที่ 1 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.14: ตัวเลขวันที่บนแถบสีเข้มเป็นสีขาว • Bravo BKK = ShowDC / Sathorn Saint Louise = PrudentialSathorn • ชื่อจอแถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
+ *   เวอร์ชัน 5.5.15: Signature Max / Show DC ข้ามแถวที่จำนวนครั้งว่างและไม่มีหมายเหตุ (sigNoCnt) • JUNK: ออนเมื่อ… • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  * ======================================================================
  */
 
@@ -371,7 +372,7 @@ function parseD(t) {
 const serial = d => Math.round((d - Date.UTC(1899, 11, 30)) / 864e5),
   addD = (d, n) => new Date(d.getTime() + n * 864e5);
 const JUNK =
-    /^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s*[A-Za-z]{3}|^แจ้ง\s*HOLD|^HOLD$|^รอ\s*ไฟล์/i,
+    /^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s*[A-Za-z]{3}|^แจ้ง\s*HOLD|^HOLD$|^รอ\s*ไฟล์|^ออน(?:แอร์)?\s*เมื่อ/i,
   MTP = /^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i,
   FASTN = /(^|[^a-z])Fast[\s_-]*Ads?/i; /* FastAd4-3_V2, #FAST_ADS: ไม่ใช่หนังโฆษณา ไม่ลงใบเช็ค */
 /* เรียงแบบ Excel (A→Z): ไม่สนตัวพิมพ์, ข้าม - และ ', เครื่องหมายอื่น < ตัวเลข < A-Z < ภาษาไทย */
@@ -5339,7 +5340,7 @@ async function fillWb(f, on, metro, o) {
                   .filter(
                     r =>
                       !r.off &&
-                      skipRow(j[3], r) &&
+                      (sig ? noteSkip(j[3], r) : skipRow(j[3], r)) &&
                       r.ad &&
                       r.ad !== j[3].c &&
                       !/เมื่อมีไฟล์/.test(r.ad) &&
@@ -5363,6 +5364,31 @@ async function fillWb(f, on, metro, o) {
                   : ''),
               0,
             ]);
+          if (sig) {
+            const z2 = [
+              ...new Set(
+                j[3].rows
+                  .filter(
+                    r =>
+                      !r.off &&
+                      !noteSkip(j[3], r) &&
+                      sigNoCnt(j[3], r) &&
+                      r.ad &&
+                      r.ad !== j[3].c &&
+                      !JUNK.test(r.ad.trim()) &&
+                      !FASTN.test(r.ad),
+                  )
+                  .map(r => r.ad),
+              ),
+            ];
+            if (z2.length)
+              rep.push([
+                sn,
+                j[3].c,
+                'ตรวจ: ไม่ใส่เพราะจำนวนครั้งว่าง (จอนี้ไม่ได้ออน) → ' + z2.join(', '),
+                0,
+              ]);
+          } /* 5.5.15 */
         }
       }
     } else
@@ -7957,8 +7983,9 @@ const ALLAL = new Set(Object.values(SIGAL).flat());
 let FRZIN = new Set();
 const isFrz = r => r.cnt === 0 && /freeze/i.test(String(r.note || '') + ' ' + String(r.ad || ''));
 const frzOn = r => isFrz(r) && FRZIN.has(String(r.ad).trim());
+const sigNoCnt = (scr, r) => !!SIGAL[scr.c] && r.cnt == null && !String(r.note || '').trim(); /* 5.5.15 */
 const skipRow = (scr, r) =>
-  SIGAL[scr.c] ? noteSkip(scr, r) : r.cnt === 0 && !MTP.test(r.ad.trim()) && !frzOn(r);
+  SIGAL[scr.c] ? noteSkip(scr, r) || sigNoCnt(scr, r) : r.cnt === 0 && !MTP.test(r.ad.trim()) && !frzOn(r);
 /* ไฟล์ Playlist แบบ Signature Max: 1 ชีต = 1 จอ หัวตารางมีคำว่า หนังโฆษณา และ “รายการปลด” แยกส่วนที่ถอดแล้ว */
 const SIGCODE = { 'Exchange Tower': 'Exchange Tower (SM)', 'Exchange Tower (2)': 'Exchange Tower (SM) 2' };
 /* ไฟล์แบบ Signature Max / Show DC / BKJ: 1 ชีต = 1 จอ หัวตารางมีคำว่า หนังโฆษณา และ “รายการปลด” แยกส่วนที่ถอดแล้ว */
@@ -9250,7 +9277,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.14 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.15 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
