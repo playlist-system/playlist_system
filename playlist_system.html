@@ -1061,6 +1061,7 @@ function mkStyles(doc){const g=n=>doc.getElementsByTagNameNS(NS,n)[0],cache={},X
   if(opt.border){const bs=g('borders'),bo=doc.createElementNS(NS,'border');for(const k of['left','right','top','bottom']){const e=doc.createElementNS(NS,k);e.setAttribute('style','thin');const co=doc.createElementNS(NS,'color');co.setAttribute('indexed','64');e.appendChild(co);bo.appendChild(e)}bo.appendChild(doc.createElementNS(NS,'diagonal'));xf.setAttribute('borderId',addU(bs,bo));xf.setAttribute('applyBorder','1')}
   if(opt.numFmt!=null){xf.setAttribute('numFmtId',String(opt.numFmt));xf.setAttribute('applyNumberFormat','1')} /* 4.7 */
   if(opt.nofill){xf.setAttribute('fillId','0');xf.removeAttribute('applyFill')} /* 5.5.13 */
+  if(opt.fontName){const fo=g('fonts'),bf=fo.children[+xf.getAttribute('fontId')||0].cloneNode(true);let nm=bf.getElementsByTagNameNS(NS,'name')[0];if(!nm){nm=doc.createElementNS(NS,'name');bf.insertBefore(nm,bf.getElementsByTagNameNS(NS,'family')[0]||bf.getElementsByTagNameNS(NS,'charset')[0]||bf.getElementsByTagNameNS(NS,'scheme')[0]||null)}nm.setAttribute('val',opt.fontName);for(const e of[...bf.getElementsByTagNameNS(NS,'scheme'),...bf.getElementsByTagNameNS(NS,'charset')])bf.removeChild(e);const fam=bf.getElementsByTagNameNS(NS,'family')[0];if(fam)fam.setAttribute('val','2');xf.setAttribute('fontId',addU(fo,bf));xf.setAttribute('applyFont','1')} /* 5.5.18 */
   if(opt.right){let al=xf.getElementsByTagNameNS(NS,'alignment')[0];if(!al){al=doc.createElementNS(NS,'alignment');xf.appendChild(al)}al.setAttribute('horizontal','right');xf.setAttribute('applyAlignment','1')}
   return cache[k]=addU(xfs,xf)},
   fillKey(st){const xf=g('cellXfs').children[+st||0];if(!xf)return'';const fl=g('fills').children[+xf.getAttribute('fillId')||0];if(!fl)return'';const pt=fl.getElementsByTagNameNS(NS,'patternFill')[0];return fl.getElementsByTagNameNS(NS,'gradientFill')[0]||(pt&&pt.getAttribute('patternType')&&pt.getAttribute('patternType')!=='none')?ser(fl):''},
@@ -1216,6 +1217,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  for(const k of dates){const n=Math.max(...B.map(b=>(b.grp.get(k)||[]).length));hdr(cur,new Date(k));for(const b of B){const g=b.grp.get(k)||[];g.forEach((r,i)=>put(b,r,cur+1+i));pad(b,cur+1+g.length,cur+n)}cur+=1+n}
  if(TRAIL)hdr(cur,addD(new Date(Math.max(dates.length?dates[dates.length-1]:+P,dd)),1)); /* แถบว่างท้ายตาราง = วันถัดจากวันที่เติม (เติมวันที่ 2 → แถบ 3) */ /* ปิดท้ายด้วยแถบวันถัดไปเสมอ ไว้ใส่หนังของวันพรุ่งนี้ */
  if(o.off){let row=cur+2;for(const b of B){let q=row;for(const r of b.rows.filter(x=>x.off))sh.setText(b.lc,q++,r.ad)}}
+ {const cols=new Set();for(const b of B){cols.add(b.lc);cols.add(b.nc);for(const L of b.pcs)cols.add(L)}for(const[L]of HXA)cols.add(L);const end=Math.max(Z,cur+2);for(let r=Math.min(hr,FIRST);r<=end;r++){const R=sh.row(r,false);if(!R)continue;for(const c of R.children){const L=(c.getAttribute('r')||'').match(/[A-Z]+/);if(!L||!cols.has(L[0]))continue;const st=c.getAttribute('s');if(st==null&&!c.firstChild)continue;c.setAttribute('s',ST.derive(st||0,'calibri',{fontName:'Calibri'}))}}} /* 5.5.18: ฟอนต์ Calibri ทุกใบตอนเติม */
  for(const b of B)for(const q of b.cnt.values())for(const t of q)dropped+=t.filter(Boolean).length;
  return{hr,S,H,P,E,two,contm:CONTM,trail:TRAIL,bval:BVAL,fold:B.map(b=>({lc:b.lc,items:(b.ent||[]).map(e=>[e.nm,e.g])})),fdrop,keep:KB.map(b=>b.scr.c).join(', '),renew,back,frozen,noNotes,hist,dates:dates.length,later:B.reduce((n,b)=>n+b.later.length,0),laterL:B.map(b=>[b.scr.c,b.later.map(r=>r.ad+(r.s?' (เริ่ม '+r.s+')':''))]).filter(x=>x[1].length),ratioL:B.map(b=>[b.scr.c,b.ratio]).filter(x=>x[1].length),nostL:B.map(b=>[b.scr.c,[...new Set(b.nostL||[])]]).filter(x=>x[1].length),mergedL:B.map(b=>[b.scr.c,[...new Set(b.mergedL||[])]]).filter(x=>x[1].length),moved,dropped,cleared,kept,merged,gone,today,nost,W:dd,end:cur}}
 
@@ -2852,6 +2854,7 @@ async function fillWb(f,on,metro,o){const rep=[],FOLD=[];const buf=f.buf.slice(0
   const ct=zip.file('[Content_Types].xml');if(ct)zip.file('[Content_Types].xml',(await ct.async('string')).replace(/<Override[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/gi,''),{createFolders:false})} /* ลบลำดับการคำนวณเดิม (Excel สร้างใหม่เอง) กัน Excel ขึ้น “ซ่อมแซมไฟล์” */
  zip.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(wx.documentElement),{createFolders:false});
  if(BKH)return{rep:[...rep.filter(x=>/^ตรวจ: ข้ามวันย้อนหลัง/.test(x[2])),['ทั้งไฟล์','รูปแบบ','ตรวจ: ไม่ได้แก้ไฟล์นี้ — มีชีตที่เติมไปถึงวันหลังกว่า Playlist ที่เติมแล้ว (ดูด้านบน) ไฟล์เดียวกันเติมวันเดียวกันทั้งไฟล์ ระบบจึงไม่แก้ชีตอื่นด้วย ไฟล์ที่ได้เหมือนไฟล์เดิมทุกอย่าง',0]],fold:[],blob:new Uint8Array(f.buf.slice(0))}; /* 4.7: ไม่แก้ทั้งไฟล์ */
+ for(const k of Object.keys(zip.files))if(zip.files[k].dir)delete zip.files[k]; /* 5.5.18 */
  return{rep,fold:FOLD,blob:await zip.generateAsync({type:'uint8array',compression:'DEFLATE'})}}
 
 /* ===== 4.8: ใบเปล่าเดือนใหม่ — ทำสำเนาจากใบเช็คเดือนล่าสุด: ทุกชีตจอล้างตั้งแต่แถบวันที่แถวแรกลงไป (ค่า สูตร สีพื้น) แบบเดียวกับใบเปล่าที่ทีมทำ
@@ -3189,6 +3192,7 @@ async function cloneSheet(buf,base,name,lab){const zip=await JSZip.loadAsync(buf
  for(const dn of wx.getElementsByTagNameNS(NS,'definedName')){const l=dn.getAttribute('localSheetId');if(l!=null&&+l>=ix)dn.setAttribute('localSheetId',String(+l+1))}
  for(const v of wx.getElementsByTagNameNS(NS,'workbookView'))for(const a of['activeTab','firstSheet']){const x=v.getAttribute(a);if(x!=null&&+x>=ix)v.setAttribute(a,String(+x+1))}
  zip.file('xl/workbook.xml',ser(wx));zip.file('xl/_rels/workbook.xml.rels',ser(relsX));zip.file('[Content_Types].xml',ser(ct));
+ for(const k of Object.keys(zip.files))if(zip.files[k].dir)delete zip.files[k]; /* 5.5.18 */
  return u8buf(await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}))}
 
 /* เพิ่ม / เอาออกตามฐานข้อมูล: DGT / ID → arrangeWb • Bangkok Jams / Metro LED → colWb */
@@ -3538,7 +3542,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.17 (4 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.18 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
