@@ -115,6 +115,7 @@
  *   เวอร์ชัน 5.5.10: ชีตแพค DGT / ID แบบ 1 คอลัมน์ต่อจอ ย้าย / เพิ่มได้ (colWb kind COL) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.11: แก้สูตรคะแนน Analysis (#REF! / ชี้ผิดช่อง) อัตโนมัติ • zipTidy (ไฟล์ไม่ต้องซ่อมใน Excel) • unshare สูตรใน colWb / Analysis • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.12: Playlist Rama9 Connect ตัด BMN_ หน้าชื่อหนัง (parseSect + ชื่อเดิมในใบเช็ค Rama9) • ส่วนเติมแก้เฉพาะชื่อของใบ Rama9
+ *   เวอร์ชัน 5.5.13: แถว # ของ Bangkok Jams / Metro อยู่เหนือแถบวันแรก • JUNK: On d-d Mon / แจ้งHOLD • nameHit (จอตั้งชื่อเอง) • เติมครั้งแรกของรอบหลังวันที่ 1 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  * ======================================================================
  */
 
@@ -367,7 +368,7 @@ function parseD(t) {
 const serial = d => Math.round((d - Date.UTC(1899, 11, 30)) / 864e5),
   addD = (d, n) => new Date(d.getTime() + n * 864e5);
 const JUNK =
-    /^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}\s*[A-Za-z]{3}/i,
+    /^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s*[A-Za-z]{3}|^แจ้ง\s*HOLD|^HOLD$|^รอ\s*ไฟล์/i,
   MTP = /^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i,
   FASTN = /(^|[^a-z])Fast[\s_-]*Ads?/i; /* FastAd4-3_V2, #FAST_ADS: ไม่ใช่หนังโฆษณา ไม่ลงใบเช็ค */
 /* เรียงแบบ Excel (A→Z): ไม่สนตัวพิมพ์, ข้าม - และ ', เครื่องหมายอื่น < ตัวเลข < A-Z < ภาษาไทย */
@@ -704,6 +705,10 @@ function mkStyles(doc) {
         xf.setAttribute('numFmtId', String(opt.numFmt));
         xf.setAttribute('applyNumberFormat', '1');
       } /* 4.7 */
+      if (opt.nofill) {
+        xf.setAttribute('fillId', '0');
+        xf.removeAttribute('applyFill');
+      } /* 5.5.13 */
       if (opt.right) {
         let al = xf.getElementsByTagNameNS(NS, 'alignment')[0];
         if (!al) {
@@ -888,7 +893,17 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       if (x && !x.f && cl(x.v)) lh = r;
     }
     hr = cs && cs <= 18 ? Math.max(cs - 1, lh + 2) : Math.max(FIRST - 1, cs ? cs - 1 : 0, lh + 2);
-  } /* 4.7.1: ใบเปล่า (ยังไม่มีหัววันที่) — แถบวันแรกตามช่วงสูตรนับในหัวชีต หนังจะอยู่ในช่วงที่สูตรนับเสมอ */
+    if (jobs.length && jobs.every(j => j[4] === 'jam' || j[4] === 'metro')) {
+      const lc = jobs[0][1];
+      let k = 0;
+      while (k < 8) {
+        const x = wsv && wsv[lc + (hr + 1 + k)];
+        if (x && typeof x.v === 'string' && /^#/.test(x.v.trim())) k++;
+        else break;
+      }
+      if (k) hr += k + 1;
+    }
+  } /* 5.5.13: แถว # ของ Bangkok Jams / Metro LED อยู่เหนือแถบวันที่แรก */ /* 4.7.1: ใบเปล่า (ยังไม่มีหัววันที่) — แถบวันแรกตามช่วงสูตรนับในหัวชีต หนังจะอยู่ในช่วงที่สูตรนับเสมอ */
   let { two, P1, P, E } = per(W);
   const P2 = two ? P : null,
     SCAN = 1500,
@@ -933,7 +948,9 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     const any = (B.find(b => b.bl != null) || {}).bl;
     for (const b of B) if (b.bl == null) b.bl = any != null ? any : b.be || sh.getS(b.lc, hr + 1) || '0';
     for (const b of B) if (!ST.hasBorder(b.bl)) b.bl = ST.derive(b.bl, 'bord', { border: true });
-  }
+    for (const b of B)
+      if (/FFFF00$/i.test(ST.fillOf(b.bl) || '')) b.bl = ST.derive(b.bl, 'nofill', { nofill: true });
+  } /* 5.5.13 */
   var PADC = PADO || 'FF8AEDFE';
   if (!PADO) {
     padscan: for (const b of B)
@@ -1322,7 +1339,8 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       else if (NEWST.test(r.st || '') && g !== dd) {
         if (g > dd) g = Math.max(dd, +P);
         else if (hb0 && g > +P && !b.hist.some(h => h.g === g && fam(h.nm) === fam(r.ad))) g = dd;
-      } /* “ขึ้นใหม่” = ขึ้นวันนี้ */
+        else if (!hb0 && dd > +P && b.scr.pd && +b.scr.pd === dd) g = dd;
+      } /* 5.5.13: เติมครั้งแรกหลังวันที่ 1 */ /* “ขึ้นใหม่” = ขึ้นวันนี้ */
       if (g > lim) {
         if (!b.hist.some(h => fam(h.nm) === fam(r.ad))) b.later.push(r);
         continue;
@@ -1344,6 +1362,25 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         sd: r.sd ? +r.sd : 0,
       });
     }
+    if (!hb0 && dd > +P && b.kind !== 'jam' && b.kind !== 'metro')
+      for (const r of b.scr.rows) {
+        if (!r.off || !r.ad || JUNK.test(String(r.ad).trim()) || FASTN.test(r.ad) || skipRow(b.scr, r))
+          continue;
+        const k = (/^Content/i.test(r.ty || '') ? '#' : '') + r.ad,
+          x = offEd.get(k);
+        if (!x || x < +P || pl.some(q => q.nm === k)) continue;
+        const s0 = parseD(r.s);
+        pl.push({
+          nm: k,
+          hash: k.startsWith('#'),
+          g: s0 && +s0 > +P && +s0 <= x ? +s0 : +P,
+          ed: x,
+          st: '',
+          rnw: false,
+          note: '',
+          sd: s0 ? +s0 : 0,
+        });
+      } /* 5.5.13: เติมครั้งแรกของรอบหลังวันที่ 1 — หนังที่ออนในรอบนี้แล้วถูกถอดไปก่อน ลงไว้พร้อม “ออกวันที่” */
     pl.sort((x, y) => x.g - y.g);
     for (const h of b.hist) {
       let x =
@@ -4933,7 +4970,7 @@ async function fillWb(f, on, metro, o) {
         if (blocks.some(x => x[0] === cn)) continue;
         const raw = cl((ws[n2col(cn) + '11'] || {}).v);
         if (!raw || nrm(raw).length < 3) continue;
-        const hit = [...on.keys()].filter(k => nrm(k.split('|')[1]) === nrm(raw)),
+        const hit = nameHit([...on.keys()], raw),
           own = hit.filter(k => k.startsWith(media + '|')),
           pick = own.length === 1 ? own[0] : hit.length === 1 ? hit[0] : null;
         if (pick) blocks.push([cn, pick.split('|')[1]]);
@@ -9008,6 +9045,22 @@ function listOf(s, o) {
   const n = L.map(r => r.ad);
   return o.dedupe ? [...new Set(n)] : n;
 }
+/* 5.5.13: ชื่อจอในใบเช็ค → คีย์ media|code (ตรงรหัส หรือชื่อในใบเช็คอยู่ในชื่อจอของ Playlist เช่น The Prime 9 ↔ EkamaiExpressway_ThePrime9) */
+const nameHit = (keys, raw) => {
+  const q = nrm(raw).toUpperCase();
+  let h = keys.filter(k => nrm(k.split('|')[1]).toUpperCase() === q);
+  if (!h.length && q.length >= 5)
+    h = keys.filter(k => {
+      const s = DB.find(z => z.m + '|' + z.c === k);
+      return (
+        !!s &&
+        nrm(s.n || '')
+          .toUpperCase()
+          .includes(q)
+      );
+    });
+  return h;
+};
 function buildOn(o) {
   const on = new Map();
   for (const s of DB) {
@@ -9165,7 +9218,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.12 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.13 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -9703,7 +9756,7 @@ function readyOf(f) {
       else nf.push(`${code} (${e.sn})`);
     }
     for (const raw of e.names) {
-      const hit = keys.filter(k => nrm(k.split('|')[1]) === nrm(raw)),
+      const hit = nameHit(keys, raw),
         own = hit.filter(k => k.startsWith(e.media + '|')),
         pick = own.length === 1 ? own[0] : hit.length === 1 ? hit[0] : null;
       if (pick) add(pick.split('|')[0], e.sn, true);
