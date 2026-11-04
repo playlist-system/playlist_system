@@ -2947,6 +2947,35 @@ function sdbAddPlan(files){const Q=sdbCheck(files.map(f=>({name:f.name,codes:ndC
   if(adds.length||skip.length)out.push({name:x.name,adds,skip})}
  return out}
 /* 5.4: ย้ายจอตามฐานข้อมูลจอ (ใบเปล่า) — จอที่อยู่ในใบของ ก แต่ฐานข้อมูลบอกว่าเป็นของ ข → เอาออกจากใบของ ก แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของ ข */
+/* 5.5.21: ย้ายจอตามฐานข้อมูลให้เองก่อนเติม — เฉพาะใบเปล่า (ยังไม่มีแถบวันที่) ในชุดที่เติม • ย้ายเฉพาะจอที่ทั้งเอาออกจากใบเดิม และใส่ในใบของคนใหม่ได้ (จอไม่หาย ไม่ซ้ำ)
+   • จอที่ใบของคนใหม่ไม่อยู่ในชุด (หรือเติมแล้ว) ไม่เอาออก บอกไว้ • แล้วเพิ่มจอที่ยังไม่มีในใบของใคร (แบบปุ่ม “เพิ่มจอที่ขาด”) */
+let AMV0=null;
+const amvNm=n=>String(n||'').replace(/\.xls[xm]?$/i,'');
+async function autoMv(list){const E={list,go:[],no:[],add:[],bad:[],names:[]};if(!OP.amv||!sdb()||!list.length)return E;
+ const nd=f=>{if(!f.nd){try{f.nd=sheetNeeds(f.buf,f.name)}catch(_){f.nd={S:[]}}}return f.nd};
+ let Q=[];try{Q=sdbCheck(list.map(f=>({name:f.name,codes:ndCodesX(nd(f))})))||[]}catch(_){Q=[]}
+ if(!Q.some(x=>x.who&&((x.moved||[]).length||(x.miss||[]).some(r=>!r.at))))return E; /* ไม่มีจอผิดคน / ขาด → ไม่ต้องอ่านไฟล์ */
+ const fs=[];for(const f of list){let fold=null;try{fold=(await chkFold(f)).fold}catch(_){fold=null}if(!fold||fold.length)continue;fs.push({name:f.name,buf:f.buf,nd:nd(f)})}
+ if(!fs.length)return E;
+ note='กำลังย้ายจอตามฐานข้อมูล …';view();await new Promise(r=>setTimeout(r,30));
+ let M={mv:[]};try{M=sdbMovePlan(fs,[])}catch(_){M={mv:[]}}
+ const mv=M.mv.filter(m=>!m.out),no=M.mv.filter(m=>m.out).map(m=>({...m,why:`ใบของ${m.who||'คนที่รับจอนี้'}ไม่อยู่ในชุดที่เติม หรือเติมไปแล้ว — ระบบไม่เอาออกจากใบนี้ (จอจะได้ไม่หาย)`})),names=new Set();let go=[];
+ if(mv.length){let R=null;try{R=await sdbMoveApply(fs,mv,null)}catch(e){R={err:String(e&&e.message||e)}}
+  if(R.err)no.push(...mv.map(m=>({...m,why:'ย้ายไม่ได้ ('+R.err+') — ไม่ได้แก้ใบไหน'})));else{go=R.go;no.push(...R.no);for(const n of R.names)names.add(n)}}
+ for(const k of M.skip||[])no.push({...k,why:k.why||'ย้ายไม่ได้'});
+ let AP=[];try{AP=sdbAddPlan(fs)}catch(_){AP=[]}
+ const done=AP.some(x=>x.adds.length)?await sdbApply(fs,AP):[],add=[],bad=[];for(const x of AP)for(const k of x.skip||[])bad.push({name:x.name,t:k.code+' — '+String(k.why||'').replace(/\s*—\s*$/,'')+' ใส่เองในใบเช็ค'});
+ for(const d of done){for(const a of d.ok){add.push({name:d.name,code:a.code,sheet:a.sheet});names.add(d.name)}for(const b of d.bad)bad.push({name:d.name,t:String(b[1]||'')})}
+ E.list=list.map(f=>{const g=fs.find(z=>z.name===f.name);return names.has(f.name)&&g?{...f,buf:g.buf,nd:g.nd}:f});Object.assign(E,{go,no,add,bad,names:[...names]});return E}
+const amvTxt=A=>{if(!A||!(A.go.length+A.add.length+A.no.length+A.bad.length))return[];
+ return['',`ย้ายจอตามฐานข้อมูล (ก่อนเติม เฉพาะใบเปล่า): ย้าย ${A.go.length} จอ • เพิ่ม ${A.add.length} จอ • ทำให้ไม่ได้ ${A.no.length+A.bad.length} รายการ`,
+  ...A.go.map(m=>`  ย้าย ${m.code}: ${amvNm(m.from)} › ${m.fsn} → ${amvNm(m.to)} › ${m.tsn}`),...A.add.map(x=>`  เพิ่ม ${x.code}: ${amvNm(x.name)}${x.sheet?' › '+x.sheet:''}`),
+  ...A.no.map(m=>`  ทำให้ไม่ได้ ${m.code}: ${amvNm(m.from)} — ${m.why||'ย้ายไม่ได้'}`),...A.bad.map(x=>`  ทำให้ไม่ได้: ${amvNm(x.name)} — ${x.t}`),'']};
+const amvHTML=A=>{if(!A)return'';const n=A.go.length+A.add.length,nb=A.no.length+A.bad.length;if(!n&&!nb)return'';
+ const li=t=>`<li>${t}</li>`,g=A.go.map(m=>li(`<b>${esc(m.code)}</b> ${esc(amvNm(m.from))} → <b>${esc(amvNm(m.to))}</b> · ชีต ${esc(m.tsn||m.fsn||'')}`)).join(''),a=A.add.map(x=>li(`<b>${esc(x.code)}</b> เพิ่มในใบ <b>${esc(amvNm(x.name))}</b>${x.sheet?' · ชีต '+esc(x.sheet):''}`)).join(''),
+  b=[...A.no.map(m=>li(`<b>${esc(m.code)}</b> ใบ${esc(amvNm(m.from))} — ${esc(m.why||'ย้ายไม่ได้')}`)),...A.bad.map(x=>li(`ใบ${esc(amvNm(x.name))} — ${esc(x.t)}`))].join('');
+ return alertHTML(n?'ok':'wr',n?`ย้ายจอตามฐานข้อมูลให้แล้ว ${n} จอ`+(nb?` • ทำให้ไม่ได้ ${nb} รายการ`:''):`ย้ายจอตามฐานข้อมูลไม่ได้ ${nb} รายการ`,
+  `${n?`<ul>${g}${a}</ul>`:''}${nb?`<p><b>ทำให้ไม่ได้ — แก้เองในใบเช็ค</b></p><ul>${b}</ul>`:''}<p class="hint">ทำก่อนเติม เฉพาะใบเปล่า (ยังไม่มีแถบวันที่) • ปิดได้ที่สวิตช์ “ย้ายจอตามฐานข้อมูลให้เอง” ในขั้นที่ 4</p>`)};
 function sdbMovePlan(files,fail=[]){const Q=sdbCheck(files.map(f=>({name:f.name,codes:ndCodesX(f.nd)})))||[],mv=[],skip=[];
  for(const x of Q){if(!x.who)continue;const fx=files.find(z=>z.name===x.name),S0=(fx&&fx.nd&&fx.nd.S)||[];
   for(const r of x.moved){const k=sdbK(r.c),T=Q.filter(q=>q.who&&q.who===r.to&&q.name!==x.name),src=S0.find(z=>z.sn===r.sn);
@@ -3566,7 +3595,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.20 (4 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.21 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -3597,7 +3626,7 @@ let THEME=document.documentElement.dataset.theme==='dark'?'dark':'light';
 const setTheme=t=>{THEME=t;document.documentElement.dataset.theme=t};
 /* 3.14: ค่าเริ่มต้น = โหมดมืดโทนน้ำเงินกรม (ไม่ตามธีมของเครื่อง) เลือกเองแล้วระบบจำไว้ใน ps_theme */
 
-OP.col1=store.get('ps_col1')||'';OP.nostAdd=store.get('ps_nost')==='1'; /* 4.5 */OP.col2=store.get('ps_col2')||'';OP.padc=store.get('ps_padc')||'';
+OP.col1=store.get('ps_col1')||'';OP.nostAdd=store.get('ps_nost')==='1'; /* 4.5 */OP.amv=store.get('ps_amv')!=='0'; /* 5.5.21: ย้ายจอตามฐานข้อมูลให้เอง (ค่าเริ่มต้น เปิด) */OP.col2=store.get('ps_col2')||'';OP.padc=store.get('ps_padc')||'';
 try{FRZIN=new Set(JSON.parse(store.get('ps_frz')||'[]'))}catch(_){FRZIN=new Set()}
 let adv=false,HELP=false,HOW=false,PASTE=false,WELCOME=!store.get('ps_welcomed'),TOUR=null,pendTour=null,SCANNING=false,LIT=new Set();const RO=new Set();
 let FOCUSSEL=null,TOURWAS=false,BUSY=null,FILLING=false,BASEERR='',TQ='',FLOPEN=false,RETF=null,FOCUSNEW=null,MDOWN=null,PTR=false,DEFER=false,TDRAWN='',OVK='';
@@ -3881,6 +3910,7 @@ function vFl(){const ms=['ทั้งหมด',...new Set(DB.filter(s=>/^(40|8
  ${OP.hand?'':alertHTML('wr','ปิดการจัดรูปแบบอยู่','<p id="o_hand_d">ใบเช็คจะไม่มีแถบวันที่และ “ออกวันที่” และวันที่ถ่าย (ช่องหลังชื่อหนัง) จะไม่ย้ายตามชื่อหนัง ถ้าจะส่งงานจริง เปิดสวิตช์นี้ไว้</p>')}
  <label class="tgl"><span>จัดจอเข้าชีตตามแพค <em class="rec">แนะนำ: เปิด</em><small>จอที่ Playlist วันนี้ย้ายแพค (เช่น Spare → 40 RED) ระบบย้ายจอไปชีตของแพคนั้นให้ หนัง วันที่ถ่าย และ “ออกวันที่” ไปด้วยครบ • ป้ายแพคที่เขียนผิดแก้ให้ • บอกในผลการเติมว่าย้ายอะไรไปไหน</small>${OP.arr&&!arrOn(OP)?`<small class="wrn">ตอนนี้ยังไม่จัดจอ — ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง” และเลือกสื่อ “ทั้งหมด”</small>`:''}</span><span class="sw"><input type="checkbox" id="o_arr"><span></span></span></label>
  <label class="tgl"><span>เพิ่มหนังกันตกหล่นให้เอง <em class="rec">ค่าเริ่มต้น: ปิด</em><small>หนังที่มีใน Playlist แต่ยังไม่เคยลงใบเช็คของจอนั้น และวันนี้ไม่ได้ “ขึ้นใหม่” (ปกติขึ้นเป็น “กันตกหล่น” ให้ลงเอง) <b>เปิด</b> = ระบบลงให้ใต้แถบวันที่ที่เติม แล้วบอกใน “แจ้งให้ทราบ” ว่าเพิ่มเรื่องไหนในจอไหน ถ้าไม่ต้องมี ลบแถวนั้นออก • ระบบจำไว้ในเครื่องนี้</small>${OP.nostAdd&&!OP.hand?`<small class="wrn">ใช้ได้เมื่อเปิด “จัดรูปแบบตามใบเช็คจริง”</small>`:''}</span><span class="sw"><input type="checkbox" id="o_nost"><span></span></span></label>
+ <label class="tgl"><span>ย้ายจอตามฐานข้อมูลให้เอง <em class="rec">ค่าเริ่มต้น: เปิด</em><small>ก่อนเติม ระบบเทียบใบเช็คกับฐานข้อมูลจอ จออยู่ผิดคน → ย้ายไปใบของคนที่ถูก (ทั้งสองใบต้องอยู่ในชุดที่เติม) • จอที่ยังไม่มีในใบของใคร → เพิ่มให้ แล้วบอกผลหลังเติม • ตอนนี้ทำได้เฉพาะใบเปล่า (ยังไม่มีแถบวันที่) • ระบบจำไว้ในเครื่องนี้</small>${OP.amv&&!sdb()?`<small class="wrn">ยังไม่ได้ใส่ฐานข้อมูลจอ — ใส่ได้ที่ “ใบเช็คที่ใช้” › ตรวจจอกับฐานข้อมูล</small>`:''}</span><span class="sw"><input type="checkbox" id="o_amv"><span></span></span></label>
  ${vFrz()}
  <div class="cols"><p class="cl">สีแถบวันที่</p><div class="crow"><span>รอบ 1–15</span>${vColPick(1)}</div><div class="crow"><span>รอบ 16–สิ้นเดือน</span>${vColPick(2)}</div><small>“ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ (รอบ 16 ถ้าชีตยังไม่มีแถบรอบ 2 ใช้สีฟ้า) เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
  <div class="cols"><p class="cl">สีช่องว่างเหนือแถบวันที่</p><div class="crow">${vPadPick()}</div><small>แถบสีในช่องว่างใต้รายการของจอที่หนังน้อยกว่า ก่อนถึงแถบวันที่ถัดไป (ปกติสีฟ้าอ่อน) “ตามชีต” = ใช้สีที่ชีตนั้นใช้อยู่ เลือกสีแยกรายไฟล์ได้ในรายการใบเช็คด้านซ้าย ระบบจำไว้ใช้ครั้งต่อไป</small></div>
@@ -4246,7 +4276,7 @@ function vRes(){if(!last)return vFl();
  return`<section class="r5hero" data-tour="sum"><div class="r5h"><span class="r5ring${allBad?' er':nb?' wr':''}" aria-hidden="true"><span>${allBad?IC.warn:IC.check}</span></span><div><small>ผลการเติม${dtx?' · '+dtx:''}${last.days?` · ${last.days.length} วัน`:''}</small><h1>${allBad?'เติมไม่ได้':`เติมเสร็จ ${g(tot.toLocaleString()+' จอ')}`}</h1></div></div>
  <div class="r5act"><span class="r5sv ${last.saved?'ok':'wr'}">${last.saved?'บันทึก / ดาวน์โหลดแล้ว':'ยังไม่ได้บันทึก'}</span>${btns}</div></section>
  <div class="stack">${last.sv?(last.sv.bad.length?alertHTML('er',`บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`,`<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`):alertHTML('ok',`บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`,`<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu?` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่`:''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)):''}
- ${ne?alertHTML('er',`${ne} ไฟล์ไม่ได้เติม`,'<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>'):''}</div>
+ ${ne?alertHTML('er',`${ne} ไฟล์ไม่ได้เติม`,'<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>'):''}${amvHTML(last.amv)}</div>
  <div class="r5grid"><article class="r5rep" aria-label="สรุปผลการเติม"><div class="r5top"><p class="r5s">เติมรายชื่อหนังลงใบเช็ค <b>${nf} ไฟล์</b>${last.days?` (${last.days.length} วัน)`:''} รวม <b>${tot.toLocaleString()} จอ</b>${last.sec?` ใช้เวลา ${last.sec} วินาที`:''} ${nb?`มี <b class="wr">${nb} เรื่องที่ต้องแก้</b>`:'<b class="ok">ไม่มีเรื่องต้องแก้</b>'}${nn?` และ ${nn} เรื่องแจ้งให้ทราบ`:''}${ne?` • ${ne} ไฟล์ไม่ได้เติม`:''}</p>
   <div class="r5ps">${pill('','ไฟล์',nf)}${pill('','จอ',tot.toLocaleString())}${pill(nb?'wr':'','ต้องแก้',nb)}${pill(nn?'nt':'','แจ้งให้ทราบ',nn)}${last.sec?pill('','เวลา',last.sec+' วินาที'):''}</div></div>
   ${nb?`<div class="r5sec"><h2><i class="h5d wr" aria-hidden="true"></i>ต้องแก้ ${nb} เรื่อง</h2><ol class="r5ml">${MU.slice(0,8).map((x,k)=>`<li><span class="r5n">${k+1}</span><span class="r5mt"><b>${x.t}</b><small>${x.p}</small></span><button class="r5go" data-a="rx5" data-k="${x.i}">ดูในไฟล์</button></li>`).join('')}</ol>${MU.length>8?`<p class="hint">และอีก ${MU.length-8} เรื่อง — เปิดดูในแต่ละไฟล์ด้านล่าง</p>`:''}<p class="hint">แก้ในใบเช็คก่อนใช้งาน (จอที่เติมไม่ได้ จอที่เติมจากรายการอื่นแทน จอที่ขาดตามฐานข้อมูล หรือชีตที่ระบบข้าม)</p></div>`:`<div class="r5sec"><h2><i class="h5d ok" aria-hidden="true"></i>ไม่มีเรื่องต้องแก้</h2><p class="hint">เปิดใบเช็คใน Excel ดูความถูกต้องอีกครั้งก่อนใช้งาน</p></div>`}
@@ -4422,7 +4452,7 @@ function view(){logTick();const ae=document.activeElement,fk=focusKey(ae);let se
  const tb=$('.tbl'),tbs=tb?[tb.scrollTop,tb.scrollLeft]:null;
  $('#hnav').innerHTML=vNav();$('#sect').innerHTML=vSect();$('#side').innerHTML=vSide();$('#steps').innerHTML=vSteps();$('#steps').style.display=tab==='tools'?'none':'';$('#ver').textContent=VERTXT;
  $('#app').innerHTML=({home:vHome,dat:vData,pl:vPl,tl:vTl,fl:vFl,res:vRes,tools:vTools})[tab]();
- if(tab==='fl'){$('#o_media').value=OP.media;$('#o_sort').value=OP.sort;$('#o_new').checked=OP.newOnly;$('#o_dd').checked=OP.dedupe;$('#o_off').checked=OP.off;$('#o_hand').checked=OP.hand;$('#o_r2').value=OP.r2;$('#o_arr').checked=OP.arr;{const e=$('#o_nost');if(e)e.checked=!!OP.nostAdd}$('#o_arrmk').checked=OP.arrMk;$('#o_arrsort').checked=OP.arrSort;{const b=$('#o_base');if(b)b.value=BASEERR||OP.base}}
+ if(tab==='fl'){$('#o_media').value=OP.media;$('#o_sort').value=OP.sort;$('#o_new').checked=OP.newOnly;$('#o_dd').checked=OP.dedupe;$('#o_off').checked=OP.off;$('#o_hand').checked=OP.hand;$('#o_r2').value=OP.r2;$('#o_arr').checked=OP.arr;{const e=$('#o_nost');if(e)e.checked=!!OP.nostAdd}{const e=$('#o_amv');if(e)e.checked=!!OP.amv}$('#o_arrmk').checked=OP.arrMk;$('#o_arrsort').checked=OP.arrSort;{const b=$('#o_base');if(b)b.value=BASEERR||OP.base}}
  for(const id in kv){const el=$('#'+id);if(el&&(id!=='o_base'||(fk&&fk.id==='o_base')))el.value=kv[id]}
  if(tbs){const t2=$('.tbl');if(t2){t2.scrollTop=tbs[0];t2.scrollLeft=tbs[1]}}
  busyPaint();
@@ -4546,7 +4576,7 @@ async function fillRun(list,o,L,out,bt){const on=buildOn(o),ms=DB.find(s=>s.m===
 const arrMerge=A=>{if(!A.length)return null;const u=(k)=>{const S=new Set(),o=[];for(const a of A)for(const x of a[k]||[]){const j=JSON.stringify(x);if(!S.has(j)){S.add(j);o.push(x)}}return o};
  return{err:A.some(a=>a.err),moves:A.flatMap(a=>a.moves||[]),notes:u('notes'),relabeled:u('relabeled'),sorted:u('sorted'),ana:A.reduce((t,a)=>t+(a.ana||0),0)}};
 async function fillDays(G,list){const T0=performance.now(),out=new JSZip(),keep=DB,nD=G.length,D=[],fin=new Map(),old=new Map(list.map(f=>[f.name,f]));let cur=list;
- const L=['รายงานการเติมใบเช็ครูป',`เติมต่อกัน ${nD} วัน: ${G.map(g=>thd(new Date(g.d))).join(', ')} — ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไป`];
+ const L=['รายงานการเติมใบเช็ครูป',...amvTxt(AMV0),`เติมต่อกัน ${nD} วัน: ${G.map(g=>thd(new Date(g.d))).join(', ')} — ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไป`];
  try{for(let k=0;k<nD;k++){const g=G[k],W=new Date(g.d),o={...OP,W},T1=performance.now(),own=new Set(g.E.map(e=>e.f));DB=g.db;PLD=W;
    L.push('',`===== วันที่ ${thd(W)} (${THW[W.getUTCDay()]}) • วันที่ ${k+1} จาก ${nD} =====`,...plRepOf(PLI.filter(x=>own.has(x.f))),...frzRep());
    const R=await fillRun(cur,o,L,null,`กำลังเติมวันที่ ${thdS(W)} (${k+1}/${nD})`),sec=+((performance.now()-T1)/1000).toFixed(1);
@@ -4779,11 +4809,12 @@ const ACT={help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()
  fill:async()=>{if(FILLING||BUSY)return;if(!DB.length){note='ยังไม่ได้ใส่ Playlist ของวันนี้ — ใส่ไฟล์ที่ขั้นที่ 1 ก่อน';return}const MD=plDays();if(BASEERR&&!MD){note='แก้วันที่ทำงานให้ถูกต้องก่อน';return}
   const o={...OP,W:workDate()};if(!MD&&o.hand&&!o.W){note='ไม่พบวันที่ Playlist — ใส่วันที่ทำงานเอง เช่น 2-Oct-26';return}
   const list=[...C];if(!list.length)return;{const ps=PLI.filter(x=>x.lv==='stop'&&!x.ack);if(ps.length&&!confirm(`ด่านตรวจ Playlist พบ ${ps.length} เรื่องที่ระบบอาจอ่านผิด:\n\n${ps.slice(0,6).map(x=>'• '+x.f+': '+x.t).join('\n')}${ps.length>6?'\n…':''}\n\nเติมต่อเลยไหม? (กด Cancel เพื่อกลับไปตรวจ)`))return}if(last&&!last.saved&&!confirm('ผลการเติมครั้งก่อนยังไม่ได้บันทึกหรือดาวน์โหลด ถ้าเติมใหม่ ผลเดิมจะหายไป ต้องการเติมใหม่เลยไหม?'))return;FILLING=true;
-  try{if(MD){await fillDays(MD,list);return} /* 4.3: Playlist หลายวัน → เติมต่อกันทีละวัน */
-   const out=new JSZip(),L=['รายงานการเติมใบเช็ครูป',...plRep(),...frzRep()],T0=performance.now();const res=await fillRun(list,o,L,out,'กำลังเติมใบเช็ครูป');
+  try{AMV0=null;{const AM=await autoMv(list);if(AM.names.length)list.splice(0,list.length,...AM.list);AMV0=AM} /* 5.5.21 */
+   if(MD){await fillDays(MD,list);if(last)last.amv=AMV0;return} /* 4.3: Playlist หลายวัน → เติมต่อกันทีละวัน */
+   const out=new JSZip(),L=['รายงานการเติมใบเช็ครูป',...plRep(),...frzRep(),...amvTxt(AMV0)],T0=performance.now();const res=await fillRun(list,o,L,out,'กำลังเติมใบเช็ครูป');
 
    const SEC=+((performance.now()-T0)/1000).toFixed(1);L.push(...fillSum(res,list.length,SEC)); /* 4.2.1: สรุปตัวเลขท้ายรายงาน */
-   out.file('รายงาน.txt',L.join('\n'));last={res,zip:await out.generateAsync({type:'blob'}),saved:false,W:o.W?+o.W:Date.now(),txt:L.join('\n'),sec:SEC};{const _w=res.reduce((t,r)=>t+r.rep.filter(isMust).length,0),_f=res.filter(r=>r.blob).length;MQN=_w?'warn':'party';{const _b=res.reduce((t,r)=>t+r.rep.filter(x=>/^ตรวจ: ข้ามวันย้อนหลัง/.test(x[2])).length,0);note=`เติมเสร็จแล้ว ${_f} ไฟล์`+(_w?` • ต้องแก้ ${_w} รายการ`:' • ไม่มีเรื่องต้องแก้')+(_b?` • ข้ามชีตที่เติมไปแล้ว ${_b} ชีต`:'')}}last.csig=sigOf(C);tab='res';cs=null;RO.clear();window.scrollTo(0,0);
+   out.file('รายงาน.txt',L.join('\n'));last={res,zip:await out.generateAsync({type:'blob'}),saved:false,W:o.W?+o.W:Date.now(),txt:L.join('\n'),sec:SEC,amv:AMV0};{const _w=res.reduce((t,r)=>t+r.rep.filter(isMust).length,0),_f=res.filter(r=>r.blob).length;MQN=_w?'warn':'party';{const _b=res.reduce((t,r)=>t+r.rep.filter(x=>/^ตรวจ: ข้ามวันย้อนหลัง/.test(x[2])).length,0);note=`เติมเสร็จแล้ว ${_f} ไฟล์`+(_w?` • ต้องแก้ ${_w} รายการ`:' • ไม่มีเรื่องต้องแก้')+(_b?` • ข้ามชีตที่เติมไปแล้ว ${_b} ชีต`:'')}}last.csig=sigOf(C);tab='res';cs=null;RO.clear();window.scrollTo(0,0);
    const fi=res.findIndex(r=>r.rep.some(isMust));if(fi>=0)RO.add(fi)}
   finally{FILLING=false;BUSY=null;$('.wrap').inert=false}}};
 function g(fn){const t=TQ.toLowerCase();if(!t)return;let c=0;for(const s of DB){let h=0;s.rows=s.rows.filter(r=>{if(!String(r.ad).toLowerCase().includes(t))return true;c++;h++;if(fn)fn(r);return !!fn});if(h){s.rows=stable(s.rows);touch(s)}}note=`แก้ไข ${c} แถว`}
@@ -4791,7 +4822,7 @@ document.addEventListener('click',async e=>{const a=e.target.closest('[data-a]')
 document.addEventListener('change',e=>{const t=e.target;
  if(t.id==='o_base'){const raw=t.value.trim();if(!raw){OP.base='';BASEERR=''}else{const d=parseUserDate(raw);if(d){OP.base=end(d);BASEERR=''}else{BASEERR=raw;OP.base=''}}softView();return}
  if(t.dataset.frz!=null){const k=t.dataset.frz;if(t.checked)FRZIN.add(k);else FRZIN.delete(k);frzSave();softView();return}
- if(t.id&&t.id.startsWith('o_')){OP.media=$('#o_media').value;OP.sort=$('#o_sort').value;OP.newOnly=$('#o_new').checked;OP.dedupe=$('#o_dd').checked;OP.off=$('#o_off').checked;OP.hand=$('#o_hand').checked;OP.r2=$('#o_r2').value;OP.arr=$('#o_arr').checked;OP.arrMk=$('#o_arrmk').checked;OP.arrSort=$('#o_arrsort').checked;{const e=$('#o_nost');if(e&&!!OP.nostAdd!==e.checked){OP.nostAdd=e.checked;store.set('ps_nost',OP.nostAdd?'1':'0')}}softView();return}
+ if(t.id&&t.id.startsWith('o_')){OP.media=$('#o_media').value;OP.sort=$('#o_sort').value;OP.newOnly=$('#o_new').checked;OP.dedupe=$('#o_dd').checked;OP.off=$('#o_off').checked;OP.hand=$('#o_hand').checked;OP.r2=$('#o_r2').value;OP.arr=$('#o_arr').checked;OP.arrMk=$('#o_arrmk').checked;OP.arrSort=$('#o_arrsort').checked;{const e=$('#o_nost');if(e&&!!OP.nostAdd!==e.checked){OP.nostAdd=e.checked;store.set('ps_nost',OP.nostAdd?'1':'0')}}{const e=$('#o_amv');if(e&&!!OP.amv!==e.checked){OP.amv=e.checked;store.set('ps_amv',OP.amv?'1':'0')}}softView();return}
  if(t.id==='colpick'&&t.dataset.k==='p'){OP.padc='FF'+t.value.slice(1).toUpperCase();store.set('ps_padc',OP.padc);padAdd(OP.padc);view();return}
  if(t.dataset.fpad!=null){const m=fcol(t.dataset.fpad);m.p=t.value;store.set(fkey(t.dataset.fpad),JSON.stringify(m));softView();return}
  if(t.id==='colpick'){OP['col'+t.dataset.k]='FF'+t.value.slice(1).toUpperCase();store.set('ps_col'+t.dataset.k,OP['col'+t.dataset.k]);view();return}
