@@ -121,6 +121,7 @@
  *   เวอร์ชัน 5.5.16: “ออกวันที่ N” แบบเดียวกันทุกใบ • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.17: จอชื่อเฉพาะ (ไม่มีรหัส DGT) ในชีตแพคที่รหัสจออยู่แถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.18: ฟอนต์ Calibri ในส่วนรายการทุกใบที่เติม • ไม่มีรายการโฟลเดอร์ในไฟล์ zip • ชุดทดสอบใหม่ (ใบสำรองก่อนเติม 27 ต.ค.) ผลเหมือน 5.5.10
+ *   เวอร์ชัน 5.5.19: ช่องวันที่ถ่ายพื้นดำ ตัวเลขขาว (shotOk / SHOTBW) • แก้สีช่องที่ใส่ไว้แล้ว (R.sty)
  * ======================================================================
  */
 
@@ -741,6 +742,15 @@ function mkStyles(doc) {
         xf.setAttribute('fontId', addU(fo, bf));
         xf.setAttribute('applyFont', '1');
       } /* 5.5.18 */
+      if (opt.center) {
+        let al = xf.getElementsByTagNameNS(NS, 'alignment')[0];
+        if (!al) {
+          al = doc.createElementNS(NS, 'alignment');
+          xf.appendChild(al);
+        }
+        al.setAttribute('horizontal', 'center');
+        xf.setAttribute('applyAlignment', '1');
+      } /* 5.5.19 */
       if (opt.right) {
         let al = xf.getElementsByTagNameNS(NS, 'alignment')[0];
         if (!al) {
@@ -2940,7 +2950,12 @@ async function chkRead(f) {
     }
     sheets.push({ sn, ws, sh, blocks: L });
   }
-  return { sheets, mx };
+  const sx = zip.file('xl/styles.xml'); /* 5.5.19: สไตล์ของไฟล์ (ดูสีช่องวันที่ถ่าย) */
+  return {
+    sheets,
+    mx,
+    sty: sx ? mkStyles(new DOMParser().parseFromString(await sx.async('string'), 'application/xml')) : null,
+  };
 }
 /* ----- ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป (3.12) อ่านรูปอย่างเดียว เขียนเฉพาะช่องวันที่ถ่ายที่ยังว่างในใบเช็ค
    แถวหนังใต้แถบวันที่ 1–15 → โฟลเดอร์รอบ 1-15 (ไม่มีรูปที่ใช้ได้ ดู 16-30 / 16-31 ด้วย รวมหนังชื่อซ้ำที่ต่อสัญญา 3.12.3), ใต้แถบ 16 ขึ้นไป → 16-30 / 16-31
@@ -2997,6 +3012,36 @@ async function exifDay(file) {
 const IMGX = /\.(jpe?g|png|heic|heif|webp)$/i,
   RND1 = n => /^0?1\s*-\s*15$/.test(String(n).trim()),
   RND2 = n => /^16\s*-\s*(2[89]|3[01])$/.test(String(n).trim());
+/* 5.5.19: ช่องวันที่ถ่ายแบบของทีม = พื้นดำ ตัวเลขขาว (ใบเช็คจริงทุกใบ) • shotOk = สไตล์นี้เป็นพื้นเข้ม + ตัวอักษรสีอ่อนอยู่แล้ว */
+const shotOk = (ST, st) => {
+  if (!ST || st == null) return false;
+  const d = ST.doc,
+    g = n => d.getElementsByTagNameNS(NS, n)[0],
+    xf = g('cellXfs').children[+st || 0];
+  if (!xf) return false;
+  const lum = h => {
+    h = String(h).slice(-6);
+    return (
+      0.299 * parseInt(h.slice(0, 2), 16) +
+      0.587 * parseInt(h.slice(2, 4), 16) +
+      0.114 * parseInt(h.slice(4, 6), 16)
+    );
+  };
+  const fl = g('fills').children[+xf.getAttribute('fillId') || 0],
+    pf = fl && fl.getElementsByTagNameNS(NS, 'patternFill')[0];
+  if (!pf || (pf.getAttribute('patternType') || 'none') === 'none') return false;
+  const fg = pf.getElementsByTagNameNS(NS, 'fgColor')[0];
+  if (!fg) return false;
+  const th = fg.getAttribute('theme'),
+    tn = +(fg.getAttribute('tint') || 0),
+    rgb = fg.getAttribute('rgb'),
+    ix = fg.getAttribute('indexed');
+  const dk = th != null ? (th === '1' || th === '3') && tn < 0.35 : rgb ? lum(rgb) < 100 : ix === '8';
+  if (!dk) return false;
+  const fc = ST.fcOf(st);
+  return fc === 'T0' || fc === 'T2' || (/^[0-9A-F]{6,8}$/.test(fc) && lum(fc) > 160);
+};
+const SHOTBW = { fill: 'FF000000', color: 'FFFFFFFF', fontName: 'Calibri', center: true };
 async function shotScan(root, files, prog) {
   const { S, shut } = await picScreens(root),
     same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -3009,6 +3054,7 @@ async function shotScan(root, files, prog) {
     miss: [],
     closed: [],
     read: [],
+    sty: [],
     n: 0,
     dir: root.name,
     cells: 0,
@@ -3140,6 +3186,17 @@ async function shotScan(root, files, prog) {
       };
       for (const b of x.blocks) {
         if (!b.items.length) continue;
+        for (const cn of b.cs) {
+          const L = n2col(cn);
+          for (const it of b.items) {
+            const r = it[2],
+              xv = x.ws[L + r];
+            if (!xv || xv.t !== 'n' || xv.f || !Number.isInteger(xv.v) || xv.v < 1 || xv.v > 31) continue;
+            const e = x.sh && x.sh.cell(L, r, false);
+            if (!e || e.getElementsByTagNameNS(NS, 'f').length) continue;
+            if (!shotOk(X.sty, e.getAttribute('s'))) R.sty.push({ f: f.name, sn: x.sn, c: L, r });
+          }
+        } /* 5.5.19: วันที่ถ่ายที่ใส่ไว้แล้ว แต่ยังไม่ใช่พื้นดำตัวเลขขาว → แก้สี (ไม่แตะเลข) */
         const id = picId(x.ws, x.sn, b.lc),
           bb = { ...id, sn: x.sn };
         const cols = [];
@@ -3272,8 +3329,9 @@ async function shotScan(root, files, prog) {
 async function shotApply(R, files) {
   const out = [];
   for (const f of files) {
-    const L = R.fill.filter(x => x.f === f.name);
-    if (!L.length) continue;
+    const L = R.fill.filter(x => x.f === f.name),
+      LS = (R.sty || []).filter(x => x.f === f.name);
+    if (!L.length && !LS.length) continue;
     const zip = await JSZip.loadAsync(f.buf.slice(0)),
       wx = new DOMParser().parseFromString(
         await zip.file('xl/workbook.xml').async('string'),
@@ -3291,8 +3349,12 @@ async function shotApply(R, files) {
       const t = rid[s.getAttributeNS(RNS, 'id')];
       path[s.getAttribute('name')] = t.startsWith('/') ? t.slice(1) : 'xl/' + t;
     }
-    let n = 0;
-    for (const sn of [...new Set(L.map(x => x.sn))]) {
+    const sx = zip.file('xl/styles.xml'),
+      ST = sx ? mkStyles(new DOMParser().parseFromString(await sx.async('string'), 'application/xml')) : null,
+      bw = b => (ST ? ST.derive(b == null ? 0 : b, 'shotbw', SHOTBW) : b); /* 5.5.19 */
+    let n = 0,
+      ns = 0;
+    for (const sn of [...new Set([...L, ...LS].map(x => x.sn))]) {
       const zx = path[sn] && zip.file(path[sn]);
       if (!zx) continue;
       const sh = new Sheet(await zx.async('string'));
@@ -3307,11 +3369,21 @@ async function shotApply(R, files) {
               if (s2 != null) st = s2;
             }
         sh.setNum(x.c, x.r, x.day);
-        if (st != null) sh.setS(x.c, x.r, st);
+        const s2 = shotOk(ST, st) ? st : bw(st);
+        if (s2 != null) sh.setS(x.c, x.r, s2);
         n++;
       }
+      for (const x of LS.filter(q => q.sn === sn)) {
+        const c = sh.cell(x.c, x.r, false);
+        if (!c) continue;
+        const st = c.getAttribute('s');
+        if (shotOk(ST, st)) continue;
+        sh.setS(x.c, x.r, bw(st));
+        ns++;
+      } /* 5.5.19 */
       zip.file(path[sn], sh.xml(), { createFolders: false });
     }
+    if (ST) zip.file('xl/styles.xml', ST.xml(), { createFolders: false });
     let cp = wx.getElementsByTagNameNS(NS, 'calcPr')[0];
     if (!cp) {
       cp = wx.createElementNS(NS, 'calcPr');
@@ -3348,9 +3420,11 @@ async function shotApply(R, files) {
         new XMLSerializer().serializeToString(wx.documentElement),
       { createFolders: false },
     );
+    for (const k of Object.keys(zip.files)) if (zip.files[k].dir) delete zip.files[k];
     out.push({
       name: f.name,
       n,
+      ns,
       blob: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
     });
   }
@@ -3392,6 +3466,19 @@ const shotTxt = R => {
       x.rnd +
       (x.nornd ? ' (ยังไม่มีโฟลเดอร์รอบ)' : x.nofold ? ' (ไม่มีโฟลเดอร์หนังนี้)' : ' (โฟลเดอร์ว่าง)'),
   );
+  {
+    const A = R.sty || [],
+      by = new Map();
+    for (const x of A) {
+      const k = x.f + ' | ' + x.sn;
+      by.set(k, (by.get(k) || 0) + 1);
+    }
+    L.push(
+      `แก้สีช่องวันที่ถ่ายเป็นพื้นดำ ตัวเลขขาว (${A.length})`,
+      ...[...by].map(([k, v]) => `  ${k} | ${v} ช่อง`),
+      '',
+    );
+  }
   L.push(`หาโฟลเดอร์จอไม่เจอ (${R.miss.length})`, ...R.miss.map(x => `  ${x.f} | ${x.sn} | ${x.id}`));
   return L.join('\n');
 };
@@ -9318,7 +9405,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.18 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.19 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -10782,6 +10869,7 @@ const vShot = () => {
     D = SHOT && SHOT.done,
     FL = shotFill(),
     NF = FL.length,
+    NS = R && R.sty ? R.sty.length : 0,
     M = (SHOT && SHOT.man) || {};
   const lst = (A, fx, open) => {
     const by = new Map();
@@ -10804,7 +10892,7 @@ const vShot = () => {
       : '';
   let b = '';
   if (!R)
-    b = `<p class="hint">ระบบดูรูปในโฟลเดอร์แยกรูปของแต่ละจอ (เดือน → รอบ → ชื่อหนัง) แล้วใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง <b>ช่องที่มีเลขอยู่แล้วไม่แตะ</b> และบอกเรื่องที่น่าจะลืมใส่หรือใส่ผิด ก่อนใส่จะให้ดูก่อน ระบบไม่แก้รูปหรือโฟลเดอร์</p><div><button class="btn secondary" data-a="shotscan">${IC.folder}ตรวจวันที่ถ่ายจากโฟลเดอร์แยกรูป</button></div>`;
+    b = `<p class="hint">ระบบดูรูปในโฟลเดอร์แยกรูปของแต่ละจอ (เดือน → รอบ → ชื่อหนัง) แล้วใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง <b>ช่องที่มีเลขอยู่แล้วไม่เปลี่ยนเลข</b> (ถ้ายังไม่ใช่พื้นดำตัวเลขขาว ระบบแก้สีให้) และบอกเรื่องที่น่าจะลืมใส่หรือใส่ผิด ก่อนใส่จะให้ดูก่อน ระบบไม่แก้รูปหรือโฟลเดอร์</p><div><button class="btn secondary" data-a="shotscan">${IC.folder}ตรวจวันที่ถ่ายจากโฟลเดอร์แยกรูป</button></div>`;
   else {
     const nr = new Set(FL.map(x => x.scr + '|' + x.f)).size,
       n1 = R.none.filter(x => x.rnd === '1-15').length,
@@ -10837,15 +10925,15 @@ const vShot = () => {
           })
           .join('')}</ul></details>`
       : '';
-    b = `${D ? (D.bad ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`) : alertHTML('ok', `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง ใน ${D.files.length} ไฟล์`, `<p>${TCS === 'c' ? 'ใบเช็คในขั้นที่ 3 เป็นฉบับที่ใส่แล้วด้วย (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้)' : TCS === 'last' ? 'ผลการเติมในขั้นที่ 4 เป็นฉบับที่ใส่แล้วด้วย' : 'ใบเช็คชุดนี้เป็นฉบับที่ใส่แล้ว'} ${D.saved && D.sv ? `<b>บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว</b> (ทับ ${D.sv.ok - D.sv.neu} ไฟล์${D.sv.neu ? ` • ไฟล์ใหม่ ${D.sv.neu} ไฟล์ เพราะโฟลเดอร์นี้ไม่มีไฟล์ชื่อเดียวกัน` : ''}) — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย/${esc(D.sv.day)}` : 'ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็คด้านล่าง'}</p>`)) : ''}
+    b = `${D ? (D.bad ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`) : alertHTML('ok', `${D.n && D.ns ? `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง • แก้สี ${D.ns.toLocaleString()} ช่อง` : D.n || !D.ns ? `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง` : `แก้สีช่องวันที่ถ่ายแล้ว ${D.ns.toLocaleString()} ช่อง`} ใน ${D.files.length} ไฟล์`, `<p>${TCS === 'c' ? 'ใบเช็คในขั้นที่ 3 เป็นฉบับที่ใส่แล้วด้วย (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้)' : TCS === 'last' ? 'ผลการเติมในขั้นที่ 4 เป็นฉบับที่ใส่แล้วด้วย' : 'ใบเช็คชุดนี้เป็นฉบับที่ใส่แล้ว'} ${D.saved && D.sv ? `<b>บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว</b> (ทับ ${D.sv.ok - D.sv.neu} ไฟล์${D.sv.neu ? ` • ไฟล์ใหม่ ${D.sv.neu} ไฟล์ เพราะโฟลเดอร์นี้ไม่มีไฟล์ชื่อเดียวกัน` : ''}) — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย/${esc(D.sv.day)}` : 'ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็คด้านล่าง'}</p>`)) : ''}
  <p class="hint">โฟลเดอร์ “${esc(R.dir)}” • ตรวจ ${R.cells.toLocaleString()} ช่อง${R.read.length ? ` • เปิดไม่ได้: ${esc(R.read.join(', '))}` : ''}</p>
- ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man ? ' (เลือกเอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}
+ ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man ? ' (เลือกเอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}${D || !NS ? '' : `<p class="hint">ช่องวันที่ถ่ายที่ใส่ไว้แล้ว <b>${NS.toLocaleString()} ช่อง</b> ยังไม่ใช่พื้นดำตัวเลขขาว — กดปุ่มด้านล่าง ระบบแก้สีให้ (เลขเหมือนเดิม)</p>`}
  <div class="shg">${grp('มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์', R.has, 'อาจลืมคัดลอกรูป หรือชื่อโฟลเดอร์ไม่ตรงกับชื่อหนัง', x => x.nm + ' (' + x.v + ')')}
  ${grp('เลขในใบเช็คไม่ตรงกับวันที่ในรูป', R.diff, 'ระบบไม่ได้แก้ ตรวจว่าเลขไหนถูก', x => x.nm + ': ใบเช็ค ' + x.v + ' / รูป ' + x.day)}
  ${badH}
  ${grp('ยังไม่มีรูป (ช่องยังว่าง)', R.none, `รอบ 1–15: ${n1} ช่อง • รอบ 16–สิ้นเดือน: ${n2} ช่อง`, x => x.nm + (x.nornd ? ' (ยังไม่มีโฟลเดอร์รอบ ' + x.rnd + ')' : x.nofold ? ' (ไม่มีโฟลเดอร์)' : ''))}
  ${R.miss.length ? `<details class="picd"><summary><b>หาโฟลเดอร์จอไม่เจอ</b> ${R.miss.length} จอ</summary><ul>${R.miss.map(x => `<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>` : ''}</div>
- <div class="picb">${D ? `<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="shotsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}` : NF ? `<button class="btn primary" data-a="shotapply">ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
+ <div class="picb">${D ? `<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="shotsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}` : NF || NS ? `<button class="btn primary" data-a="shotapply">${NF && NS ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง + แก้สี ${NS.toLocaleString()} ช่อง` : NF ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค` : `แก้สีช่องวันที่ถ่าย ${NS.toLocaleString()} ช่อง`}</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
   }
   return `<section class="pic" data-tour="tshot"><h3>${IC.folder}ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป</h3>${b}</section>`;
 };
@@ -13866,7 +13954,7 @@ const ACT = {
   },
   shotapply: async () => {
     const FL = shotFill();
-    if (!FL.length) return;
+    if (!FL.length && !(SHOT && SHOT.R && SHOT.R.sty && SHOT.R.sty.length)) return;
     note = 'กำลังใส่วันที่ถ่าย …';
     view();
     const RR = { ...SHOT.R, fill: FL };
@@ -13900,6 +13988,7 @@ const ACT = {
     SHOT.done = {
       files: out,
       n: out.reduce((t, x) => t + x.n, 0),
+      ns: out.reduce((t, x) => t + (x.ns || 0), 0),
       saved: false,
       txt: shotTxt(RR),
       orig,
@@ -13910,7 +13999,10 @@ const ACT = {
       PICX.sig =
         ckSig(); /* วันที่ถ่ายไม่เปลี่ยนรายชื่อหนังในใบเช็ค → ใช้ผลที่อ่านไว้ต่อ (แผนสร้างโฟลเดอร์ / ผลตรวจเทียบจอยังอยู่) */
     MQN = 'photo';
-    note = `ใส่วันที่ถ่ายแล้ว ${SHOT.done.n.toLocaleString()} ช่อง`;
+    note =
+      SHOT.done.n || !SHOT.done.ns
+        ? `ใส่วันที่ถ่ายแล้ว ${SHOT.done.n.toLocaleString()} ช่อง`
+        : `แก้สีช่องวันที่ถ่ายแล้ว ${SHOT.done.ns.toLocaleString()} ช่อง`;
   },
   shotdl: async () => {
     const D = SHOT && SHOT.done;
