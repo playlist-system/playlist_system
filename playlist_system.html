@@ -1134,7 +1134,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
  const jamSkip=(note,nums)=>{if(!nums||!nums.size)return false;const n=String(note||''),L=(t)=>{const s=new Set();for(const m of t.matchAll(/BKJ\s*\d?\s*-\s*(\d{1,3})/gi))s.add(+m[1]);return s};let m=n.match(/(?:ขึ้น|ออน)เ?ฉพาะ(.*)/);if(m){const s=L(m[1]);return s.size>0&&![...nums].some(x=>s.has(x))}m=n.match(/(?:ยกเว้น(?:จอ)?|ไม่ออน(?:จอ)?)(.*)/);if(m){const s=L(m[1].split(/ชดเชย/)[0]);return s.size>0&&[...nums].every(x=>s.has(x))}return false};
  for(const b of B){b.cnt=new Map();b.hist=[];let g=+P;
   for(let r=S+1;r<=last;r++){if(isBar(r)){const d=barD(r);if(d)g=Math.max(+d,+P);continue}
-   const nm=vOf(b.lc,r);if(!nm||/^ออก(วันที่)?\s*\d/.test(nm))continue;
+   let nm=vOf(b.lc,r);if(!nm||/^ออก(วันที่)?\s*\d/.test(nm))continue;if(b.scr&&b.scr.m==='Rama9 Connect')nm=bmnCut(nm); /* 5.5.12 */
    const fx=FASTN.test(nm);let t=null;for(let i=0;i<b.pcs.length;i++){const k=sh.take(b.pcs[i],r);if(k){sh.setS(b.pcs[i],r,b.bps[i]);if(hist&&!fx)(t||(t=b.pcs.map(()=>null)))[i]=k;else if(!hist)cleared++}}if(t){if(!b.cnt.has(nm))b.cnt.set(nm,[]);b.cnt.get(nm).push(t)}
    if(fx){if(hist)fdrop++;continue} /* แถว #FAST_ADS ที่มีอยู่ในใบเช็ค → ลบออก */
    if(hist){const m=vOf(b.nc,r).match(/^ออก(?:วันที่)?\s*(\d{1,2})/);b.hist.push({nm,g,ned:m?exitOf(+m[1],P):0,raw:m?vOf(b.nc,r):''})}}}
@@ -3419,6 +3419,7 @@ function parseSplit(wb,media,I){const out=[],names={},iss=(lv,t)=>{if(!I.some(x=
 /* Playlist แบบแบ่งกลุ่ม (3.4): Rama9 Connect / Digital MRT / Gateway X — ชีต “รายการหนัง…” มีหลายกลุ่ม (Plan B, BMN, Content …) แต่ละกลุ่มมีหัวตาราง “รายชื่อหนังโฆษณา”
    กลุ่ม “AD.ออก / Ads ถอด” = หนังที่ถอด • ไม่มีช่องสถานะ: ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม (ตามคำอธิบายสีท้ายตาราง) และรายชื่อใต้ “รายการขึ้นใหม่” (ชีต Playlist ของ Rama9)
    Content อาคาร / Content Plan B ไม่ลงใบเช็ค (ใบเช็ค MRT ไม่มี) • Content อื่น เช่น Content กทพ. ลงเป็นหนัง # (ใบเช็ค Gateway X มี) • แถวที่ยังไม่มีชื่อไฟล์ เช่น “Onair 19/10/2026” ไม่ใส่ */
+const bmnCut=t=>{const m=String(t).match(/^BMN[\s_\-]+(\S.*)$/i);return m?m[1]:t}; /* 5.5.12: BMN_ชื่อหนัง_1Nov26_15s → ชื่อหนัง_1Nov26_15s */
 const SECT_SKIP=/^Content\s*(อาคาร|Plan\s*B)/i,SECT_OFF=/^(AD\.?\s*ออก|Ads?\.?\s*ถอด|รายการ\s*(ปลด|ถอด))/i,SECT_JUNK=/^(on\s*-?\s*air|วันที่)\s*\d|\d{1,2}\/\d{1,2}\/\d{2,4}/i,
  SECT_NEW=/^(FFFF00)$/,SECT_BACK=/^(FF66CC|FF99CC|FF66FF|FF99FF)$/;
 const sectHead=ws=>{for(let r=0;r<8;r++)for(let c=0;c<14;c++){const x=ws[XLSX.utils.encode_cell({r,c})];if(x&&cl(x.v)==='รายชื่อหนังโฆษณา')return true}return false};
@@ -3443,9 +3444,9 @@ function parseSect(wb,fn,I,opt){const ven=!!(opt&&opt.ven),media=ven?opt.media:s
    if(!H)continue;
    if(!/^\d+$/.test(T[0])){if(T.some(x=>/^Total$/i.test(x)))H=null;continue}
    if(skip)continue;const ad=T[H.ad];if(!ad||SECT_JUNK.test(ad)||JUNK.test(ad))continue;
-   const g=k=>(H[k]<0?'':A[r][H[k]]),fk=fillKey(at(r,H.ad)),cn=g('cnt');
+   const g=k=>(H[k]<0?'':A[r][H[k]]),fk=fillKey(at(r,H.ad)),cn=g('cnt'),adn=!ven&&media==='Rama9 Connect'?bmnCut(ad):ad; /* 5.5.12 */
    const st=off?'ถอด':NEWS.has(ad)||SECT_NEW.test(fk)?'ขึ้นใหม่':SECT_BACK.test(fk)?'ขึ้นใหม่ไฟล์เดิม':'';
-   rows.push({ad,ty:/^Content/i.test(sec)?'Content':cl(g('ty')),len:+g('len')||0,cnt:cn===''||cn==null?null:+cn||0,st,s:fd(g('os'))||fd(g('s')),e:fd(g('oe'))||fd(g('e')),note:'',off,...(ven?{pb:cl(g('pb')),sec}:{})})}
+   rows.push({ad:adn,ty:/^Content/i.test(sec)?'Content':cl(g('ty')),len:+g('len')||0,cnt:cn===''||cn==null?null:+cn||0,st,s:fd(g('os'))||fd(g('s')),e:fd(g('oe'))||fd(g('e')),note:'',off,...(ven?{pb:cl(g('pb')),sec}:{})})}
   if(rows.length)out.push({m:media||'อื่นๆ',c:code,n:media==='Digital MRT'?'MRT '+code:code,f:'',ed:0,rows:stable(rows)})}
  return out}
 /* Air Traveller / The 20 (3.4): หน้าตาแบบ Signature Max แต่ไฟล์ละสื่อเดียว — ใช้ชื่อสื่อของตัวเอง ไม่ปนกับ Signature Max • ข้ามชีตสรุป (ต้นฉบับรายการหนังแยกจอ, รายการหนังประจำวัน) และชีตที่ไม่มีหนังจริง */
@@ -3531,7 +3532,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.11 (3 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.12 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',

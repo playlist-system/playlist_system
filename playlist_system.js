@@ -114,6 +114,7 @@
  *   เวอร์ชัน 5.5.9: คำอธิบายการ์ดตรวจจอเข้าใจง่าย • สร้างชีตที่ใบเช็คไม่มี (cloneSheet: คัดลอกชีตแบบเดียวกันในใบเดียวกัน) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.10: ชีตแพค DGT / ID แบบ 1 คอลัมน์ต่อจอ ย้าย / เพิ่มได้ (colWb kind COL) • ไม่แก้ส่วนเติม
  *   เวอร์ชัน 5.5.11: แก้สูตรคะแนน Analysis (#REF! / ชี้ผิดช่อง) อัตโนมัติ • zipTidy (ไฟล์ไม่ต้องซ่อมใน Excel) • unshare สูตรใน colWb / Analysis • ไม่แก้ส่วนเติม
+ *   เวอร์ชัน 5.5.12: Playlist Rama9 Connect ตัด BMN_ หน้าชื่อหนัง (parseSect + ชื่อเดิมในใบเช็ค Rama9) • ส่วนเติมแก้เฉพาะชื่อของใบ Rama9
  * ======================================================================
  */
 
@@ -1235,8 +1236,9 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         if (d) g = Math.max(+d, +P);
         continue;
       }
-      const nm = vOf(b.lc, r);
+      let nm = vOf(b.lc, r);
       if (!nm || /^ออก(วันที่)?\s*\d/.test(nm)) continue;
+      if (b.scr && b.scr.m === 'Rama9 Connect') nm = bmnCut(nm); /* 5.5.12 */
       const fx = FASTN.test(nm);
       let t = null;
       for (let i = 0; i < b.pcs.length; i++) {
@@ -8521,6 +8523,10 @@ async function slimXlsx(buf) {
 /* Playlist แบบแบ่งกลุ่ม (3.4): Rama9 Connect / Digital MRT / Gateway X — ชีต “รายการหนัง…” มีหลายกลุ่ม (Plan B, BMN, Content …) แต่ละกลุ่มมีหัวตาราง “รายชื่อหนังโฆษณา”
    กลุ่ม “AD.ออก / Ads ถอด” = หนังที่ถอด • ไม่มีช่องสถานะ: ช่องชื่อหนังสีเหลือง = ขึ้นใหม่ สีชมพู = ขึ้นใหม่ไฟล์เดิม (ตามคำอธิบายสีท้ายตาราง) และรายชื่อใต้ “รายการขึ้นใหม่” (ชีต Playlist ของ Rama9)
    Content อาคาร / Content Plan B ไม่ลงใบเช็ค (ใบเช็ค MRT ไม่มี) • Content อื่น เช่น Content กทพ. ลงเป็นหนัง # (ใบเช็ค Gateway X มี) • แถวที่ยังไม่มีชื่อไฟล์ เช่น “Onair 19/10/2026” ไม่ใส่ */
+const bmnCut = t => {
+  const m = String(t).match(/^BMN[\s_\-]+(\S.*)$/i);
+  return m ? m[1] : t;
+}; /* 5.5.12: BMN_ชื่อหนัง_1Nov26_15s → ชื่อหนัง_1Nov26_15s */
 const SECT_SKIP = /^Content\s*(อาคาร|Plan\s*B)/i,
   SECT_OFF = /^(AD\.?\s*ออก|Ads?\.?\s*ถอด|รายการ\s*(ปลด|ถอด))/i,
   SECT_JUNK = /^(on\s*-?\s*air|วันที่)\s*\d|\d{1,2}\/\d{1,2}\/\d{2,4}/i,
@@ -8648,7 +8654,8 @@ function parseSect(wb, fn, I, opt) {
       if (!ad || SECT_JUNK.test(ad) || JUNK.test(ad)) continue;
       const g = k => (H[k] < 0 ? '' : A[r][H[k]]),
         fk = fillKey(at(r, H.ad)),
-        cn = g('cnt');
+        cn = g('cnt'),
+        adn = !ven && media === 'Rama9 Connect' ? bmnCut(ad) : ad; /* 5.5.12 */
       const st = off
         ? 'ถอด'
         : NEWS.has(ad) || SECT_NEW.test(fk)
@@ -8657,7 +8664,7 @@ function parseSect(wb, fn, I, opt) {
             ? 'ขึ้นใหม่ไฟล์เดิม'
             : '';
       rows.push({
-        ad,
+        ad: adn,
         ty: /^Content/i.test(sec) ? 'Content' : cl(g('ty')),
         len: +g('len') || 0,
         cnt: cn === '' || cn == null ? null : +cn || 0,
@@ -9158,7 +9165,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.11 (3 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.12 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
