@@ -1323,14 +1323,19 @@ async function picScreens(root) {
   for (const r of RF)
     for (const [n, x] of await picDirs(r.h)) {
       if (/^#/.test(n) || isMonD(n) || rndF(n)) continue;
-      const k = picKey(n), gk = r.pp.join('/') + '|' + JSON.stringify(k), o = r.y * 24 + r.m * 2 + r.hf;
-      let e = G.get(gk);
-      if (!e) G.set(gk, (e = { g: true, path: [...r.pp, n], h: null, k, hm: false, kids: [], ph: r.ph, pp: r.pp, rounds: new Map(), name: n, last: -1 }));
-      e.rounds.set(rndK(r.y, r.m, r.hf), { h: x, name: n, rf: r });
-      if (o > e.last) {
-        e.last = o;
-        e.name = n;
-        e.path = [...r.pp, n];
+      /* 5.5.20: โฟลเดอร์ “Pic @ …” ที่ข้างในเป็นจอย่อย (ไม่มี #Fast Ads / #Module / โฟลเดอร์หนัง) เช่น Pic @ BASE → 1. SCREEN A - B • จอย่อย = จอ */
+      let subs = null;
+      if (/^Pic\s*@/i.test(n)) { const ks = await picDirs(x); if (ks.length && !ks.some(([c]) => /^#/.test(c) || /_/.test(c))) subs = ks; }
+      for (const [nn, xx, mid, mh] of subs ? subs.map(([c, h]) => [c, h, n, x]) : [[n, x, '', null]]) {
+        const k = picKey(nn), gk = r.pp.join('/') + '|' + (mid ? mid + '/' : '') + JSON.stringify(k), o = r.y * 24 + r.m * 2 + r.hf, pth = mid ? [...r.pp, mid, nn] : [...r.pp, nn];
+        let e = G.get(gk);
+        if (!e) G.set(gk, (e = { g: true, path: pth, h: null, k, hm: false, kids: [], ph: r.ph, pp: r.pp, rounds: new Map(), name: nn, last: -1, mid }));
+        e.rounds.set(rndK(r.y, r.m, r.hf), { h: xx, name: nn, rf: r, mh });
+        if (o > e.last) {
+          e.last = o;
+          e.name = nn;
+          e.path = pth;
+        }
       }
     }
   for (const e of G.values()) S.push(e);
@@ -1383,7 +1388,7 @@ function pzPlan(W,res,rs,upto,X){ /* 5.5.1: X = {S, shut, dir} จากโฟ�
   const Ls=pzScr(b,pack),T0=X?picTg(b,X.S):[];
   for(let[id,key,path]of Ls){let ns='ck';
    if(X){const t=T0.find(x=>x[1]&&sameK(x[1],key))||(Ls.length===1&&T0.length===1&&!T0[0][1]?T0[0]:null),z=t&&t[2];
-    if(z){const g=z.g?[z.name]:z.path.slice(z.pp.length?1:0);if(g.length){if(z.pp.length&&nrm(z.pp[0])!==nrm(pack))g[g.length-1]=reTag(g[g.length-1],pack);path=g;ns='fd'}}
+    if(z){const g=z.g?(z.mid?[z.mid,z.name]:[z.name]):z.path.slice(z.pp.length?1:0);if(g.length){if(z.pp.length&&nrm(z.pp[0])!==nrm(pack))g[g.length-1]=reTag(g[g.length-1],pack);path=g;ns='fd'}}
     else if(X.shut.some(q=>sameK(q,key))){closed.push({f:r.name,sn:b.sn,id});continue}}
    const k=(pack+'/'+path.join('/')).toLowerCase(),e=T.get(k)||{id,pack,path,ns,films:RS.map(()=>new Set()),src:new Set()};
    fs.forEach((L,i)=>L.forEach(f=>e.films[i].add(f)));e.src.add(r.name+' • '+b.sn);T.set(k,e)}}
@@ -1401,8 +1406,8 @@ async function pzZip(P){const z=new JSZip(),seen=new Set(),add=p=>{const l=p.toL
 /* 5.5: จอที่ยังไม่มีโฟลเดอร์เลย (ตอนสร้างลงโฟลเดอร์) → ตั้งชื่อจากใบเช็ค แล้วสร้างแบบ Gallary ในโฟลเดอร์แพค (ต้องมีโฟลเดอร์แพคนั้นอยู่แล้ว) */
 function picNew(b,id,k,tops){const pack=pzPack(b);if(!pack||!tops.length)return null;
  const top=tops.find(([n])=>nrm(n)===nrm(pack))||(PKM[b.media]&&tops.find(([n])=>PKM[b.media].test(nrm(n))));if(!top)return null;
- const L=pzScr(b,pack),e=L.find(x=>x[0]===id)||(L.length===1?L[0]:null);if(!e||e[2].length!==1)return null;
- return{g:true,syn:true,path:[top[0],e[2][0]],h:null,k:k||e[1],hm:false,kids:[],ph:top[1],pp:[top[0]],rounds:new Map(),name:e[2][0],last:-1}}
+ const L=pzScr(b,pack),e=L.find(x=>x[0]===id)||(L.length===1?L[0]:null);if(!e||(e[2].length!==1&&e[2].length!==2))return null;const two=e[2].length===2; /* 5.5.20: จอย่อย (Pic @ BASE / 1. SCREEN A - B) */
+ return{g:true,syn:true,path:[top[0],...e[2]],h:null,k:k||e[1],hm:false,kids:[],ph:top[1],pp:[top[0]],rounds:new Map(),name:e[2][e[2].length-1],mid:two?e[2][0]:'',last:-1}}
 /* แพคตามสื่อของชีต (จอแยก) → โฟลเดอร์แพคชั้นบนสุด เช่น 40Blue → “Pic @ Plan B TV 40 BLUE”, Spare → “Pic @ Other” */
 const PKM = { '40Blue': /40BLUE/, '40Red': /40RED/, '80Blue': /80BLUE/, '80Red': /80RED/, CITY: /CITY/, Spare: /OTHER|SPARE/ };
 async function picPlan(root, W, res, rs, upto) {
@@ -1468,7 +1473,7 @@ async function picPlan(root, W, res, rs, upto) {
       const gHave = gs.filter(z => z.rounds.has(rk));
       if (gHave.length) {
         const z = prefer(gHave), q = z.rounds.get(rk);
-        P = { lay: 'B', base: z.ph, pp: z.pp, chain: [[q.rf.name, q.rf.h, 'rnd'], [q.name, q.h, 'scr']], fin: q.h, label: q.name };
+        P = { lay: 'B', base: z.ph, pp: z.pp, chain: [[q.rf.name, q.rf.h, 'rnd'], ...(z.mid ? [[z.mid, q.mh, 'scr']] : []), [q.name, q.h, 'scr']], fin: q.h, label: q.name }; /* 5.5.20: จอย่อย */
       } else {
         let oz = null, oq = null;
         for (const z of [prefer(os), ...os].filter(Boolean)) {
@@ -1489,7 +1494,9 @@ async function picPlan(root, W, res, rs, upto) {
             inO = os.find(z => z.pp.join('/') === pp.join('/')),
             name = inG ? inG.name : inO ? inO.path[inO.path.length - 1] : reTag((gz[0] && gz[0].name) || e.s.path[e.s.path.length - 1], pp[pp.length - 1] || root.name),
             rf = rfOf(pp, R);
-          P = { lay: 'B', base: ph, pp, chain: [[rf ? rf.name : rndName(y, m, R.h, smp), rf ? rf.h : null, 'rnd'], [fsafe(name), null, 'scr']], fin: null, label: name };
+          const mid = (inG && inG.mid) || (!inG && !inO && ((gz[0] && gz[0].mid) || e.s.mid)) || ''; let mh = null; /* 5.5.20: จอย่อย → สร้าง Pic @ BASE / 1. SCREEN A - B */
+          if (mid && rf) { try { mh = await rf.h.getDirectoryHandle(mid); } catch (_) {} }
+          P = { lay: 'B', base: ph, pp, chain: [[rf ? rf.name : rndName(y, m, R.h, smp), rf ? rf.h : null, 'rnd'], ...(mid ? [[fsafe(mid), mh, 'scr']] : []), [fsafe(name), null, 'scr']], fin: null, label: name };
         }
       }
       if (!P.base && !P.chain[0][1]) {
@@ -3559,7 +3566,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.19 (4 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.20 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',

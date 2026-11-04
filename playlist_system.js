@@ -122,6 +122,7 @@
  *   เวอร์ชัน 5.5.17: จอชื่อเฉพาะ (ไม่มีรหัส DGT) ในชีตแพคที่รหัสจออยู่แถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.18: ฟอนต์ Calibri ในส่วนรายการทุกใบที่เติม • ไม่มีรายการโฟลเดอร์ในไฟล์ zip • ชุดทดสอบใหม่ (ใบสำรองก่อนเติม 27 ต.ค.) ผลเหมือน 5.5.10
  *   เวอร์ชัน 5.5.19: ช่องวันที่ถ่ายพื้นดำ ตัวเลขขาว (shotOk / SHOTBW) • แก้สีช่องที่ใส่ไว้แล้ว (R.sty)
+ *   เวอร์ชัน 5.5.20: จอย่อยในโฟลเดอร์รูป (Pic @ BASE / 1. SCREEN A - B) — picScreens / picPlan / picNew / pzPlan
  * ======================================================================
  */
 
@@ -2139,32 +2140,42 @@ async function picScreens(root) {
   for (const r of RF)
     for (const [n, x] of await picDirs(r.h)) {
       if (/^#/.test(n) || isMonD(n) || rndF(n)) continue;
-      const k = picKey(n),
-        gk = r.pp.join('/') + '|' + JSON.stringify(k),
-        o = r.y * 24 + r.m * 2 + r.hf;
-      let e = G.get(gk);
-      if (!e)
-        G.set(
-          gk,
-          (e = {
-            g: true,
-            path: [...r.pp, n],
-            h: null,
-            k,
-            hm: false,
-            kids: [],
-            ph: r.ph,
-            pp: r.pp,
-            rounds: new Map(),
-            name: n,
-            last: -1,
-          }),
-        );
-      e.rounds.set(rndK(r.y, r.m, r.hf), { h: x, name: n, rf: r });
-      if (o > e.last) {
-        e.last = o;
-        e.name = n;
-        e.path = [...r.pp, n];
+      /* 5.5.20: โฟลเดอร์ “Pic @ …” ที่ข้างในเป็นจอย่อย (ไม่มี #Fast Ads / #Module / โฟลเดอร์หนัง) เช่น Pic @ BASE → 1. SCREEN A - B • จอย่อย = จอ */
+      let subs = null;
+      if (/^Pic\s*@/i.test(n)) {
+        const ks = await picDirs(x);
+        if (ks.length && !ks.some(([c]) => /^#/.test(c) || /_/.test(c))) subs = ks;
+      }
+      for (const [nn, xx, mid, mh] of subs ? subs.map(([c, h]) => [c, h, n, x]) : [[n, x, '', null]]) {
+        const k = picKey(nn),
+          gk = r.pp.join('/') + '|' + (mid ? mid + '/' : '') + JSON.stringify(k),
+          o = r.y * 24 + r.m * 2 + r.hf,
+          pth = mid ? [...r.pp, mid, nn] : [...r.pp, nn];
+        let e = G.get(gk);
+        if (!e)
+          G.set(
+            gk,
+            (e = {
+              g: true,
+              path: pth,
+              h: null,
+              k,
+              hm: false,
+              kids: [],
+              ph: r.ph,
+              pp: r.pp,
+              rounds: new Map(),
+              name: nn,
+              last: -1,
+              mid,
+            }),
+          );
+        e.rounds.set(rndK(r.y, r.m, r.hf), { h: xx, name: nn, rf: r, mh });
+        if (o > e.last) {
+          e.last = o;
+          e.name = nn;
+          e.path = pth;
+        }
       }
     }
   for (const e of G.values()) S.push(e);
@@ -2366,7 +2377,7 @@ function pzPlan(W, res, rs, upto, X) {
               (Ls.length === 1 && T0.length === 1 && !T0[0][1] ? T0[0] : null),
             z = t && t[2];
           if (z) {
-            const g = z.g ? [z.name] : z.path.slice(z.pp.length ? 1 : 0);
+            const g = z.g ? (z.mid ? [z.mid, z.name] : [z.name]) : z.path.slice(z.pp.length ? 1 : 0);
             if (g.length) {
               if (z.pp.length && nrm(z.pp[0]) !== nrm(pack)) g[g.length - 1] = reTag(g[g.length - 1], pack);
               path = g;
@@ -2462,11 +2473,12 @@ function picNew(b, id, k, tops) {
   if (!top) return null;
   const L = pzScr(b, pack),
     e = L.find(x => x[0] === id) || (L.length === 1 ? L[0] : null);
-  if (!e || e[2].length !== 1) return null;
+  if (!e || (e[2].length !== 1 && e[2].length !== 2)) return null;
+  const two = e[2].length === 2; /* 5.5.20: จอย่อย (Pic @ BASE / 1. SCREEN A - B) */
   return {
     g: true,
     syn: true,
-    path: [top[0], e[2][0]],
+    path: [top[0], ...e[2]],
     h: null,
     k: k || e[1],
     hm: false,
@@ -2474,7 +2486,8 @@ function picNew(b, id, k, tops) {
     ph: top[1],
     pp: [top[0]],
     rounds: new Map(),
-    name: e[2][0],
+    name: e[2][e[2].length - 1],
+    mid: two ? e[2][0] : '',
     last: -1,
   };
 }
@@ -2607,13 +2620,10 @@ async function picPlan(root, W, res, rs, upto) {
           lay: 'B',
           base: z.ph,
           pp: z.pp,
-          chain: [
-            [q.rf.name, q.rf.h, 'rnd'],
-            [q.name, q.h, 'scr'],
-          ],
+          chain: [[q.rf.name, q.rf.h, 'rnd'], ...(z.mid ? [[z.mid, q.mh, 'scr']] : []), [q.name, q.h, 'scr']],
           fin: q.h,
           label: q.name,
-        };
+        }; /* 5.5.20: จอย่อย */
       } else {
         let oz = null,
           oq = null;
@@ -2669,12 +2679,20 @@ async function picPlan(root, W, res, rs, upto) {
                     pp[pp.length - 1] || root.name,
                   ),
             rf = rfOf(pp, R);
+          const mid = (inG && inG.mid) || (!inG && !inO && ((gz[0] && gz[0].mid) || e.s.mid)) || '';
+          let mh = null; /* 5.5.20: จอย่อย → สร้าง Pic @ BASE / 1. SCREEN A - B */
+          if (mid && rf) {
+            try {
+              mh = await rf.h.getDirectoryHandle(mid);
+            } catch (_) {}
+          }
           P = {
             lay: 'B',
             base: ph,
             pp,
             chain: [
               [rf ? rf.name : rndName(y, m, R.h, smp), rf ? rf.h : null, 'rnd'],
+              ...(mid ? [[fsafe(mid), mh, 'scr']] : []),
               [fsafe(name), null, 'scr'],
             ],
             fin: null,
@@ -9405,7 +9423,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.19 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.20 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
