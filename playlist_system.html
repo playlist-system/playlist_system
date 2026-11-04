@@ -503,6 +503,7 @@ body{background-image:radial-gradient(900px 620px at -8% -14%,var(--glowB),trans
 .hnav .tg.off{opacity:.55}
 /* การ์ดเครื่องมือ (หน้างานโฟลเดอร์และรูป) */
 .tcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px;margin-top:16px}
+.tgh{display:flex;align-items:baseline;gap:10px;margin:26px 0 0;font:600 17px/1.35 var(--f-hd);color:var(--tx)}.tgh small{font:400 14px var(--f-ui);color:var(--mu)}.tgh+.tcards,.tgh+.tlist{margin-top:10px} /* 5.5.22: กลุ่ม ทุกวัน / ต้นเดือน / ตรวจเป็นครั้งคราว */
 .tcard{display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:var(--r-l);background:var(--sf);border:1px solid var(--ln);box-shadow:var(--shadow);min-width:0}
 .tcard.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac),var(--shadow)}
 .tch{display:flex;align-items:center;gap:12px}.tch h3{font:700 19px/1.3 var(--f-hd);margin:0}
@@ -3595,7 +3596,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.21 (4 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.22 (4 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4051,8 +4052,8 @@ function vTools(){const n=TC.length,L=PICX,
  ${n?`<p class="hint"><b>${src}</b>${info}</p><ul class="tsl">${TC.slice(0,40).map(f=>`<li title="${esc(f.name)}">${esc(f.name)}</li>`).join('')}${n>40?`<li>… และอีก ${n-40} ไฟล์</li>`:''}</ul>`
   :`<p class="hint">ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist — กด “เปิดใบเช็คทั้งโฟลเดอร์” หรือลากไฟล์มาวาง</p>${drop('tc','ลากใบเช็ครูปมาวางที่นี่','ใบเช็คที่เติมแล้ว (.xlsm หรือ .xlsx) หรือคลิกเพื่อเลือกไฟล์ เลือกหลายไฟล์ได้','.xlsx,.xlsm','drop-tc',true)}`}
  <div class="tsb">${FSA?`<button class="btn secondary" data-a="tcdir">${IC.folder}เปิดใบเช็คทั้งโฟลเดอร์${CKDIR?` (ล่าสุด: ${esc(CKDIR.name)})`:''}</button>`:''}${n?`<button class="btn quiet" data-a="pick" data-k="tc">${IC.up}เพิ่มไฟล์</button>`:''}${qb}${n?'<button class="linkb" data-a="tcclear">ล้างรายการ</button>':''}</div></section>`;
- const tools=n?vTCards()+`<div id="tdetail">${TOOLV==='shot'?vShot():TOOLV==='cmp'?vCmp():TOOLV==='blank'?vBlank():TOOLV==='sdb'?vSdb():vPicCk()}</div>`:`<h3 class="sec-t" style="margin-top:22px">เครื่องมือในหน้านี้<small>ใช้ได้เมื่อเลือกใบเช็คแล้ว</small></h3><div class="tlist"><div><b>${IC.folder}สร้างโฟลเดอร์แยกรูป</b><p class="hint">สร้างโฟลเดอร์หนังที่ยังไม่มี ตามรายชื่อในใบเช็ค เลือกรอบและวันที่ได้</p></div><div><b>${IC.folder}ใส่วันที่ถ่าย</b><p class="hint">อ่านวันที่ถ่ายจากไฟล์รูป ใส่ลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ</p></div><div><b>${IC.folder}ตรวจโฟลเดอร์เทียบจอ</b><p class="hint">เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ Plan B TV BKK ว่าอยู่ถูกแพคไหม อ่านอย่างเดียว</p></div><div><b>${IC.fillI}ใบเปล่าเดือนใหม่</b><p class="hint">ขึ้นเดือนใหม่: ทำใบเปล่าจากใบเช็คเดือนล่าสุด ล้างรายชื่อหนังและแถบวันที่ จอของแต่ละคนตามใบล่าสุด</p></div><div><b>${IC.clip}ตรวจจอกับฐานข้อมูล</b><p class="hint">เทียบจอในใบเช็คกับไฟล์ฐานข้อมูลจอ ว่าใบของใครขาดจอ หรือมีจอที่เป็นของคนอื่น</p></div></div>`;
- return`${shead('งานโฟลเดอร์และรูป','สร้างโฟลเดอร์แยกรูป • ใส่วันที่ถ่าย • ตรวจโฟลเดอร์เทียบจอ • ใบเปล่าเดือนใหม่ • ตรวจจอกับฐานข้อมูล — ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
+ const tools=n?vTCards()+`<div id="tdetail">${TOOLV==='shot'?vShot():TOOLV==='cmp'?vCmp():TOOLV==='blank'?vBlank():TOOLV==='sdb'?vSdb():vPicCk()}</div>`:`<h3 class="sec-t" style="margin-top:22px">เครื่องมือในหน้านี้<small>ใช้ได้เมื่อเลือกใบเช็คแล้ว</small></h3><h4 class="tgh">ทุกวัน<small>หลังเติมใบเช็คแต่ละวัน</small></h4><div class="tlist"><div><b>${IC.folder}สร้างโฟลเดอร์แยกรูป</b><p class="hint">สร้างโฟลเดอร์หนังที่ยังไม่มี ตามรายชื่อในใบเช็ค เลือกรอบและวันที่ได้</p></div><div><b>${IC.folder}ใส่วันที่ถ่าย</b><p class="hint">อ่านวันที่ถ่ายจากไฟล์รูป ใส่ลงช่องหลังชื่อหนังที่ยังว่าง (พื้นดำ ตัวเลขขาว) ช่องที่มีเลขแล้วไม่เปลี่ยนเลข</p></div></div><h4 class="tgh">ต้นเดือน<small>ขึ้นเดือนใหม่</small></h4><div class="tlist"><div><b>${IC.fillI}ใบเปล่าเดือนใหม่</b><p class="hint">ขึ้นเดือนใหม่: ทำใบเปล่าจากใบเช็คเดือนล่าสุด ล้างรายชื่อหนังและแถบวันที่ จอของแต่ละคนตามใบล่าสุด</p></div><div><b>${IC.clip}ตรวจจอกับฐานข้อมูล</b><p class="hint">เทียบจอในใบเช็คกับไฟล์ฐานข้อมูลจอ ว่าใบของใครขาดจอ หรือมีจอที่เป็นของคนอื่น</p></div></div><h4 class="tgh">ตรวจเป็นครั้งคราว<small>อ่านอย่างเดียว</small></h4><div class="tlist"><div><b>${IC.folder}ตรวจโฟลเดอร์เทียบจอ</b><p class="hint">เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ Plan B TV BKK ว่าอยู่ถูกแพคไหม อ่านอย่างเดียว</p></div></div>`;
+ return`${shead('งานโฟลเดอร์และรูป','ทุกวัน: สร้างโฟลเดอร์แยกรูป • ใส่วันที่ถ่าย — ต้นเดือน: ใบเปล่าเดือนใหม่ • ตรวจจอกับฐานข้อมูล — ตรวจเป็นครั้งคราว: ตรวจโฟลเดอร์เทียบจอ • ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
  ${FSA?'':alertHTML('wr','ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์','<p>เครื่องมือในหน้านี้ต้องเปิดโฟลเดอร์ในเครื่อง ซึ่งเบราว์เซอร์นี้ทำไม่ได้</p>')}${box}${tools}
  <p class="hint tsafe">ไม่ลบ ไม่ย้ายรูปหรือโฟลเดอร์ที่มีอยู่ • บันทึกทับใบเช็คเมื่อไหร่ เก็บไฟล์เดิมไว้ในโฟลเดอร์สำรองเสมอ • กลับไปเติมใบเช็ค กด “เติมใบเช็ครูป” ด้านบน งานที่ค้างไว้ไม่หาย</p>`}
 /* ===== น้องโฟกัส (3.14): ผู้ช่วยตัวการ์ตูน (ออกแบบใหม่สำหรับระบบนี้) — โผล่มุมขวาล่างตอนรับไฟล์ ตอนเสร็จ และตอนมีเรื่องต้องดู แล้วหายเอง
@@ -4170,12 +4171,14 @@ function tcStat(){if(PICX&&PICX.sig!==ckSig())PICX=null;if(SHOT&&SHOT.sig!==ckSi
  return{pic,shot,cmp,blank,sdq}}
 function vTCards(){const{pic,shot,cmp,blank,sdq}=tcStat();
  const C3=[['pic','สร้างโฟลเดอร์แยกรูป','ทำโฟลเดอร์แบบ Gallary ตามรายชื่อหนังในใบเช็ค ดาวน์โหลดเป็น .zip หรือสร้างลงโฟลเดอร์ที่เลือก',IC.folder,pic],
-  ['shot','ใส่วันที่ถ่าย','อ่านวันที่ถ่ายจากไฟล์รูป ใส่ลงช่องหลังชื่อหนังที่ยังว่าง ช่องที่มีเลขแล้วไม่แตะ',IC.cam,shot],
+  ['shot','ใส่วันที่ถ่าย','อ่านวันที่ถ่ายจากไฟล์รูป ใส่ลงช่องหลังชื่อหนังที่ยังว่าง (พื้นดำ ตัวเลขขาว) ช่องที่มีเลขแล้วไม่เปลี่ยนเลข',IC.cam,shot],
   ['cmp','ตรวจโฟลเดอร์เทียบจอ','เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ Plan B TV BKK ว่าอยู่ถูกแพคไหม อ่านอย่างเดียว',IC.cmpi,cmp],
   ['blank','ใบเปล่าเดือนใหม่','ทำใบเปล่าจากใบเช็คชุดนี้ ล้างรายชื่อหนังและแถบวันที่ เก็บหัวตาราง จอ และสูตรไว้ ไฟล์เดิมไม่ถูกแก้',IC.fillI,blank],
   ['sdb','ตรวจจอกับฐานข้อมูล','เทียบจอในใบเช็คของแต่ละคนกับไฟล์ฐานข้อมูลจอ ว่าขาดจอไหน หรือมีจอที่เป็นของคนอื่น อ่านอย่างเดียว',IC.clip,sdq]];
- return`<div class="tcards" data-tour="tcards">${C3.map(([k,t,d,ic,[st,big,unit,s]])=>{const on=TOOLV===k;
-  return`<article class="tcard st-${st}${on?' sel':''}"><div class="tch"><span class="tci">${ic}</span><h3>${t}</h3></div><p class="tcd">${d}</p><div class="tcs"><span class="tcn"><b>${big}</b>${unit?`<span>${unit}</span>`:''}</span><small>${s}</small></div><button class="btn ${on?'primary':'secondary'}" data-a="toolv" data-k="${k}" aria-expanded="${on}" aria-controls="tdetail">${on?'เปิดอยู่ด้านล่าง':'เปิด'}</button></article>`}).join('')}</div>`}
+ const G=[['ทุกวัน','หลังเติมใบเช็คแต่ละวัน',['pic','shot']],['ต้นเดือน','ขึ้นเดือนใหม่',['blank','sdb']],['ตรวจเป็นครั้งคราว','อ่านอย่างเดียว',['cmp']]]; /* 5.5.22 */
+ const card=([k,t,d,ic,[st,big,unit,s]])=>{const on=TOOLV===k;
+  return`<article class="tcard st-${st}${on?' sel':''}"><div class="tch"><span class="tci">${ic}</span><h3>${t}</h3></div><p class="tcd">${d}</p><div class="tcs"><span class="tcn"><b>${big}</b>${unit?`<span>${unit}</span>`:''}</span><small>${s}</small></div><button class="btn ${on?'primary':'secondary'}" data-a="toolv" data-k="${k}" aria-expanded="${on}" aria-controls="tdetail">${on?'เปิดอยู่ด้านล่าง':'เปิด'}</button></article>`};
+ return`<div data-tour="tcards">${G.map(([h,sub,ks])=>`<h3 class="tgh">${h}<small>${sub}</small></h3><div class="tcards">${ks.map(k=>card(C3.find(x=>x[0]===k))).join('')}</div>`).join('')}</div>`}
 /* ===== 4.0 PHOTO CHECK STUDIO: แถบบน / เมนูซ้าย / หน้าหลัก ===== */
 IC.homeI='<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>';
 IC.editI='<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg>';
@@ -4192,7 +4195,7 @@ const sideFoot=()=>`<p class="sgrp">ตัวช่วย</p><button class="sh" 
 function vSide(){
  if(tab==='tools'){const S=tcStat(),sv=x=>x[1]!=='—'?(x[1]+' '+x[2]).trim():x[3],
    it=(k,a,t,sub,ic,on)=>`<button class="si${on?' on':''}" data-a="${a}" data-k="${k}" ${on?'aria-current="page"':''}>${ic}<span><b>${t}</b><small>${esc(sub)}</small></span></button>`;
-  return it('top','tooltop','ภาพรวม',TC.length?`ใบเช็ค ${TC.length} ไฟล์`:'เลือกใบเช็คที่ใช้',IC.grid,false)+it('pic','toolv','สร้างโฟลเดอร์แยกรูป',sv(S.pic),IC.folder,TOOLV==='pic')+it('shot','toolv','ใส่วันที่ถ่าย',sv(S.shot),IC.cam,TOOLV==='shot')+it('cmp','toolv','ตรวจโฟลเดอร์เทียบจอ',sv(S.cmp),IC.cmpi,TOOLV==='cmp')+it('blank','toolv','ใบเปล่าเดือนใหม่',sv(S.blank),IC.fillI,TOOLV==='blank')+it('sdb','toolv','ตรวจจอกับฐานข้อมูล',sv(S.sdq),IC.clip,TOOLV==='sdb')+sideFoot()}
+  return it('top','tooltop','ภาพรวม',TC.length?`ใบเช็ค ${TC.length} ไฟล์`:'เลือกใบเช็คที่ใช้',IC.grid,false)+'<p class="sgrp">ทุกวัน</p>'+it('pic','toolv','สร้างโฟลเดอร์แยกรูป',sv(S.pic),IC.folder,TOOLV==='pic')+it('shot','toolv','ใส่วันที่ถ่าย',sv(S.shot),IC.cam,TOOLV==='shot')+'<p class="sgrp">ต้นเดือน</p>'+it('blank','toolv','ใบเปล่าเดือนใหม่',sv(S.blank),IC.fillI,TOOLV==='blank')+it('sdb','toolv','ตรวจจอกับฐานข้อมูล',sv(S.sdq),IC.clip,TOOLV==='sdb')+'<p class="sgrp">ตรวจเป็นครั้งคราว</p>'+it('cmp','toolv','ตรวจโฟลเดอร์เทียบจอ',sv(S.cmp),IC.cmpi,TOOLV==='cmp')+sideFoot() /* 5.5.22 */}
  const sk=stepKey(),dn={dat:DB.length>0,pl:DB.some(s=>s.ed),fl:!!last,res:!!(last&&last.saved)};
  const it=(k,t,sub,ic)=>{const on=k==='home'?tab==='home':sk===k,dis=k==='res'&&!last;
   return`<button class="si${on?' on':''}" data-a="tab" data-k="${k}" ${on?'aria-current="page"':''} ${dis?'disabled':''}>${ic}<span><b>${t}</b><small>${sub}</small></span>${dn[k]&&!on?`<span class="dn"><span class="sr">ทำแล้ว</span>${IC.check}</span>`:''}</button>`};
