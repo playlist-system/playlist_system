@@ -127,6 +127,7 @@
  *   เวอร์ชัน 5.5.22: หน้างานโฟลเดอร์และรูป เรียงเป็นกลุ่ม ทุกวัน / ต้นเดือน / ตรวจเป็นครั้งคราว
  *   เวอร์ชัน 5.5.23: ปุ่มแจ้งปัญหา / เสนอแนะ (vFb / FB_URL → apps_script/feedback.gs)
  *   เวอร์ชัน 5.5.24: ย้ายจอกลางเดือนทั้งก้อน (arrangeWb opt.filled + add.hist, autoMv)
+ *   เวอร์ชัน 5.5.25: แถว # เหนือแถบแรก (BKJ / Metro) ในโฟลเดอร์แยกรูป • เลขจอ BKJ1_04 / METRO_05 (scrNum)
  * ======================================================================
  */
 
@@ -1996,6 +1997,12 @@ const PMON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OC
   isMonD = n => /^\d{1,2}\s*[A-Za-z]{3}[A-Za-z]*\s*\d{2,4}$/.test(String(n).trim()),
   pck = c => String(c).replace(/-/g, '').toUpperCase(),
   pnm = t => nrm(t).replace(/^PIC/, '').replace(/^\d+/, '');
+const scrNum = v => {
+  const q = String(v == null ? '' : v)
+    .replace(/\s+/g, '')
+    .match(/^(?:(?:BKJ|BANGKOKJAMS?)[12]?[_.\-]?|(?:LED)?METRO[_.\-]?)?0*(\d{1,3})$/i);
+  return q ? +q[1] : null;
+}; /* 5.5.25: 04 / BKJ1_04 / METRO_05 / LEDMETRO_002 / BANGKOKJAM2_01 → เลขจอ */
 function picKey(n) {
   const s = String(n).trim(),
     c = codeOf(s);
@@ -2021,8 +2028,8 @@ function picId(ws, sn, lc) {
       T.push(t);
       if (!code) code = codeOf(t);
     }
-    const n = g(L + '10') || g(L + '11');
-    if (/^\d{1,3}$/.test(n)) nums.push(+n);
+    const n = scrNum(g(L + '10') || g(L + '11'));
+    if (n != null) nums.push(n);
   }
   for (const r of [10, 11, 12]) {
     const t = g(lc + r);
@@ -2270,7 +2277,7 @@ const pzPack = b => {
 function pzScr(b, pack) {
   const X = b.px || { hd: '', cols: [] },
     t = pkTag(pack),
-    num = v => (/^\d{1,3}$/.test(String(v || '').trim()) ? +v : null),
+    num = v => scrNum(v),
     out = [];
   if (b.code) {
     for (const r of X.cols) {
@@ -2366,7 +2373,9 @@ function pzPlan(W, res, rs, upto, X) {
       const fs = RS.map(R => [
         ...new Set(
           (b.items || [])
-            .filter(([n, g]) => n && (R.t ? g >= cut : g < cut) && g < capT && g >= m0 && g < m1)
+            .filter(
+              ([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1,
+            )
             .map(([n]) => String(n).trim())
             .filter(Boolean),
         ),
@@ -2537,7 +2546,9 @@ async function picPlan(root, W, res, rs, upto) {
       const fs = RS.map(R => [
         ...new Set(
           (b.items || [])
-            .filter(([n, g]) => n && (R.t ? g >= cut : g < cut) && g < capT && g >= m0 && g < m1)
+            .filter(
+              ([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1,
+            )
             .map(([n]) => String(n).trim())
             .filter(Boolean),
         ),
@@ -2828,7 +2839,8 @@ async function chkFold(f) {
     fold = [];
   for (const x of R.sheets)
     for (const b of x.blocks)
-      if (b.items.length) fold.push({ sn: x.sn, lc: b.lc, items: b.items, ...picId(x.ws, x.sn, b.lc) });
+      if (b.items.some(i => !i[4]))
+        fold.push({ sn: x.sn, lc: b.lc, items: b.items, ...picId(x.ws, x.sn, b.lc) });
   return { fold, mx: R.mx };
 }
 async function chkRead(f) {
@@ -2886,10 +2898,7 @@ async function chkRead(f) {
           nc: n2col(c - 2),
           items: [],
           cs: sc,
-          cn: sc.map(k => {
-            const v = cl((ws[n2col(k) + '10'] || {}).v) || cl((ws[n2col(k) + '11'] || {}).v);
-            return /^\d{1,3}$/.test(v) ? +v : null;
-          }),
+          cn: sc.map(k => scrNum(cl((ws[n2col(k) + '10'] || {}).v) || cl((ws[n2col(k) + '11'] || {}).v))),
         };
       });
     if (!L.length)
@@ -2948,6 +2957,26 @@ async function chkRead(f) {
       const d = s2d(v);
       return Math.abs(d.getUTCFullYear() - hy) === 1 ? Date.UTC(hy, d.getUTCMonth(), d.getUTCDate()) : +d;
     };
+    {
+      let g0 = null;
+      for (let r = hr; r <= hr + 3 && g0 == null; r++)
+        g0 =
+          barD(
+            r,
+          ); /* 5.5.25: แถว # เหนือแถบวันที่แรก (เช่น #BANGKOK JAM_ETA / #Traffic MTP) = รายการประจำของจอ ใช้ทุกรอบ */
+      if (g0 != null)
+        for (let r = hr - 1; r >= 14; r--) {
+          let any = false;
+          for (const b of L) {
+            const nm = vOf(b.lc, r);
+            if (nm && /^#/.test(nm) && !FASTN.test(nm) && !/^#\s*module/i.test(nm)) {
+              b.items.push([nm, g0, r, 0, 1]);
+              any = true;
+            }
+          }
+          if (!any) break;
+        }
+    }
     let g = null;
     for (let r = hr; r <= end; r++) {
       const d = barD(r);
@@ -3207,7 +3236,7 @@ async function shotScan(root, files, prog) {
         return shS;
       };
       for (const b of x.blocks) {
-        if (!b.items.length) continue;
+        if (!b.items.some(i => !i[4])) continue;
         for (const cn of b.cs) {
           const L = n2col(cn);
           for (const it of b.items) {
@@ -6110,7 +6139,7 @@ async function autoMv(list) {
       X = null;
     }
     if (!X) continue;
-    if (!X.sheets.some(x => x.blocks.some(b => b.items.length))) blank.add(f.name);
+    if (!X.sheets.some(x => x.blocks.some(b => b.items.some(i => !i[4])))) blank.add(f.name);
     RD.set(f.name, X);
     fs.push({ name: f.name, buf: f.buf, nd: nd(f) });
   }
@@ -9702,7 +9731,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.24 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.25 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
