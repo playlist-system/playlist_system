@@ -119,6 +119,7 @@
  *   เวอร์ชัน 5.5.14: ตัวเลขวันที่บนแถบสีเข้มเป็นสีขาว • Bravo BKK = ShowDC / Sathorn Saint Louise = PrudentialSathorn • ชื่อจอแถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.15: Signature Max / Show DC ข้ามแถวที่จำนวนครั้งว่างและไม่มีหมายเหตุ (sigNoCnt) • JUNK: ออนเมื่อ… • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  *   เวอร์ชัน 5.5.16: “ออกวันที่ N” แบบเดียวกันทุกใบ • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
+ *   เวอร์ชัน 5.5.17: จอชื่อเฉพาะ (ไม่มีรหัส DGT) ในชีตแพคที่รหัสจออยู่แถว 10 • ส่วนเติมผลชุดทดสอบเดิมเหมือนเดิม
  * ======================================================================
  */
 
@@ -4985,11 +4986,11 @@ async function fillWb(f, on, metro, o) {
         continue;
       }
     }
-    if (media && brow === 11) {
-      const av = avCols(ws);
+    if (media && (brow === 11 || brow === 10)) {
+      const av = avCols(ws); /* 5.5.17: แถว 10 ด้วย */
       for (const cn of av) {
         if (blocks.some(x => x[0] === cn)) continue;
-        const raw = cl((ws[n2col(cn) + '11'] || {}).v);
+        const raw = cl((ws[n2col(cn) + brow] || {}).v);
         if (!raw || nrm(raw).length < 3) continue;
         const hit = nameHit([...on.keys()], raw),
           own = hit.filter(k => k.startsWith(media + '|')),
@@ -9268,7 +9269,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.16 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.17 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -9666,11 +9667,11 @@ function sheetNeeds(buf, name) {
     }
     if (blocks.length && !media && !avOf(ws).length) blocks.length = 0;
     const names = [];
-    if (media && brow === 11)
+    if (media && (brow === 11 || brow === 10))
       for (const cn of avOf(ws)) {
         if (blocks.some(x => x[0] === cn)) continue;
-        const raw = cl((ws[n2col(cn) + '11'] || {}).v);
-        if (raw && nrm(raw).length >= 3) names.push(raw);
+        const raw = cl((ws[n2col(cn) + brow] || {}).v);
+        /* 5.5.17 */ if (raw && nrm(raw).length >= 3) names.push(raw);
       }
     if (blocks.length && avRowOf(ws) === 10) {
       const av = avOf(ws);
