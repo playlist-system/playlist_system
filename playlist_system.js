@@ -125,6 +125,7 @@
  *   เวอร์ชัน 5.5.20: จอย่อยในโฟลเดอร์รูป (Pic @ BASE / 1. SCREEN A - B) — picScreens / picPlan / picNew / pzPlan
  *   เวอร์ชัน 5.5.21: ย้ายจอตามฐานข้อมูลให้เองก่อนเติม (autoMv / OP.amv) — ใบเปล่า
  *   เวอร์ชัน 5.5.22: หน้างานโฟลเดอร์และรูป เรียงเป็นกลุ่ม ทุกวัน / ต้นเดือน / ตรวจเป็นครั้งคราว
+ *   เวอร์ชัน 5.5.23: ปุ่มแจ้งปัญหา / เสนอแนะ (vFb / FB_URL → apps_script/feedback.gs)
  * ======================================================================
  */
 
@@ -9568,7 +9569,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.22 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.23 (4 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -10210,7 +10211,7 @@ const vNav = () => {
     t = tab === 'tools',
     wd = DB.length ? workDate() : null,
     ml = mqOn() ? 'ปิดผู้ช่วยน้องโฟกัส' : 'เปิดผู้ช่วยน้องโฟกัส';
-  return `<div class="tops" role="navigation" aria-label="ส่วนของระบบ" data-tour="sect"><button class="tp${t ? '' : ' on'}" data-a="fillsec" ${t ? '' : 'aria-current="page"'}>${IC.fillI}<span>เติมใบเช็ครูป</span></button><button class="tp${t ? ' on' : ''}" data-a="tools" ${t ? 'aria-current="page"' : ''}>${IC.folder}<span>งานโฟลเดอร์และรูป</span></button><button class="tp" data-a="help" aria-haspopup="dialog">${IC.book}<span>วิธีใช้</span></button></div><div class="hright" data-tour="hdr">${wd ? (G => `<span class="dchip">${IC.cal}<span><b>Playlist ${G ? rngTxt(G) : thd(wd)}</b><small>${G ? G.length + ' วัน • ' : ''}รอบ ${rndOf(+wd)}</small></span></span>`)(plDays()) : ''}<button class="rb fsb" data-a="find" aria-haspopup="dialog" aria-label="ค้นหา (Ctrl K)" title="ค้นหา (Ctrl K)">${IC.search}<span class="fst">ค้นหา</span><kbd>Ctrl K</kbd></button><button class="rb${mqOn() ? '' : ' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${ml}" title="${ml}">${IC.bot}</button><button class="rb" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button></div>`;
+  return `<div class="tops" role="navigation" aria-label="ส่วนของระบบ" data-tour="sect"><button class="tp${t ? '' : ' on'}" data-a="fillsec" ${t ? '' : 'aria-current="page"'}>${IC.fillI}<span>เติมใบเช็ครูป</span></button><button class="tp${t ? ' on' : ''}" data-a="tools" ${t ? 'aria-current="page"' : ''}>${IC.folder}<span>งานโฟลเดอร์และรูป</span></button><button class="tp" data-a="help" aria-haspopup="dialog">${IC.book}<span>วิธีใช้</span></button></div><div class="hright" data-tour="hdr">${wd ? (G => `<span class="dchip">${IC.cal}<span><b>Playlist ${G ? rngTxt(G) : thd(wd)}</b><small>${G ? G.length + ' วัน • ' : ''}รอบ ${rndOf(+wd)}</small></span></span>`)(plDays()) : ''}<button class="rb fsb" data-a="fb" aria-haspopup="dialog" title="แจ้งปัญหา / เสนอแนะ">${IC.chat}<span class="fst">แจ้งปัญหา</span></button><button class="rb fsb" data-a="find" aria-haspopup="dialog" aria-label="ค้นหา (Ctrl K)" title="ค้นหา (Ctrl K)">${IC.search}<span class="fst">ค้นหา</span><kbd>Ctrl K</kbd></button><button class="rb${mqOn() ? '' : ' off'}" data-a="mqtoggle" aria-pressed="${mqOn()}" aria-label="${ml}" title="${ml}">${IC.bot}</button><button class="rb" data-a="theme" aria-label="${tl}" title="${tl}">${THEME === 'dark' ? IC.sun : IC.moon}</button></div>`;
 };
 const shead = (t, p, extra = '') =>
   `<div class="shead"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ''}</div>${extra}</div>`;
@@ -12928,7 +12929,7 @@ function view() {
     }
   }
   busyPaint();
-  const ok = WELCOME ? 'w' : PASTE ? 'v' : HOW ? 'h' : HELP ? 'p' : FIND ? 'k' : '',
+  const ok = WELCOME ? 'w' : PASTE ? 'v' : HOW ? 'h' : HELP ? 'p' : FBK ? 'f' : FIND ? 'k' : '',
     o = $('#ovl'),
     was = OVK;
   if (OVK !== ok) {
@@ -12942,9 +12943,12 @@ function view() {
             ? vHow()
             : ok === 'p'
               ? vHelp()
-              : ok === 'k'
-                ? vFind()
-                : '';
+              : ok === 'f'
+                ? vFb()
+                : ok === 'k'
+                  ? vFind()
+                  : '';
+    if (ok === 'f') fbThumbs();
     if (ok) {
       if (!was) RETF = RETF || fk;
       const f = o.querySelector('[data-focus]') || o.querySelector('button');
@@ -12999,6 +13003,163 @@ function view() {
   }
 }
 /* 5.1: ค้นหา (Ctrl K) — หน้า / เครื่องมือ / ใบเช็คที่ใส่ / จอใน Playlist (รหัสหรือชื่อจอ) */
+/* ===== 5.5.23: แจ้งปัญหา / เสนอแนะ — ส่งเข้า Google Drive ของบริษัท (Google Apps Script ดู apps_script/feedback.gs)
+   ข้อความยาวไม่จำกัด แนบรูปได้หลายรูป (ลากมาวาง / Ctrl+V / เลือกไฟล์ — รูปใหญ่ย่อก่อนส่ง) แนบไฟล์ใบเช็คได้ • FB_URL = ที่อยู่ Web app ที่ deploy แล้ว (ยังไม่ตั้ง = ส่งไม่ได้ คัดลอกข้อความแทน) ===== */
+const FB_URL = '';
+IC.chat =
+  '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></svg>';
+let FBK = false,
+  FBI = [],
+  FBS = '',
+  FBB = false;
+const fbUrl = () => {
+  try {
+    return store.get('ps_fburl') || FB_URL;
+  } catch (_) {
+    return FB_URL;
+  }
+};
+const FBT = [
+  'ไม่เติม / เติมไม่ครบ',
+  'เติมผิด',
+  'ชื่อหนังแปลก ๆ',
+  'ไฟล์เปิดไม่ได้',
+  'อยากให้เพิ่ม / ปรับ',
+  'อื่น ๆ',
+];
+const fbFiles = () => {
+  const m = new Map();
+  for (const f of C) m.set(f.name, () => f.buf);
+  if (last) for (const r of last.res) if (r.blob) m.set(r.name, () => r.blob);
+  for (const f of TC) if (!m.has(f.name)) m.set(f.name, () => f.buf);
+  return m;
+};
+function vFb() {
+  const nm = store.get('ps_fbname') || '',
+    fs = [...fbFiles().keys()],
+    u = fbUrl();
+  return `<div class="ov"><div class="dlg fbd" role="dialog" aria-modal="true" aria-labelledby="fbt"><div class="dlgh"><h2 id="fbt">แจ้งปัญหา / เสนอแนะ</h2><button class="ib" data-a="fb" aria-label="ปิด">${IC.x}</button></div>
+ <p class="hint">เขียนได้ยาวเท่าที่ต้องการ แนบรูปได้หลายรูป ส่งตรงถึงคนดูแลระบบ — เก็บใน Google Drive ของบริษัทเท่านั้น</p>
+ ${u ? '' : alertHTML('wr', 'ยังไม่ได้ตั้งที่รับฟีดแบ็ก', '<p>คนดูแลระบบยังไม่ได้ตั้ง Google Apps Script ตอนนี้ส่งจากหน้านี้ไม่ได้ — กด “คัดลอกข้อความ” แล้วส่งให้คนดูแลระบบทาง LINE แทนได้</p>')}
+ <div class="fbg">
+ <div class="fbr"><label><span>ชื่อผู้แจ้ง</span><input type="text" id="fb_nm" value="${esc(nm)}" autocomplete="name" data-focus><small class="hint">ระบบจำไว้ในเครื่องนี้</small></label>
+ <label><span>เกี่ยวกับใบไหน <small class="hint">(ไม่ใส่ก็ได้)</small></span><input type="text" id="fb_wh" placeholder="เช่น คุณตูน.xlsm · ชีต PBTV 80 BLUE · จอ DGT127" list="fb_wl"><datalist id="fb_wl">${fs.map(n => `<option value="${esc(n)}">`).join('')}</datalist></label></div>
+ <fieldset><legend>เรื่อง</legend><div class="fbtp">${FBT.map((t, i) => `<label><input type="radio" name="fb_tp" value="${esc(t)}" ${i === 0 ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div></fieldset>
+ <label><span style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">รายละเอียด<small class="hint" id="fb_cn">ยาวได้ไม่จำกัด</small></span><textarea id="fb_tx" placeholder="เกิดอะไรขึ้น ตอนไหน จอไหน — เขียนยาวได้ไม่จำกัด"></textarea></label>
+ <div style="display:grid;gap:10px"><span style="font-weight:600">แนบรูป</span>
+  <div class="fbdrop" id="fb_drop" role="button" tabindex="0" data-a="fbpick" aria-label="เลือกรูปที่จะแนบ"><span class="dic" aria-hidden="true" style="width:48px;height:48px">${IC.cam}</span><span><b>ลากรูปมาวาง หรือกด Ctrl+V วางภาพหน้าจอได้เลย</b><br><small class="hint">หรือคลิกเพื่อเลือกรูป • แนบได้หลายรูป รูปใหญ่ระบบย่อให้ก่อนส่ง</small></span></div>
+  <input type="file" id="fb_file" accept="image/*" multiple hidden><div class="fbth" id="fb_th"></div></div>
+ <label class="fbck"><input type="checkbox" id="fb_sys" checked><span>แนบข้อมูลระบบ<small class="hint" style="display:block">เวอร์ชัน • เบราว์เซอร์ • รายงานการเติมล่าสุด — ช่วยให้รู้ว่าเกิดตอนไหน</small></span></label>
+ ${fs.length ? `<label class="fbck"><input type="checkbox" id="fb_ckon"><span>แนบไฟล์ใบเช็ค<small class="hint" style="display:block">แก้ได้เร็วที่สุด เพราะได้ไฟล์จริงไปดู</small></span></label><select id="fb_ck" aria-label="ไฟล์ใบเช็คที่จะแนบ">${fs.map(n => `<option>${esc(n)}</option>`).join('')}</select>` : ''}
+ <p class="fbst" id="fb_st" role="status" aria-live="polite">${FBS}</p>
+ </div>
+ <div class="dlgf">${u ? `<button class="btn primary" data-a="fbsend" ${FBB ? 'disabled' : ''}>${IC.chat}ส่งให้คนดูแลระบบ</button>` : ''}<button class="btn ${u ? 'ghost' : 'secondary'}" data-a="fbcopy">คัดลอกข้อความ</button><button class="btn ghost" data-a="fb">ปิด</button></div></div></div>`;
+}
+function fbThumbs() {
+  const t = $('#fb_th');
+  if (!t) return;
+  t.innerHTML = FBI.map(
+    (x, i) =>
+      `<figure><img src="${x.url}" alt="${esc(x.name)}"><figcaption>${esc(x.name)} · ${Math.max(1, Math.round(x.size / 1024))} KB</figcaption><button class="ib del" data-a="fbdel" data-k="${i}" aria-label="เอา ${esc(x.name)} ออก">${IC.x}</button></figure>`,
+  ).join('');
+}
+const fbSay = t => {
+  FBS = t;
+  const e = $('#fb_st');
+  if (e) e.innerHTML = t;
+};
+async function fbAdd(files) {
+  for (const f of files) {
+    if (!f || !/^image\//.test(f.type || '')) continue;
+    let url = await new Promise(r => {
+      const rd = new FileReader();
+      rd.onload = () => r(rd.result);
+      rd.onerror = () => r('');
+      rd.readAsDataURL(f);
+    });
+    if (!url) continue;
+    let type = f.type,
+      size = f.size;
+    if (size > 1.5e6) {
+      try {
+        const im = await new Promise((ok, no) => {
+            const i = new Image();
+            i.onload = () => ok(i);
+            i.onerror = no;
+            i.src = url;
+          }),
+          k = Math.min(1, 1920 / Math.max(im.width, im.height)),
+          cv = document.createElement('canvas');
+        cv.width = Math.round(im.width * k);
+        cv.height = Math.round(im.height * k);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        const u2 = cv.toDataURL('image/jpeg', 0.85);
+        url = u2;
+        type = 'image/jpeg';
+        size = Math.round(u2.length * 0.75);
+      } catch (_) {}
+    }
+    const nm = (f.name && f.name !== 'image.png' ? f.name : 'ภาพหน้าจอ ' + (FBI.length + 1) + '.png').replace(
+      /\.(png|gif|webp|bmp)$/i,
+      type === 'image/jpeg' ? '.jpg' : '.$1',
+    );
+    FBI.push({ name: nm, type, url, size });
+  }
+  fbThumbs();
+}
+const fbText = () => {
+  const g = id => {
+      const e = $('#' + id);
+      return e ? e.value : '';
+    },
+    tp = (document.querySelector('input[name=fb_tp]:checked') || {}).value || '';
+  return { name: g('fb_nm').trim(), topic: tp, where: g('fb_wh').trim(), text: g('fb_tx') };
+};
+const b64of = async b => {
+  const u =
+    b instanceof Uint8Array
+      ? b
+      : new Uint8Array(b instanceof ArrayBuffer ? b : await new Blob([b]).arrayBuffer());
+  let s = '';
+  for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768));
+  return btoa(s);
+};
+document.addEventListener('input', e => {
+  if (e.target && e.target.id === 'fb_tx') {
+    const c = $('#fb_cn');
+    if (c) c.textContent = 'ยาวได้ไม่จำกัด · ' + e.target.value.length.toLocaleString() + ' ตัวอักษร';
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'fb_file') {
+    fbAdd([...e.target.files]);
+    e.target.value = '';
+  }
+});
+document.addEventListener('paste', e => {
+  if (!FBK) return;
+  const fs = [...((e.clipboardData && e.clipboardData.items) || [])]
+    .filter(x => x.kind === 'file' && /^image\//.test(x.type))
+    .map(x => x.getAsFile())
+    .filter(Boolean);
+  if (fs.length) {
+    e.preventDefault();
+    fbAdd(fs);
+  }
+});
+for (const ev of ['dragover', 'dragenter', 'dragleave', 'drop'])
+  document.addEventListener(
+    ev,
+    e => {
+      if (!FBK) return;
+      const d = $('#fb_drop');
+      e.preventDefault();
+      e.stopPropagation();
+      if (d) d.classList.toggle('over', ev === 'dragover' || ev === 'dragenter');
+      if (ev === 'drop') fbAdd([...((e.dataTransfer && e.dataTransfer.files) || [])]);
+    },
+    true,
+  ); /* หน้าต่างแจ้งปัญหาเปิดอยู่ → วางรูปที่ไหนก็ได้ = แนบรูป */
 let FIND = false;
 const fnorm = x =>
   String(x == null ? '' : x)
@@ -13082,7 +13243,7 @@ const closeOv = () => {
     store.set('ps_welcomed', '1');
     WELCOME = false;
   }
-  HELP = HOW = PASTE = FIND = false;
+  HELP = HOW = PASTE = FIND = FBK = false;
 };
 document.addEventListener('keydown', e => {
   if (
@@ -13109,7 +13270,7 @@ document.addEventListener('keydown', e => {
     if (TOUR) {
       TOUR = null;
       view();
-    } else if (WELCOME || HELP || HOW || PASTE || FIND) {
+    } else if (WELCOME || HELP || HOW || PASTE || FIND || FBK) {
       closeOv();
       view();
     }
@@ -13702,6 +13863,101 @@ async function fillDays(G, list) {
   if (fi >= 0) RO.add(fi);
 }
 const ACT = {
+  fb: () => {
+    FBK = !FBK;
+    HELP = HOW = FIND = false;
+    if (FBK) FBS = '';
+  },
+  fbpick: () => {
+    const f = $('#fb_file');
+    if (f) f.click();
+  },
+  fbdel: k => {
+    FBI.splice(+k, 1);
+    fbThumbs();
+  } /* 5.5.23 */,
+  fbcopy: async () => {
+    const p = fbText(),
+      t = [
+        'แจ้งปัญหา / เสนอแนะ — PHOTO CHECK STUDIO',
+        'ผู้แจ้ง: ' + p.name,
+        'เรื่อง: ' + p.topic,
+        'เกี่ยวกับ: ' + p.where,
+        VERTXT,
+        '',
+        p.text,
+        FBI.length ? `\n(มีรูป ${FBI.length} รูป — ส่งรูปแยก)` : '',
+      ].join('\n');
+    try {
+      await navigator.clipboard.writeText(t);
+      fbSay('คัดลอกข้อความแล้ว — วางใน LINE หรืออีเมลถึงคนดูแลระบบได้เลย');
+    } catch (_) {
+      fbSay('คัดลอกไม่ได้ — เลือกข้อความในช่องรายละเอียดแล้วกด Ctrl+C');
+    }
+  },
+  fbsend: async () => {
+    const u = fbUrl();
+    if (!u || FBB) return;
+    const p = fbText();
+    if (!p.text.trim() && !FBI.length) {
+      fbSay('<b>ยังไม่ได้เขียนรายละเอียด</b> — เขียนสั้น ๆ ว่าเกิดอะไรขึ้น หรือแนบรูป');
+      return;
+    }
+    try {
+      store.set('ps_fbname', p.name);
+    } catch (_) {}
+    FBB = true;
+    const bt = document.querySelector('[data-a="fbsend"]');
+    if (bt) bt.disabled = true;
+    fbSay('กำลังส่ง …');
+    try {
+      const body = {
+        ...p,
+        ver: VERTXT,
+        at: new Date().toISOString(),
+        images: FBI.map(x => ({ name: x.name, type: x.type, data: x.url.split(',')[1] || '' })),
+      };
+      if (($('#fb_sys') || {}).checked)
+        body.sys = {
+          ver: VERTXT,
+          ua: navigator.userAgent,
+          lang: navigator.language,
+          screen: innerWidth + 'x' + innerHeight,
+          files: C.map(f => f.name),
+          report: last && last.txt ? String(last.txt).slice(0, 30000) : '',
+        };
+      if (($('#fb_ckon') || {}).checked) {
+        const n = ($('#fb_ck') || {}).value,
+          g = n && fbFiles().get(n);
+        if (g) body.file = { name: n, data: await b64of(g()) };
+      }
+      const r = await fetch(u, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(body),
+          redirect: 'follow',
+        }),
+        j = await r.json().catch(() => null);
+      if (!j || !j.ok) throw new Error((j && j.err) || 'HTTP ' + r.status);
+      FBI = [];
+      fbThumbs();
+      {
+        const t = $('#fb_tx');
+        if (t) t.value = '';
+      }
+      fbSay(`<b>ส่งแล้ว · เลขที่ ${esc(j.no || '')}</b> — ขอบคุณครับ คนดูแลระบบจะเห็นในตารางรวมคำแจ้ง`);
+      MQN = 'done';
+      note = 'ส่งฟีดแบ็กแล้ว' + (j.no ? ' เลขที่ ' + j.no : '');
+    } catch (x) {
+      fbSay(
+        `<b>ส่งไม่ได้</b> (${esc(x.message || x)}) — ตรวจว่าต่ออินเทอร์เน็ตอยู่ แล้วกดส่งอีกครั้ง หรือกด “คัดลอกข้อความ” ส่งทาง LINE แทน`,
+      );
+    } finally {
+      FBB = false;
+      const b2 = document.querySelector('[data-a="fbsend"]');
+      if (b2) b2.disabled = false;
+    }
+  },
   help: () => {
     HELP = !HELP;
     HOW = false;
