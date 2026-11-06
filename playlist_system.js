@@ -128,6 +128,7 @@
  *   เวอร์ชัน 5.5.23: ปุ่มแจ้งปัญหา / เสนอแนะ (vFb / FB_URL → apps_script/feedback.gs)
  *   เวอร์ชัน 5.5.24: ย้ายจอกลางเดือนทั้งก้อน (arrangeWb opt.filled + add.hist, autoMv)
  *   เวอร์ชัน 5.5.25: แถว # เหนือแถบแรก (BKJ / Metro) ในโฟลเดอร์แยกรูป • เลขจอ BKJ1_04 / METRO_05 (scrNum)
+ *   เวอร์ชัน 5.5.26: หลายวันจากไฟล์ที่ไม่ได้ส่งทุกวัน (pfXL / pfVL)
  * ======================================================================
  */
 
@@ -518,6 +519,9 @@ const pfG = e => e.d > 0 && e.p.some(s => KINDS.some(K => K.g && K.has(s))),
     e.p.some(s =>
       KINDS.some(K => K.x && !K.v && !K.latest && K.has(s)),
     ); /* 5.3.2: Playlist เพิ่มเติม (CCTV / MRT) */
+/* 5.5.26: ใส่แต่ Playlist ที่ไม่ได้ส่งทุกวัน (Digital MRT / Gateway X / The 20 / LA PlanB หรือห้างที่ไม่ได้ส่งทุกวัน) หลายวัน → วันที่ของไฟล์พวกนี้เป็นวันที่เติม (เดิมไม่นับ เลยเติมแค่วันล่าสุด) */
+const pfXL = e => e.d > 0 && e.p.some(s => KINDS.some(K => K.x && !K.v && !K.n && K.has(s))),
+  pfVL = e => e.d > 0 && e.p.some(s => KINDS.some(K => K.v && K.has(s)));
 const pfPut = (db, p) => {
   if (p.every(x => x.rep === 'screen')) {
     const ks = new Set(p.map(x => x.m + '|' + x.c));
@@ -534,12 +538,16 @@ function plDays() {
   let G = null;
   const vd = !PFS.some(pfG),
     xm = vd && !PFS.some(pfV),
-    pfFull = !vd ? pfG : xm ? pfX : pfV,
+    xl = xm && !PFS.some(pfX),
+    vl = xl && !PFS.some(pfXL),
+    pfFull = !vd ? pfG : !xm ? pfV : !xl ? pfX : !vl ? pfXL : pfVL,
     ds = [...new Set(PFS.filter(pfFull).map(e => e.d))].sort((a, b) => a - b);
   if (ds.length > 1) {
     G = ds.map(d => ({ d, E: [] }));
-    G.v = vd && !xm;
-    G.x = xm;
+    G.v = (vd && !xm) || vl;
+    G.x = xm && !vl;
+    G.xl = xl && !vl;
+    G.vl = vl;
     for (const e of PFS) {
       let i = pfFull(e) ? ds.indexOf(e.d) : e.d > 0 ? ds.findIndex(d => d >= e.d) : -1;
       if (i < 0) i = ds.length - 1;
@@ -9731,7 +9739,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.25 (4 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.26 (6 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -10425,10 +10433,12 @@ async function busyStep(t, i, n, f) {
 function vDays(G) {
   if (!G) return '';
   const core = G.x
-      ? KINDS.filter(K => K.x && !K.v && !K.latest && PFS.some(e => e.p.some(K.has)))
-      : G.v
-        ? KINDS.filter(K => K.day)
-        : KINDS.filter(K => !K.x && !K.latest),
+      ? KINDS.filter(K => K.x && !K.v && (G.xl || !K.latest) && PFS.some(e => e.p.some(K.has)))
+      : G.vl
+        ? KINDS.filter(K => K.v && PFS.some(e => e.p.some(K.has)))
+        : G.v
+          ? KINDS.filter(K => K.day)
+          : KINDS.filter(K => !K.x && !K.latest),
     gaps = [];
   for (let i = 1; i < G.length; i++) for (let t = G[i - 1].d + 864e5; t < G[i].d; t += 864e5) gaps.push(t);
   const row = (g, i) => {
