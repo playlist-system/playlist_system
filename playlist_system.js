@@ -133,6 +133,7 @@
  *   เวอร์ชัน 5.5.28: วันที่ Playlist ผิด (sdOf) • ย้าย BKJ / Metro กลางเดือน (xHist) • สร้างใบเปล่าคนใหม่ (sdbNewFile) • หัวตารางแบบเก่า (oldHdrFix)
  *   เวอร์ชัน 5.5.29: สร้างโฟลเดอร์แยกรูปจากใบเปล่า (chkRead blank) • ชื่อจอใบเปล่าแถวเลื่อน (pzScr)
  *   เวอร์ชัน 5.5.30: โฟลเดอร์แยกรูปแพค Digital MRT / The 20 / Air Traveller / Gateway X / Rama 9 (FXP, fxScr, fxIdx)
+ *   เวอร์ชัน 5.5.31: แถวหมายเหตุในช่องชื่อหนังของ Playlist ไม่ใส่ บอกใน ต้องแก้ (RMK)
  * ======================================================================
  */
 
@@ -639,6 +640,11 @@ const adDate = a => {
       ok = nd && nd <= +ed;
     return { sd: ok ? new Date(nd) : sd, ed, bd: { s: sd, e: ed, nd: ok ? nd : 0 } };
   };
+/* 5.5.31: ช่องชื่อหนังใน Playlist เป็นหมายเหตุ (เช่น “ให้ขึ้นสื่อทั้งหมดวันที่ 4 Nov’26 ทบสปอต”) — ภาษาไทย มีเว้นวรรค ไม่มี _ (ชื่อหนังจริงมี _ ทุกเรื่อง) → ไม่ใส่ บอกใน “ต้องแก้” */
+const RMK = v => {
+  const t = String(v == null ? '' : v).trim();
+  return !!t && !t.includes('_') && !/^#/.test(t) && /[\u0E00-\u0E7F]/.test(t) && /\s/.test(t);
+};
 function chkRows(scr, o, kind) {
   let L = scr.rows.filter(r => o.off || !r.off);
   if (o.newOnly) L = L.filter(isNew);
@@ -647,6 +653,7 @@ function chkRows(scr, o, kind) {
     r =>
       r.ad &&
       !JUNK.test(r.ad.trim()) &&
+      !RMK(r.ad) &&
       r.ad !== scr.c &&
       !FASTN.test(r.ad) &&
       !skipRow(scr, r) &&
@@ -1010,6 +1017,14 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   const B = jobs.map(j => {
     const kind = j[4],
       all = kind === 'keep' ? [] : chkRows(j[3], { ...o, off: true }, kind),
+      rmk =
+        kind === 'keep'
+          ? []
+          : [
+              ...new Set(
+                ((j[3] || {}).rows || []).filter(r => !r.off && RMK(r.ad)).map(r => String(r.ad).trim()),
+              ),
+            ],
       lc = j[1],
       nc = pv(lc),
       pc = nx(lc);
@@ -1020,6 +1035,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       kind,
       n: j[5] || 1,
       all,
+      rmk,
       scr: j[3],
       rows: o.off ? all : all.filter(r => !r.off),
       bl: modeF(sh, lc, hr + 1, hr + 400, true, ST),
@@ -1911,6 +1927,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     hist,
     dates: dates.length,
     later: B.reduce((n, b) => n + b.later.length, 0),
+    rmkL: B.filter(b => b.rmk && b.rmk.length).map(b => [b.scr.c, b.rmk]),
     badDL: B.map(b => [
       b.scr.c,
       [
@@ -3192,7 +3209,13 @@ async function chkFold(f) {
   for (const x of R.sheets)
     for (const b of x.blocks)
       if (b.items.some(i => !i[4]) || x.blank)
-        fold.push({ sn: x.sn, lc: b.lc, items: b.items, blank: x.blank ? 1 : 0, ...picId(x.ws, x.sn, b.lc) });
+        fold.push({
+          sn: x.sn,
+          lc: b.lc,
+          items: b.items.filter(i => !RMK(i[0])),
+          /* 5.5.31 */ blank: x.blank ? 1 : 0,
+          ...picId(x.ws, x.sn, b.lc),
+        });
   return { fold, mx: R.mx };
 }
 async function chkRead(f, o) {
@@ -5926,6 +5949,15 @@ async function fillWb(f, on, metro, o) {
             ),
           0,
         ]);
+        for (const [c, l] of L.rmkL || [])
+          rep.push([
+            sn,
+            c,
+            'ตรวจ: ช่องชื่อหนังใน Playlist เป็นข้อความหมายเหตุ ระบบไม่ใส่ (ถามทีม Playlist ว่าหนังชื่ออะไร แล้วใส่เอง) → “' +
+              l.join('”, “') +
+              '”',
+            0,
+          ]); /* 5.5.31 */
         for (const [c, l] of L.badDL || [])
           rep.push([
             sn,
@@ -10657,7 +10689,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.30 (9 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.31 (9 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
