@@ -132,6 +132,7 @@
  *   เวอร์ชัน 5.5.27: ชื่อโฟลเดอร์ BKJ ตามกลุ่มในใบเช็ค (BANGKOK JAM2_R → (R)) (bkjAB / abTag)
  *   เวอร์ชัน 5.5.28: วันที่ Playlist ผิด (sdOf) • ย้าย BKJ / Metro กลางเดือน (xHist) • สร้างใบเปล่าคนใหม่ (sdbNewFile) • หัวตารางแบบเก่า (oldHdrFix)
  *   เวอร์ชัน 5.5.29: สร้างโฟลเดอร์แยกรูปจากใบเปล่า (chkRead blank) • ชื่อจอใบเปล่าแถวเลื่อน (pzScr)
+ *   เวอร์ชัน 5.5.30: โฟลเดอร์แยกรูปแพค Digital MRT / The 20 / Air Traveller / Gateway X / Rama 9 (FXP, fxScr, fxIdx)
  * ======================================================================
  */
 
@@ -2117,9 +2118,153 @@ function picId(ws, sn, lc) {
         const L = n2col(c);
         return [10, 11, 12, 13].map(r => g(L + r));
       }),
+      l11: g(lc + '11'),
+      r11: cs.map(c => g(n2col(c) + '11')),
+      r14: cs.map(c => g(n2col(c) + '14')),
     },
   };
-} /* 5.5: หัวบล็อก + แถว 10–13 ของแต่ละคอลัมน์ (รหัส / Format / สถานที่ / เลขจอ) */
+} /* 5.5.30: แถว 11 / 14 = ชื่อจอของ MRT / The 20 / Air Traveller / Gateway X / Rama9 */ /* 5.5: หัวบล็อก + แถว 10–13 ของแต่ละคอลัมน์ (รหัส / Format / สถานที่ / เลขจอ) */
+/* 5.5.30: แพคที่โครงใน Gallary ไม่เหมือน Plan B TV
+   Digital MRT          → รอบ → “01_บางซื่อ(5)” (เลขสถานี_ชื่อ(จำนวนจอ)) → “001 บางซื่อ DBH-CC-01” (ชื่อจอแถว 14) → หนัง
+   The 20               → รอบ → “1_เลียบทางด่วนพระราม 4 (มุ่งหน้าบางนา) มุม A” (แถว 14 + ป้ายแถว 11) → #Module / หนัง
+   Air Traveller Series → รอบ → “Air Traveller Series (To Airport In) A” (แถว 14) → #Module / หนัง
+   Digital Gateway X    → รอบ → “01_Sirat Expressway@Srinagarindra …” (ชื่อเดิมในโฟลเดอร์ ตามเลขหน้า) → หนัง
+   Rama 9 Connected     → รอบ → #Module / หนัง (ไม่มีชั้นจอ) */
+const FXP = {
+    mrt: 'Pic @ Digital MRT',
+    the20: 'Pic @ The 20',
+    air: 'Pic @ Air Traveller Series',
+    gwx: 'Pic @ Digital Gateway X',
+    r9: 'Pic @ Rama 9 Connected',
+  },
+  FXMOD = ['#Module ขาว', '#Module ดำ', '#Module สี'],
+  MRTST =
+    '01 บางซื่อ 5|02 กำแพงเพชร 8|03 สวนจตุจักร 9|04 พหลโยธิน 10|05 ลาดพร้าว 9|06 รัชดาภิเษก 6|07 สุทธิสาร 4|08 ห้วยขวาง 6|09 ศูนย์วัฒนธรรม 7|10 พระราม9 7|11 เพชรบุรี 10|12 สุขุมวิท 10|13 ศูนย์ประชุมแห่งชาติสิริกิติ์ 5|14 คลองเตย 2|15 ลุมพินี 4|16 สีลม 3|17 สามย่าน 5|18 หัวลำโพง 4|19 ท่าพระ 2|20 จรัญ13 2|21 ไฟฉาย 2|22 บางขุนนนท์ 2|23 บางยี่ขัน 2|24 สิรินธร 2|25 บางพลัด 2|26 บางอ้อ 2|27 บางโพ 2|28 เตาปูน 1|29 วัดมังกร 1|30 สามยอด 1|31 สนามไชย 1|32 อิสรภาพ 1|33 บางไผ่ 2|34 บางหว้า 2|35 เพชรเกษม48 2|36 ภาษีเจริญ 2|37 บางแค 2|38 หลักสอง 2'
+      .split('|')
+      .map(x => x.split(' ')),
+  mrtN = v =>
+    String(v || '')
+      .replace(/^\d+_/, '')
+      .replace(/\(\d+\)\s*$/, '')
+      .replace(/[\sฯ.()]/g, ''),
+  fxKind = b => {
+    const U = nrm(b.sn);
+    if (/^THE20/.test(U)) return 'the20';
+    if (/AIRTRAVEL/.test(U)) return 'air';
+    if (/GATEWAYX/.test(U)) return 'gwx';
+    if (/^RAMA9/.test(U)) return 'r9';
+    const r = (b.px && b.px.r14) || [];
+    return r.length && r.every(v => /^\d{3}(?:-\d+)?\s+\S/.test(v || '')) ? 'mrt' : '';
+  },
+  fxCtx = res => {
+    const c = new Map();
+    for (const r of res || [])
+      for (const b of r.fold || [])
+        if (fxKind(b) === 'mrt')
+          for (const v of b.px.r14) {
+            const st = mrtN(String(v).trim().split(/\s+/)[1]);
+            if (!c.has(st)) c.set(st, new Set());
+            c.get(st).add(String(v).trim());
+          }
+    return c;
+  },
+  fxScr = (b, k, ctx) => {
+    const X = b.px || {},
+      T = v => pzT(v),
+      r14 = X.r14 || [],
+      r11 = X.r11 || [];
+    if (k === 'the20')
+      return [
+        [
+          T(r14[0]) + ' ' + T(X.l11),
+          { nm: 'FX|the20|' + nrm(r14[0]) + nrm(X.l11) },
+          [T(r14[0]) + (T(X.l11) ? ' ' + T(X.l11) : '')],
+          FXMOD,
+        ],
+      ];
+    if (k === 'air') return [[T(r14[0]), { nm: 'FX|air|' + nrm(r14[0]) }, [T(r14[0])], FXMOD]];
+    if (k === 'r9') return [[FXP.r9, { nm: 'FX|r9' }, [], FXMOD]];
+    if (k === 'gwx')
+      return r14
+        .map((v, i) => {
+          const a = T(r11[i]),
+            z = T(v),
+            q = a.match(/^(\d+)_/);
+          return a || z
+            ? [
+                a + (z ? '@' + z : ''),
+                { nm: 'FX|gwx|' + (q ? +q[1] : nrm(a + z)) },
+                [a + (z ? '@' + z : '')],
+                [],
+              ]
+            : null;
+        })
+        .filter(Boolean);
+    if (k === 'mrt')
+      return r14
+        .map(v => {
+          const scr = T(v),
+            st = scr.split(/\s+/)[1] || '',
+            t = MRTST.find(x => mrtN(x[1]) === mrtN(st)),
+            n = ((ctx && ctx.get(mrtN(st))) || new Set()).size || (t ? +t[2] : 0);
+          return scr
+            ? [
+                scr,
+                { nm: 'FX|mrt|' + scr.split(/\s+/)[0] },
+                [(t ? t[0] + '_' + t[1] : st) + (n ? '(' + n + ')' : ''), scr],
+                [],
+              ]
+            : null;
+        })
+        .filter(Boolean);
+    return [];
+  },
+  fxPick = (k, j, kids, want) => {
+    if (!kids || !kids.length || !want) return null;
+    const N = kids.map(x => x[0]);
+    if (k === 'mrt' && j === 1)
+      return (
+        N.find(n => n === want) || N.find(n => n.split(/\s+/)[0] === String(want).split(/\s+/)[0]) || null
+      );
+    if (k === 'mrt') return N.find(n => /^\d+_/.test(n) && mrtN(n) === mrtN(want)) || null;
+    if (k === 'gwx' || k === 'the20') {
+      const q = String(want).match(/^(\d+)_/);
+      return q
+        ? N.find(n => {
+            const z = n.match(/^(\d+)_/);
+            return z && +z[1] === +q[1];
+          }) || null
+        : null;
+    }
+    if (k === 'air') return N.find(n => n.toLowerCase() === String(want).toLowerCase()) || null;
+    return null;
+  },
+  fxModL = n => fsafe(n).toLowerCase().replace(/^#\s+/, '#'); /* “# Module ขาว” = “#Module ขาว” */
+/* zip + โฟลเดอร์ที่เลือก: ชื่อเดิมของแพคใหม่ (ชั้นแรกในรอบล่าสุดที่มีโฟลเดอร์) */
+async function fxIdx(RF, W) {
+  const D = new Date(W),
+    y = D.getUTCFullYear(),
+    m = D.getUTCMonth(),
+    h = D.getUTCDate() >= 16 ? 2 : 1,
+    o = {};
+  for (const k of Object.keys(FXP)) {
+    const L = RF.filter(r => r.pp.length && nrm(r.pp[r.pp.length - 1]) === nrm(FXP[k])).sort(
+      (a, b) => b.y * 24 + b.m * 2 + b.hf - (a.y * 24 + a.m * 2 + a.hf),
+    );
+    if (!L.length) continue;
+    let best = null;
+    for (const r of L) {
+      if (r.y * 24 + r.m * 2 + r.hf > y * 24 + m * 2 + h) continue;
+      if (!r.kids) r.kids = await picDirs(r.h);
+      if (r.kids.length) {
+        best = r.kids;
+        break;
+      }
+    }
+    o[k] = { best };
+  }
+  return o;
+}
 const picDirs = async h => {
   const o = [];
   for await (const [n, x] of h.entries()) if (x.kind === 'directory') o.push([n, x]);
@@ -2331,6 +2476,10 @@ const pzPack = b => {
   if (PZP[b.media]) return PZP[b.media];
   if (b.jam) return 'Pic @ Bangkok Jams ' + b.jam;
   if (b.metro) return 'Pic @ Metro LED';
+  {
+    const fk = fxKind(b);
+    if (fk) return FXP[fk];
+  } /* 5.5.30 */
   const u = nrm(b.sn + ' ' + ((b.px && b.px.hd) || ''));
   if (/SIGNATURE|SOBANGKOK|TWINTUBE|BIGY|BASE/.test(u)) return 'Pic @ Signature Max';
   const d = b.code && pzDb(b.code),
@@ -2338,7 +2487,9 @@ const pzPack = b => {
   return PZP[md] || '';
 }; /* ชีตไม่บอกแพค (เช่น ชีต PBTV) → แพคตามฐานข้อมูลจอ (ถ้าใส่ไว้) */
 /* จอในบล็อก → [[รหัสที่แสดง, คีย์, ชื่อโฟลเดอร์ทีละชั้น]] */
-function pzScr(b, pack) {
+function pzScr(b, pack, ctx) {
+  const fk = fxKind(b);
+  if (fk) return fxScr(b, fk, ctx);
   const X = b.px || { hd: '', cols: [] },
     t = pkTag(pack),
     num = v => scrNum(v),
@@ -2425,7 +2576,8 @@ function pzPlan(W, res, rs, upto, X) {
     m1 = Date.UTC(y, m + 1, 1);
   const T = new Map(),
     skip = [],
-    closed = [];
+    closed = [],
+    FXC = fxCtx(res); /* 5.5.30: จำนวนจอต่อสถานี MRT */
   for (const r of res || [])
     for (const b of r.fold || []) {
       const pack = pzPack(b);
@@ -2443,11 +2595,19 @@ function pzPlan(W, res, rs, upto, X) {
             .filter(Boolean),
         ),
       ]);
-      const Ls = pzScr(b, pack),
-        T0 = X ? picTg(b, X.S) : [];
-      for (let [id, key, path] of Ls) {
+      const fk = fxKind(b),
+        Ls = pzScr(b, pack, FXC),
+        T0 = X && !fk ? picTg(b, X.S) : [];
+      for (let [id, key, path, mods] of Ls) {
         let ns = 'ck';
-        if (X) {
+        if (fk) {
+          const I = X && X.fx && X.fx[fk],
+            p0 = I && fxPick(fk, 0, I.best, path[0]);
+          if (p0) {
+            path = [p0, ...path.slice(1)];
+            ns = 'fd';
+          }
+        } /* 5.5.30: แพคใหม่ → ชื่อเดิมในโฟลเดอร์ที่เลือก */ else if (X) {
           const t =
               T0.find(x => x[1] && sameK(x[1], key)) ||
               (Ls.length === 1 && T0.length === 1 && !T0[0][1] ? T0[0] : null),
@@ -2471,7 +2631,15 @@ function pzPlan(W, res, rs, upto, X) {
           }
         }
         const k = (pack + '/' + path.join('/')).toLowerCase(),
-          e = T.get(k) || { id, pack, path, ns, films: RS.map(() => new Set()), src: new Set() };
+          e = T.get(k) || {
+            id,
+            pack,
+            path,
+            ns,
+            films: RS.map(() => new Set()),
+            src: new Set(),
+            mods: mods || PMOD,
+          };
         fs.forEach((L, i) => L.forEach(f => e.films[i].add(f)));
         e.src.add(r.name + ' • ' + b.sn);
         T.set(k, e);
@@ -2482,7 +2650,7 @@ function pzPlan(W, res, rs, upto, X) {
     RS.forEach((R, i) => {
       if (!R.cur && !e.films[i].size)
         return; /* รอบ 1–15 ที่จอนี้ไม่มีหนัง ไม่ทำ (แบบเดียวกับตอนสร้างลงโฟลเดอร์) */
-      const sub = [...PMOD, ...[...e.films[i]].sort((a, b) => a.localeCompare(b, 'th'))]
+      const sub = [...(e.mods || PMOD), ...[...e.films[i]].sort((a, b) => a.localeCompare(b, 'th'))]
         .map(fsafe)
         .filter(Boolean);
       list.push({
@@ -2610,8 +2778,32 @@ async function picPlan(root, W, res, rs, upto) {
   const T = new Map(),
     miss = [],
     closed = [];
+  const FXG = new Map(),
+    FXC = fxCtx(res); /* 5.5.30: แพคใหม่ (MRT / The 20 / Air Traveller / Gateway X / Rama9) ทำแยกด้านล่าง */
   for (const r of res || [])
     for (const b of r.fold || []) {
+      const fk = fxKind(b);
+      if (fk) {
+        const fs0 = RS.map(R => [
+          ...new Set(
+            (b.items || [])
+              .filter(
+                ([n, g, , , pre]) =>
+                  n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1,
+              )
+              .map(([n]) => String(n).trim())
+              .filter(Boolean),
+          ),
+        ]);
+        for (const [id, key, path, mods] of fxScr(b, fk, FXC)) {
+          const gk = fk + '|' + JSON.stringify(key),
+            e = FXG.get(gk) || { fk, id, key, path, mods, films: RS.map(() => new Set()), src: new Set() };
+          fs0.forEach((L, i) => L.forEach(f => e.films[i].add(f)));
+          e.src.add(r.name + ' • ' + b.sn);
+          FXG.set(gk, e);
+        }
+        continue;
+      }
       const fs = RS.map(R => [
         ...new Set(
           (b.items || [])
@@ -2838,6 +3030,92 @@ async function picPlan(root, W, res, rs, upto) {
       });
     }
   }
+  /* 5.5.30: แพคใหม่ — รอบ → ชั้นจอตามแบบของแพค (ชื่อเดิมในรอบนี้ หรือรอบล่าสุดที่มีโฟลเดอร์) → #Module / หนัง */
+  if (FXG.size) {
+    const DC = new Map(),
+      dirs = async h => {
+        if (!h) return null;
+        if (!DC.has(h)) DC.set(h, await picDirs(h));
+        return DC.get(h);
+      };
+    for (const e of FXG.values()) {
+      const pk = FXP[e.fk];
+      let top = rr0 ? null : tops.find(([n]) => nrm(n) === nrm(pk)) || null,
+        pp = top ? [top[0]] : [];
+      if (!top && !rr0 && nrm(root.name) === nrm(pk)) {
+        top = [root.name, root];
+        pp = [];
+      }
+      if (!top) {
+        miss.push({
+          f: [...e.src][0] || '',
+          sn: 'ไม่มีโฟลเดอร์ “' + pk + '” ในโฟลเดอร์ที่เลือก',
+          id: e.path.join(' / ') || pk,
+        });
+        continue;
+      }
+      const RFp = RF.filter(q => q.pp.join('/') === pp.join('/')).sort(
+        (a, b) => b.y * 24 + b.m * 2 + b.hf - (a.y * 24 + a.m * 2 + a.hf),
+      );
+      for (let i = 0; i < RS.length; i++) {
+        const R = RS[i];
+        if (!R.cur && !e.films[i].size) continue;
+        const rf = RFp.find(q => q.y === y && q.m === m && q.hf === R.h) || null;
+        let best = null;
+        for (const q of RFp) {
+          if (q.y * 24 + q.m * 2 + q.hf > y * 24 + m * 2 + R.h) continue;
+          const ks = await dirs(q.h);
+          if (ks && ks.length) {
+            best = ks;
+            break;
+          }
+        }
+        const chain = [[rf ? rf.name : rndName(y, m, R.h, smp), rf ? rf.h : null, 'rnd']];
+        let parent = rf ? rf.h : null;
+        for (let j = 0; j < e.path.length; j++) {
+          const want = e.path[j],
+            here = await dirs(parent),
+            pick = fxPick(e.fk, j, here, want) || (j === 0 ? fxPick(e.fk, 0, best, want) : null),
+            hit = here && pick ? here.find(([n]) => n === pick) : null;
+          chain.push([fsafe(hit ? hit[0] : pick || want), hit ? hit[1] : null, 'scr']);
+          parent = hit ? hit[1] : null;
+        }
+        const have = new Set(((await dirs(parent)) || []).map(([n]) => fxModL(n))),
+          need = [],
+          nn = new Set();
+        for (const n of [...e.mods, ...[...e.films[i]].sort((a, b) => a.localeCompare(b, 'th'))]) {
+          const f = fsafe(n),
+            l = fxModL(n);
+          if (!f || have.has(l) || nn.has(l)) continue;
+          nn.add(l);
+          need.push([n, f]);
+        }
+        const label = e.path.length ? e.path[e.path.length - 1] : pk;
+        plan.push({
+          s: { k: e.key, syn: false },
+          src: [...e.src],
+          lay: 'B',
+          base: top[1],
+          bk: pp.join('/'),
+          chain,
+          label,
+          have: [...new Set([...e.mods, ...e.films[i]].map(fxModL))].filter(l => have.has(l)).length,
+          disp: [...pp, ...chain.map(c => c[0])].join(' › '),
+          mk: chain.filter(c => !c[1]).map(c => [c[2], c[0]]),
+          mon: '',
+          rnd: chain[0][0],
+          mkMon: false,
+          mkRnd: !chain[0][1],
+          mkScr: chain.slice(1).some(c => !c[1]),
+          need,
+          films: e.films[i].size,
+          r: R.rndN,
+          cur: R.cur,
+          syn: false,
+        });
+      }
+    }
+  }
   plan.sort((a, b) => a.disp.localeCompare(b.disp, 'th') || (a.r < b.r ? -1 : a.r > b.r ? 1 : 0));
   const mk = new Set();
   for (const p of plan) {
@@ -2856,7 +3134,7 @@ async function picPlan(root, W, res, rs, upto) {
     rndN,
     rounds: RS.map(R => R.rndN),
     upto: capT < Infinity ? upto : 0,
-    scr: T.size,
+    scr: T.size + FXG.size,
     dir: root.name,
     lay: { A: plan.filter(p => p.lay === 'A').length, B: plan.filter(p => p.lay === 'B').length },
     n: plan.reduce((t, p) => t + p.need.length, 0) + mk.size,
@@ -10379,7 +10657,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.29 (9 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.30 (9 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -16043,6 +16321,7 @@ const ACT = {
       try {
         X = await picScreens(d);
         X.dir = d.name;
+        X.fx = await fxIdx(X.RF, L.W);
       } catch (_) {
         MQN = 'warn';
         note = `อ่านโฟลเดอร์ “${d.name}” ไม่ได้`;
