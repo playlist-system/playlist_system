@@ -131,6 +131,7 @@
  *   เวอร์ชัน 5.5.26: หลายวันจากไฟล์ที่ไม่ได้ส่งทุกวัน (pfXL / pfVL)
  *   เวอร์ชัน 5.5.27: ชื่อโฟลเดอร์ BKJ ตามกลุ่มในใบเช็ค (BANGKOK JAM2_R → (R)) (bkjAB / abTag)
  *   เวอร์ชัน 5.5.28: วันที่ Playlist ผิด (sdOf) • ย้าย BKJ / Metro กลางเดือน (xHist) • สร้างใบเปล่าคนใหม่ (sdbNewFile) • หัวตารางแบบเก่า (oldHdrFix)
+ *   เวอร์ชัน 5.5.29: สร้างโฟลเดอร์แยกรูปจากใบเปล่า (chkRead blank) • ชื่อจอใบเปล่าแถวเลื่อน (pzScr)
  * ======================================================================
  */
 
@@ -2352,8 +2353,13 @@ function pzScr(b, pack) {
           pzT(v)
             .replace(/^\(+|\)+$/g, '')
             .replace(/\s+/g, ''),
-        fm = cf(r[i + 1]) || cf(d && d.fmt),
-        lc = pzT(r[i + 2]) || pzT(d && d.loc); /* ใบเช็คไม่มีสถานที่ / Format → ใช้จากฐานข้อมูลจอ */
+        [f1, l1] = pzT(r[i + 1]) ? [r[i + 1], r[i + 2]] : [r[i + 2], r[i + 3]],
+        fm = cf(f1) || cf(d && d.fmt),
+        lc =
+          pzT(l1) ||
+          pzT(
+            d && d.loc,
+          ); /* 5.5.29: ใบเปล่าบางแบบ แถวถัดจากรหัสว่าง (Format / สถานที่ เลื่อนลง 1 แถว) */ /* ใบเช็คไม่มีสถานที่ / Format → ใช้จากฐานข้อมูลจอ */
       return [
         [
           code,
@@ -2902,15 +2908,16 @@ async function picMake(P) {
    จอ = คอลัมน์ก่อนรหัสจอ DGT / ID (แถว 10–12) และก่อนคอลัมน์ผลวิเคราะห์แรกของแต่ละช่วง (BKJ / Metro / จอที่ไม่มีรหัส) แบบเดียวกับตอนเติม
    หัววันที่ = ตัวเลขแรกในคอลัมน์หน้าชื่อหนัง แถว 14–40 • แถบวันที่ = แถวที่คอลัมน์หน้าชื่อหนังเป็นวันที่ (สูตร =C25 อ่านจากช่องต้นทาง) • หนังใต้แถบ = เริ่มวันนั้น ----- */
 async function chkFold(f) {
-  const R = await chkRead(f),
-    fold = [];
+  const R = await chkRead(f, { blank: 1 }),
+    fold =
+      []; /* 5.5.29: ชีตใบเปล่า (ยังไม่มีรายการหนัง) → จอก็สร้างโฟลเดอร์ได้ (พร้อม #Fast Ads / #Module และแถว # ของจอ) */
   for (const x of R.sheets)
     for (const b of x.blocks)
-      if (b.items.some(i => !i[4]))
-        fold.push({ sn: x.sn, lc: b.lc, items: b.items, ...picId(x.ws, x.sn, b.lc) });
+      if (b.items.some(i => !i[4]) || x.blank)
+        fold.push({ sn: x.sn, lc: b.lc, items: b.items, blank: x.blank ? 1 : 0, ...picId(x.ws, x.sn, b.lc) });
   return { fold, mx: R.mx };
 }
-async function chkRead(f) {
+async function chkRead(f, o) {
   const sheets = [];
   let mx = 0;
   const wb = XLSX.read(f.buf, { type: 'array' }),
@@ -3003,7 +3010,27 @@ async function chkRead(f) {
       }
       if (hr) break;
     }
-    if (!hr) continue;
+    if (!hr) {
+      const WSH = (wb.Workbook && wb.Workbook.Sheets) || [],
+        hid = !!(WSH[wb.SheetNames.indexOf(sn)] || {})
+          .Hidden; /* 5.5.29: o.blank = ชีตยังไม่มีแถบวันที่ (ใบเปล่า) ก็ส่งจอกลับไป ไม่มีหนัง (ชีตที่ซ่อนไว้ไม่เอา) */
+      if (o && o.blank && !hid) {
+        for (const b of L)
+          for (let r = 12; r <= 45; r++) {
+            const nm = vOf(b.lc, r);
+            if (
+              nm &&
+              /^#/.test(nm) &&
+              !FASTN.test(nm) &&
+              !/^#\s*module/i.test(nm) &&
+              !b.items.some(i => i[0] === nm)
+            )
+              b.items.push([nm, null, r, 0, 1]);
+          }
+        sheets.push({ sn, ws, sh, blocks: L, blank: 1 });
+      }
+      continue;
+    }
     const rg = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null,
       end = Math.min(rg ? rg.e.r + 1 : hr + 1500, hr + 1500),
       hy = s2d(num(L.find(b => inB(num(b.nc, hr))).nc, hr)).getUTCFullYear();
@@ -8444,7 +8471,7 @@ function sdbOps() {
   const fs = TC.map(f => ({ name: f.name, buf: f.buf, nd: f.nd || { S: [] } })),
     A = SDA && SDA.sig === ckSig() ? SDA : null,
     PX = PICX && PICX.sig === ckSig() ? PICX : null,
-    blank = !!PX && PX.res.length < TC.length;
+    blank = !!PX && PX.res.filter(r => !r.blank).length < TC.length;
   const M = sdbMovePlan(fs, A && A.kind === 'move' ? A.no : []),
     P = sdbAddPlan(fs),
     Q = (SDQ && SDQ.sig === sdbSig() ? SDQ.r : null) || [];
@@ -10352,7 +10379,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.28 (9 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.29 (9 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -11892,7 +11919,7 @@ const vPicCk = () => {
   if (!TC.length) return '';
   if (PICX && PICX.sig !== ckSig()) PICX = null;
   if (PICX && PICX.res.some(r => r.fold.length)) return vPic();
-  return `<section class="pic" data-tour="tpic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูปจากใบเช็คนี้</h3><p class="hint">ไม่ต้องใส่ Playlist — ระบบอ่านรายชื่อหนังที่อยู่ในใบเช็คที่ใส่ไว้ (ใบที่เติมแล้ว) แล้วสร้างโฟลเดอร์ที่ยังไม่มีในโฟลเดอร์แยกรูป เลือกรอบและวันที่ได้หลังอ่าน ระบบไม่แก้ใบเช็ค</p>${PICX ? alertHTML('wr', 'ไม่พบรายชื่อหนังในใบเช็คที่ใส่', `<p>${esc(PICX.bad.join(', ') || 'ตรวจว่าเป็นใบเช็ครูปที่มีแถบวันที่และรายชื่อหนัง')}</p>`) : ''}<div><button class="btn secondary" data-a="picck">${IC.folder}อ่านรายชื่อหนังจากใบเช็ค</button></div></section>`;
+  return `<section class="pic" data-tour="tpic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูปจากใบเช็คนี้</h3><p class="hint">ไม่ต้องใส่ Playlist — ระบบอ่านรายชื่อหนังที่อยู่ในใบเช็คที่ใส่ไว้ (ใบที่เติมแล้ว • ใบเปล่าสร้างได้เฉพาะโฟลเดอร์จอ) แล้วสร้างโฟลเดอร์ที่ยังไม่มีในโฟลเดอร์แยกรูป เลือกรอบและวันที่ได้หลังอ่าน ระบบไม่แก้ใบเช็ค</p>${PICX ? alertHTML('wr', 'ไม่พบรายชื่อหนังในใบเช็คที่ใส่', `<p>${esc(PICX.bad.join(', ') || 'ตรวจว่าเป็นใบเช็ครูปที่มีแถบวันที่และรายชื่อหนัง')}</p>`) : ''}<div><button class="btn secondary" data-a="picck">${IC.folder}อ่านรายชื่อหนังจากใบเช็ค</button></div></section>`;
 };
 const cHl = (a, b) => {
   const B = new Set(String(b).split(/\s+/));
@@ -12018,7 +12045,12 @@ async function tcRead(keepCmp) {
     }
     const D = mx ? new Date(mx) : new Date(Date.now() + 7 * 36e5);
     W = Date.UTC(D.getUTCFullYear(), D.getUTCMonth(), D.getUTCDate());
-  }
+    const m0 = Date.UTC(D.getUTCFullYear(), D.getUTCMonth(), 1);
+    for (const r of res) {
+      for (const b of r.fold) if (b.blank) for (const it of b.items) if (it[1] == null) it[1] = m0;
+      r.blank = r.fold.every(b => b.blank);
+    }
+  } /* 5.5.29: ใบเปล่า → แถว # ใช้ได้ทุกรอบ • r.blank = ทั้งไฟล์ยังไม่มีรายการหนัง */
   PICX = { W, res, bad, n: res.length, sig: ckSig(), pic: null, cmp: oc };
   if (keep && res.length) {
     try {
@@ -12027,9 +12059,12 @@ async function tcRead(keepCmp) {
       PICX.pic = null;
     }
   }
-  note = res.length
-    ? `${TCS === 'last' ? 'ใช้ใบเช็คที่เพิ่งเติม' : 'อ่านใบเช็คแล้ว'} ${res.reduce((t, r) => t + r.fold.length, 0)} จอ (${TCS === 'last' ? 'วันที่ทำงาน' : 'ถึงวันที่'} ${thd(new Date(W))})`
-    : 'ไม่พบรายชื่อหนังในใบเช็คที่ใส่';
+  note =
+    res.length && res.every(r => r.blank)
+      ? `อ่านใบเปล่าแล้ว ${res.reduce((t, r) => t + r.fold.length, 0)} จอ — ยังไม่มีรายชื่อหนัง สร้างได้เฉพาะโฟลเดอร์จอ (รอบ ${rndOf(W)})`
+      : res.length
+        ? `${TCS === 'last' ? 'ใช้ใบเช็คที่เพิ่งเติม' : 'อ่านใบเช็คแล้ว'} ${res.reduce((t, r) => t + r.fold.length, 0)} จอ (${TCS === 'last' ? 'วันที่ทำงาน' : 'ถึงวันที่'} ${thd(new Date(W))})`
+        : 'ไม่พบรายชื่อหนังในใบเช็คที่ใส่';
   if (sdb()) await sdbRun();
 }
 async function tcAdd(files) {
@@ -12391,8 +12426,10 @@ function vSdbAdd() {
       `<p>${A.done.map(d => `<b>${esc(d.name)}</b> ${esc(d.ok.map(a => a.code + ' (ชีต ' + a.sheet + ')').join(', ') || '–')}${(d.made || []).length ? ' • สร้างชีตใหม่: ' + esc(d.made.join(', ')) : ''}${d.fix ? ' • แก้สูตรคะแนนในชีต Analysis ' + d.fix + ' แถว' : ''}${d.bad.length ? ' • เพิ่มไม่ได้: ' + esc(d.bad.map(z => z[1]).join(' / ')) : ''}`).join('<br>')}${A.sv ? ` • ไฟล์ก่อนเพิ่มเก็บไว้ในโฟลเดอร์ สำรองก่อนเพิ่มจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
     );
   const PX = PICX && PICX.sig === ckSig() ? PICX : null,
-    blank = !!PX && PX.res.length < TC.length,
-    FN = PX ? PX.res.map(r => r.name) : []; /* 5.5.5: ใบที่เติมแล้วระบบไม่แก้อยู่แล้ว (ทีละชีต) */
+    blank = !!PX && PX.res.filter(r => !r.blank).length < TC.length,
+    FN = PX
+      ? PX.res.filter(r => !r.blank).map(r => r.name)
+      : []; /* 5.5.5: ใบที่เติมแล้วระบบไม่แก้อยู่แล้ว (ทีละชีต) */
   if (!blank)
     return (
       h +
@@ -15609,7 +15646,9 @@ const ACT = {
   sdbnew: async k => {
     if (!sdb() || !TC.length || BUSY || FILLING || !k) return;
     const PX = PICX && PICX.sig === ckSig() ? PICX : null,
-      bl = TC.filter(f => !PX || !PX.res.some(r => r.name === f.name)).map(f => f.name); /* 5.5.28 */
+      bl = TC.filter(f => !PX || !PX.res.some(r => r.name === f.name && !r.blank)).map(
+        f => f.name,
+      ); /* 5.5.28 */
     note = 'กำลังสร้างใบเปล่าให้' + k + ' …';
     view();
     await new Promise(r => setTimeout(r, 30));
