@@ -130,6 +130,7 @@
  *   เวอร์ชัน 5.5.25: แถว # เหนือแถบแรก (BKJ / Metro) ในโฟลเดอร์แยกรูป • เลขจอ BKJ1_04 / METRO_05 (scrNum)
  *   เวอร์ชัน 5.5.26: หลายวันจากไฟล์ที่ไม่ได้ส่งทุกวัน (pfXL / pfVL)
  *   เวอร์ชัน 5.5.27: ชื่อโฟลเดอร์ BKJ ตามกลุ่มในใบเช็ค (BANGKOK JAM2_R → (R)) (bkjAB / abTag)
+ *   เวอร์ชัน 5.5.28: วันที่ Playlist ผิด (sdOf) • ย้าย BKJ / Metro กลางเดือน (xHist) • สร้างใบเปล่าคนใหม่ (sdbNewFile) • หัวตารางแบบเก่า (oldHdrFix)
  * ======================================================================
  */
 
@@ -621,6 +622,21 @@ function autoBase() {
     }
   return best ? new Date(best) : null;
 }
+/* 5.5.28: วันเริ่มออนแอร์อยู่หลังวันสิ้นสุด (Playlist พิมพ์ผิด เช่น เริ่ม 30/11 สิ้นสุด 1/11) → ใช้วันที่ในชื่อหนัง (…_30Oct26_…) ถ้าไม่เกินวันสิ้นสุด • บอกใน “ต้องแก้” ทุกครั้ง */
+const adDate = a => {
+    const m = String(a).match(
+      /(?:^|[^A-Za-z\d])(\d{1,2})[-_ ]?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-_ ]?(\d{2}|\d{4})(?![A-Za-z\d])/i,
+    );
+    return m && +m[1] >= 1 && +m[1] <= 31 ? Date.UTC(yy(m[3]), MON[m[2].toLowerCase()], +m[1]) : 0;
+  },
+  sdOf = r => {
+    const sd = parseD(r.s),
+      ed = parseD(r.e);
+    if (!sd || !ed || +sd <= +ed) return { sd, ed };
+    const nd = adDate(r.ad),
+      ok = nd && nd <= +ed;
+    return { sd: ok ? new Date(nd) : sd, ed, bd: { s: sd, e: ed, nd: ok ? nd : 0 } };
+  };
 function chkRows(scr, o, kind) {
   let L = scr.rows.filter(r => o.off || !r.off);
   if (o.newOnly) L = L.filter(isNew);
@@ -641,8 +657,7 @@ function chkRows(scr, o, kind) {
     ),
     hash: /^Content/i.test(r.ty || ''),
     sp: kind === 'metro' && MTP.test(r.ad.trim()),
-    sd: parseD(r.s),
-    ed: parseD(r.e),
+    ...sdOf(r),
     st: stl && /ขึ้นใหม่|สัญญาใหม่/.test(r.st || '') ? 'ฉบับก่อนหน้า' : r.st || '',
     off: r.off,
     note: r.note || '',
@@ -1383,8 +1398,9 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       hb0 = b.hist.length > 0;
     for (const r of b.rows) {
       if (r.sp) continue;
-      if (jn && (b.kind === 'jam' ? jamSkip(r.note, jn) || nameSkip(r.ad, jn) : locSkip(r.loc, jn)))
-        continue; /* ยังอยู่ใน Playlist = ยังออนอยู่ แม้วันหมดในไฟล์ผ่านไปแล้ว */
+      if (jn && (b.kind === 'jam' ? jamSkip(r.note, jn) || nameSkip(r.ad, jn) : locSkip(r.loc, jn))) continue;
+      if (r.bd)
+        (b.badD || (b.badD = [])).push(r); /* ยังอยู่ใน Playlist = ยังออนอยู่ แม้วันหมดในไฟล์ผ่านไปแล้ว */
       let g = r.sd && +r.sd > +P ? +r.sd : +P;
       const stl =
         CONTM &&
@@ -1410,9 +1426,9 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         else if (!hb0 && dd > +P && b.scr.pd && +b.scr.pd === dd) g = dd;
       } /* 5.5.13: เติมครั้งแรกหลังวันที่ 1 */ /* “ขึ้นใหม่” = ขึ้นวันนี้ */
       if (g > lim) {
-        if (!b.hist.some(h => fam(h.nm) === fam(r.ad))) b.later.push(r);
+        if (!r.bd && !b.hist.some(h => fam(h.nm) === fam(r.ad))) b.later.push(r);
         continue;
-      }
+      } /* 5.5.28: วันที่ผิดบอกใน “ต้องแก้” แทน */
       const rnw =
         CONTM &&
         dd === +P2 &&
@@ -1893,6 +1909,23 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     hist,
     dates: dates.length,
     later: B.reduce((n, b) => n + b.later.length, 0),
+    badDL: B.map(b => [
+      b.scr.c,
+      [
+        ...new Map(
+          (b.badD || []).map(r => [
+            r.ad,
+            r.ad +
+              ' (เริ่ม ' +
+              thdS(r.bd.s) +
+              ' หลังสิ้นสุด ' +
+              thdS(r.bd.e) +
+              (r.bd.nd ? ' → ใส่ตามวันที่ในชื่อหนัง ' + thdS(new Date(r.bd.nd)) : ' → ยังไม่ใส่') +
+              ')',
+          ]),
+        ).values(),
+      ],
+    ]).filter(x => x[1].length),
     laterL: B.map(b => [b.scr.c, b.later.map(r => r.ad + (r.s ? ' (เริ่ม ' + r.s + ')' : ''))]).filter(
       x => x[1].length,
     ),
@@ -5226,6 +5259,14 @@ async function fillWb(f, on, metro, o) {
   const rep = [],
     FOLD = [];
   const buf = f.buf.slice(0);
+  if (f.oh)
+    for (const [sn, d] of f.oh)
+      rep.push([
+        sn,
+        'รูปแบบ',
+        `ข้อมูล: หัวตารางชีตนี้เป็นแบบเก่า (สูงกว่าชีตอื่น ${d} แถว) ระบบแทรกแถวว่างบนสุดให้ จึงอ่านจอและเติมได้ (ตั้งแต่ 5.5.28)`,
+        0,
+      ]);
   const wb = XLSX.read(f.buf, { type: 'array' }),
     zip = await JSZip.loadAsync(buf),
     HIDN = new Set(
@@ -5580,6 +5621,14 @@ async function fillWb(f, on, metro, o) {
             ),
           0,
         ]);
+        for (const [c, l] of L.badDL || [])
+          rep.push([
+            sn,
+            c,
+            'ตรวจ: วันที่ใน Playlist ผิด — วันเริ่มออนแอร์อยู่หลังวันสิ้นสุด (แจ้งทีม Playlist ให้แก้) → ' +
+              l.join(', '),
+            0,
+          ]); /* 5.5.28 */
         for (const [c, l] of L.laterL || [])
           rep.push([sn, c, 'ตรวจ: ยังไม่ใส่ เพราะวันเริ่มในไฟล์ยังไม่ถึง → ' + l.join(', '), 0]);
         for (const [c, l] of L.nostL || [])
@@ -6059,7 +6108,7 @@ function sdbAddPlan(files) {
       if (isXk(r.k)) {
         const kd = xKd(r.k),
           c = ((f.nd && f.nd.X) || []).filter(z => z.kind.startsWith(kd)),
-          ab = /^[AB]$/i.test(r.pk || '') ? String(r.pk).toUpperCase() : '',
+          ab = /^[A-Z]$/i.test(r.pk || '') ? String(r.pk).toUpperCase() : '',
           t = xPick(c, kd, ab); /* 5.5.7 */
         if (!t) {
           const kind = kd === 'BKJ2' ? (ab ? 'BKJ2' + ab : '') : kd,
@@ -6136,7 +6185,223 @@ function sdbAddPlan(files) {
 /* 5.4: ย้ายจอตามฐานข้อมูลจอ (ใบเปล่า) — จอที่อยู่ในใบของ ก แต่ฐานข้อมูลบอกว่าเป็นของ ข → เอาออกจากใบของ ก แล้วเพิ่มต่อท้ายชีตแพคเดียวกันในใบของ ข */
 /* 5.5.21: ย้ายจอตามฐานข้อมูลให้เองก่อนเติม — เฉพาะใบเปล่า (ยังไม่มีแถบวันที่) ในชุดที่เติม • ย้ายเฉพาะจอที่ทั้งเอาออกจากใบเดิม และใส่ในใบของคนใหม่ได้ (จอไม่หาย ไม่ซ้ำ)
    • จอที่ใบของคนใหม่ไม่อยู่ในชุด (หรือเติมแล้ว) ไม่เอาออก บอกไว้ • แล้วเพิ่มจอที่ยังไม่มีในใบของใคร (แบบปุ่ม “เพิ่มจอที่ขาด”) */
-let AMV0 = null;
+let AMV0 = null,
+  OHX = [];
+/* 5.5.28: ใบแบบเก่า (เช่น ใบคุณแนน) — หัวตารางสูงกว่าแบบมาตรฐาน: แถว % อยู่แถว 8 (รหัสจอแถว 9) ระบบเลยหาจอไม่เจอ ข้ามชีตนั้นตอนเติม
+   ตอนเติม: แทรกแถวว่างบนสุดของชีตนั้น ให้แถว % อยู่แถว 9 รหัสจออยู่แถว 10 แบบชีตอื่น (สูตรในชีต / ชีต Analysis / ปุ่ม เลื่อนตาม) • ไฟล์ที่เติมแล้วเป็นแบบมาตรฐาน ครั้งต่อไปไม่ต้องแก้ */
+const xShiftR = (f, fn) => String(f).replace(XREF, (w, a, c, b, r) => a + c + b + fn(+r)),
+  xShiftXR = (f, sn, fn) => {
+    const q = String(sn)
+        .replace(/'/g, "''")
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      bare = /^[A-Za-z_][A-Za-z0-9_.]*$/.test(sn) ? '|' + q : '';
+    const re = new RegExp(
+      `((?:'${q}'${bare})!)(\\$?)([A-Z]{1,3})(\\$?)([0-9]+)(?::(\\$?)([A-Z]{1,3})(\\$?)([0-9]+))?`,
+      'g',
+    );
+    return String(f).replace(
+      re,
+      (w, p, a1, c1, b1, r1, a2, c2, b2, r2) =>
+        p + a1 + c1 + b1 + fn(+r1) + (c2 ? ':' + a2 + c2 + b2 + fn(+r2) : ''),
+    );
+  };
+function xRowTop(doc, d) {
+  const fn = r => r + d,
+    sh = g => ({ ...g, r1: g.r1 + d, r2: g.r2 + d }),
+    shs = a =>
+      a
+        .split(/\s+/)
+        .map(x => {
+          const g = rgP(x);
+          return g ? rgS(sh(g)) : x;
+        })
+        .join(' ');
+  arrangeWb.unshare(doc);
+  const sd = doc.getElementsByTagNameNS(NS, 'sheetData')[0];
+  for (const row of [...sd.getElementsByTagNameNS(NS, 'row')]) {
+    row.setAttribute('r', +row.getAttribute('r') + d);
+    row.removeAttribute('spans');
+    for (const c of row.getElementsByTagNameNS(NS, 'c')) {
+      const m = c.getAttribute('r').match(/^([A-Z]+)(\d+)$/);
+      if (m) c.setAttribute('r', m[1] + (+m[2] + d));
+    }
+  }
+  for (const tag of ['f', 'formula', 'formula1', 'formula2'])
+    for (const f of [...doc.getElementsByTagNameNS(NS, tag)])
+      if (f.textContent) f.textContent = xShiftR(f.textContent, fn);
+  for (const mc of [...doc.getElementsByTagNameNS(NS, 'mergeCell')]) {
+    const g = rgP(mc.getAttribute('ref'));
+    if (g) mc.setAttribute('ref', rgS(sh(g)));
+  }
+  for (const tag of ['conditionalFormatting', 'dataValidation', 'selection', 'protectedRange'])
+    for (const e of [...doc.getElementsByTagNameNS(NS, tag)]) {
+      const a = e.getAttribute('sqref');
+      if (a) e.setAttribute('sqref', shs(a));
+    }
+  for (const e of [...doc.getElementsByTagNameNS(NS, 'selection')]) {
+    const a = e.getAttribute('activeCell'),
+      g = a && rgP(a);
+    if (g) e.setAttribute('activeCell', rgS(sh(g)));
+  }
+  for (const tag of ['hyperlink', 'autoFilter', 'sortState', 'sortCondition'])
+    for (const e of [...doc.getElementsByTagNameNS(NS, tag)]) {
+      const a = e.getAttribute('ref');
+      if (a) e.setAttribute('ref', shs(a));
+    }
+  for (const p of [...doc.getElementsByTagNameNS(NS, 'pane')]) {
+    const y = +(p.getAttribute('ySplit') || 0);
+    if (y && p.getAttribute('state') !== 'split') p.setAttribute('ySplit', y + d);
+    const t = p.getAttribute('topLeftCell'),
+      g = t && rgP(t);
+    if (g) p.setAttribute('topLeftCell', rgS(sh(g)));
+  }
+  for (const b of [...doc.getElementsByTagNameNS(NS, 'rowBreaks')])
+    for (const x of b.getElementsByTagNameNS(NS, 'brk')) {
+      const i = +x.getAttribute('id');
+      if (i) x.setAttribute('id', i + d);
+    }
+  for (const e of [...doc.getElementsByTagNameNS(NS, 'dimension')]) e.parentNode.removeChild(e);
+}
+async function oldHdrFix(buf) {
+  let wb = null;
+  try {
+    wb = XLSX.read(buf, { type: 'array', cellFormula: true });
+  } catch (_) {
+    return { buf, fixed: [] };
+  }
+  const hasP = (ws, r) =>
+      Object.keys(ws).some(k => {
+        const m = k.match(/^[A-Z]+(\d+)$/);
+        if (!m || +m[1] !== r) return false;
+        const f = ws[k].f;
+        return !!f && (/^=?\s*AVERAGE/i.test(f) || JAM10.test(f));
+      }),
+    fix = [];
+  for (const sn of wb.SheetNames) {
+    if (notChk(sn)) continue;
+    const ws = wb.Sheets[sn];
+    if (!ws || !(mediaOf(sn) || xKindOf(sn))) continue;
+    if (hasP(ws, 9) || hasP(ws, 10)) continue;
+    for (const r of [8, 7])
+      if (hasP(ws, r)) {
+        fix.push([sn, 9 - r]);
+        break;
+      }
+  }
+  if (!fix.length) return { buf, fixed: [] };
+  const zip = await JSZip.loadAsync(buf.slice(0)),
+    P = new DOMParser(),
+    S = new XMLSerializer(),
+    ser = d =>
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + S.serializeToString(d.documentElement);
+  const wx = P.parseFromString(await zip.file('xl/workbook.xml').async('string'), 'application/xml'),
+    rels = P.parseFromString(await zip.file('xl/_rels/workbook.xml.rels').async('string'), 'application/xml'),
+    rid = {};
+  for (const r of rels.getElementsByTagName('Relationship'))
+    rid[r.getAttribute('Id')] = r.getAttribute('Target');
+  const SH = [...wx.getElementsByTagNameNS(NS, 'sheet')],
+    pathOf = e => {
+      const t = rid[e.getAttributeNS(RNS, 'id')];
+      return t ? (t.startsWith('/') ? t.slice(1) : 'xl/' + t) : null;
+    },
+    done = [];
+  for (const [sn, d] of fix) {
+    const e = SH.find(x => x.getAttribute('name') === sn),
+      p = e && pathOf(e);
+    if (!p || !zip.file(p)) continue;
+    const doc = P.parseFromString(await zip.file(p).async('string'), 'application/xml');
+    xRowTop(doc, d);
+    zip.file(p, ser(doc), { createFolders: false });
+    const rp = p.replace(/worksheets\/([^/]+)$/, 'worksheets/_rels/$1.rels'),
+      rf = zip.file(rp); /* ปุ่ม / รูปบนชีต เลื่อนลงตามแถว */
+    if (rf) {
+      const rx = await rf.async('string');
+      for (const m of rx.matchAll(/Target="([^"]+)"/g)) {
+        if (!/drawing/i.test(m[1])) continue;
+        const dp = ('xl/' + m[1].replace(/^\.\.\//, '')).replace('xl/xl/', 'xl/'),
+          df = zip.file(dp);
+        if (!df) continue;
+        let tx = await df.async('string');
+        tx = /\.vml$/i.test(dp)
+          ? tx.replace(/(<x:Anchor>\s*)([^<]+)(<\/x:Anchor>)/g, (w, a, v, b) => {
+              const q = v.split(',').map(z => z.trim());
+              if (q.length === 8) {
+                q[2] = String(+q[2] + d);
+                q[6] = String(+q[6] + d);
+              }
+              return a + q.join(', ') + b;
+            })
+          : tx.replace(/(<xdr:row>)(\d+)(<\/xdr:row>)/g, (w, a, v, b) => a + (+v + d) + b);
+        zip.file(dp, tx, { createFolders: false });
+      }
+    }
+    for (const e2 of SH) {
+      const p2 = pathOf(e2),
+        f2 = p2 && zip.file(p2);
+      if (!f2) continue;
+      const x = await f2.async('string');
+      if (
+        !x.includes(String(sn).replace(/&/g, '&amp;').replace(/'/g, '&apos;')) &&
+        !x.includes(String(sn).replace(/&/g, '&amp;'))
+      )
+        continue;
+      const d2 = P.parseFromString(x, 'application/xml');
+      let ch = false; /* สูตรที่อ้างชีตนี้ (เช่น ชีต Analysis ='PBTV 40 Blue'!$C$8) */
+      for (const fe of [...d2.getElementsByTagNameNS(NS, 'f')]) {
+        const t = fe.textContent;
+        if (!t) continue;
+        const t2 = xShiftXR(t, sn, r => r + d);
+        if (t2 !== t) {
+          fe.textContent = t2;
+          ch = true;
+        }
+      }
+      if (ch) zip.file(p2, ser(d2), { createFolders: false });
+    }
+    for (const dn of [...wx.getElementsByTagNameNS(NS, 'definedName')]) {
+      const t = dn.textContent,
+        t2 = xShiftXR(t, sn, r => r + d);
+      if (t2 !== t) dn.textContent = t2;
+    }
+    done.push([sn, d]);
+  }
+  if (!done.length) return { buf, fixed: [] };
+  let cp = wx.getElementsByTagNameNS(NS, 'calcPr')[0];
+  if (!cp) {
+    cp = wx.createElementNS(NS, 'calcPr');
+    let after = null;
+    for (const q of ['sheets', 'functionGroups', 'externalReferences', 'definedNames']) {
+      const e = wx.getElementsByTagNameNS(NS, q)[0];
+      if (e) after = e;
+    }
+    if (after) after.parentNode.insertBefore(cp, after.nextSibling);
+    else wx.documentElement.appendChild(cp);
+  }
+  cp.setAttribute('fullCalcOnLoad', '1');
+  if (zip.file('xl/calcChain.xml')) {
+    zip.remove('xl/calcChain.xml');
+    for (const r of [...rels.getElementsByTagName('Relationship')])
+      if (/calcChain$/i.test(r.getAttribute('Type') || '')) r.parentNode.removeChild(r);
+    zip.file('xl/_rels/workbook.xml.rels', ser(rels), { createFolders: false });
+    const ct = zip.file('[Content_Types].xml');
+    if (ct)
+      zip.file(
+        '[Content_Types].xml',
+        (await ct.async('string')).replace(/<Override[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/gi, ''),
+        { createFolders: false },
+      );
+  }
+  zip.file('xl/workbook.xml', ser(wx), { createFolders: false });
+  return { buf: u8buf(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })), fixed: done };
+}
+const ohTxt = () =>
+  OHX.length
+    ? [
+        '',
+        `ปรับหัวตารางแบบเก่า (ก่อนเติม): ${OHX.map(([n, F]) => amvNm(n) + ' › ' + F.map(x => x[0]).join(', ')).join(' • ')} — แทรกแถวว่างบนสุดของชีต ให้อ่านจอและเติมได้`,
+        '',
+      ]
+    : [];
 const amvNm = n => String(n || '').replace(/\.xls[xm]?$/i, '');
 async function autoMv(list) {
   const E = { list, go: [], no: [], add: [], bad: [], names: [] };
@@ -6209,6 +6474,31 @@ async function autoMv(list) {
     }
     return [...H];
   };
+  /* 5.5.28: Bangkok Jams / Metro LED — วันที่ถ่ายในคอลัมน์ของจอนี้ ตามแถวหนัง [{nm, g, ph, pre}] */
+  const histX = (X, sn, code) => {
+    const x = X && X.sheets.find(z => z.sn === sn);
+    if (!x) return null;
+    const n = +(String(sdbK(code)).match(/-(\d+)$/) || [])[1];
+    let b = null,
+      i = -1;
+    for (const bb of x.blocks) {
+      const j = (bb.cn || []).indexOf(n);
+      if (j >= 0) {
+        b = bb;
+        i = j;
+        break;
+      }
+    }
+    if (!b) return null;
+    const pc = n2col(b.cs[i]),
+      v = r => {
+        const q = x.ws[pc + r];
+        return q && q.v != null && String(q.v).trim() !== '' ? q.v : null;
+      };
+    return [...b.items]
+      .sort((a, c) => a[2] - c[2])
+      .map(([nm, g, r, ed, pre]) => ({ nm, g, ph: v(r), pre: !!pre }));
+  };
   let M = { mv: [] };
   try {
     M = sdbMovePlan(fs, []);
@@ -6228,12 +6518,16 @@ async function autoMv(list) {
     const fF = !blank.has(m.from),
       fT = !blank.has(m.to);
     if ((fF || fT) && isXk(sdbK(m.code))) {
-      no.push({
-        ...m,
-        why: 'จอ Bangkok Jams / Metro LED ในใบที่เติมแล้ว ระบบยังย้ายให้ไม่ได้ — ย้ายเองในใบเช็ค',
-      });
+      if (fF) {
+        const h = histX(RD.get(m.from), m.fsn, m.code);
+        if (!h) {
+          no.push({ ...m, why: 'อ่านคอลัมน์ของจอนี้ในใบเดิมไม่ได้ — ย้ายเองในใบเช็ค' });
+          continue;
+        }
+        mv.push({ ...m, hist: h, hx: 1, filled: true });
+      } else mv.push({ ...m, filled: true });
       continue;
-    }
+    } /* 5.5.28 */
     if (fF) {
       const h = histOf(RD.get(m.from), m.fsn, m.code);
       if (!h) {
@@ -6294,7 +6588,7 @@ const amvTxt = A => {
     `ย้ายจอตามฐานข้อมูล (ก่อนเติม): ย้าย ${A.go.length} จอ • เพิ่ม ${A.add.length} จอ • ทำให้ไม่ได้ ${A.no.length + A.bad.length} รายการ`,
     ...A.go.map(
       m =>
-        `  ย้าย ${m.code}: ${amvNm(m.from)} › ${m.fsn} → ${amvNm(m.to)} › ${m.tsn}${m.hist && m.hist.length ? ` (พร้อมหนังเดิม ${m.hist.reduce((t, h) => t + h[1].length, 0)} แถว และวันที่ถ่าย)` : ''}`,
+        `  ย้าย ${m.code}: ${amvNm(m.from)} › ${m.fsn} → ${amvNm(m.to)} › ${m.tsn}${m.hist && m.hist.length ? (m.hx ? ` (พร้อมวันที่ถ่าย ${m.hist.filter(h => h.ph != null).length} ช่อง)` : ` (พร้อมหนังเดิม ${m.hist.reduce((t, h) => t + h[1].length, 0)} แถว และวันที่ถ่าย)`) : ''}`,
     ),
     ...A.add.map(x => `  เพิ่ม ${x.code}: ${amvNm(x.name)}${x.sheet ? ' › ' + x.sheet : ''}`),
     ...A.no.map(m => `  ทำให้ไม่ได้ ${m.code}: ${amvNm(m.from)} — ${m.why || 'ย้ายไม่ได้'}`),
@@ -6311,7 +6605,7 @@ const amvHTML = A => {
     g = A.go
       .map(m =>
         li(
-          `<b>${esc(m.code)}</b> ${esc(amvNm(m.from))} → <b>${esc(amvNm(m.to))}</b> · ชีต ${esc(m.tsn || m.fsn || '')}${m.hist && m.hist.length ? ` · ย้ายทั้งก้อน พร้อมหนังเดิม ${m.hist.reduce((t, h) => t + h[1].length, 0)} แถว และวันที่ถ่าย` : ''}`,
+          `<b>${esc(m.code)}</b> ${esc(amvNm(m.from))} → <b>${esc(amvNm(m.to))}</b> · ชีต ${esc(m.tsn || m.fsn || '')}${m.hist && m.hist.length ? (m.hx ? ` · ย้ายทั้งคอลัมน์ พร้อมวันที่ถ่าย ${m.hist.filter(h => h.ph != null).length} ช่อง` : ` · ย้ายทั้งก้อน พร้อมหนังเดิม ${m.hist.reduce((t, h) => t + h[1].length, 0)} แถว และวันที่ถ่าย`) : ''}`,
         ),
       )
       .join(''),
@@ -6385,7 +6679,7 @@ function sdbMovePlan(files, fail = []) {
             fy = files.find(z => z.name === y.name),
             c = ((fy && fy.nd && fy.nd.X) || []).filter(z => z.kind.startsWith(kd)),
             sk = (((fx && fx.nd && fx.nd.X) || []).find(z => z.sn === r.sn) || {}).kind || '',
-            ab = /^[AB]$/i.test(mi.pk || '') ? String(mi.pk).toUpperCase() : sk.slice(4);
+            ab = /^[A-Z]$/i.test(mi.pk || '') ? String(mi.pk).toUpperCase() : sk.slice(4);
           let t = xPick(c, kd, ab); /* 5.5.7 */
           let mk = '',
             ex0 = '';
@@ -6502,7 +6796,16 @@ async function sdbMoveApply(files, mv, sel, mo = {}) {
         return null;
       }
     },
-    add1 = m => ({ sn: m.tsn, code: m.code, fmt: m.fmt, loc: m.loc, k: m.k, mk: m.mk, hist: m.hist }),
+    add1 = m => ({
+      sn: m.tsn,
+      code: m.code,
+      fmt: m.fmt,
+      loc: m.loc,
+      k: m.k,
+      mk: m.mk,
+      hist: m.hist,
+      hx: m.hx,
+    }),
     /* 5.5.24: mo.filled + hist = ย้ายกลางเดือนทั้งก้อน */ del1 = m => ({ sn: m.fsn, code: m.code }),
     key = (n, c) => n + '|' + sdbK(c);
   /* ลองทีละฝั่งก่อน — ย้ายเฉพาะจอที่ทั้งเอาออกจากใบเดิม และเพิ่มในใบใหม่ได้ (จอจะไม่หาย และไม่ซ้ำ 2 ใบ) */
@@ -7185,7 +7488,7 @@ const xKindOf = sn => {
   const U = String(sn || '')
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, ''),
-    j = U.match(/(?:JAMS?|BKJ)([12])([AB]|(?![0-9]))/);
+    j = U.match(/(?:JAMS?|BKJ)([12])(?:([A-Z])(?![A-Z])|(?![0-9]))/);
   return j ? 'BKJ' + j[1] + (j[2] || '') : /METRO/.test(U) ? 'METRO' : '';
 };
 const xKd = k => (String(k).startsWith('METRO') ? 'METRO' : String(k).slice(0, 4));
@@ -7206,14 +7509,17 @@ const xDisp = (kind, v) => {
   }
   return /^\d{1,3}$/.test(s) ? xName(kd + '-' + +s) : '';
 }; /* ชนิดชีตสำคัญกว่าตัวเลข 1/2 ในรหัส (BKJ1_14 ในชีต Bangkok Jams 2 = BKJ2_14) */
-const xPick = (c, kd, ab) =>
-  kd === 'BKJ2'
-    ? ab
-      ? c.find(z => z.kind === 'BKJ2' + ab)
-      : c.length === 1
-        ? c[0]
-        : null
-    : c[0]; /* Bangkok Jams 2 ต้องตรงชีต A / B */
+const XAB = { A: 'R', R: 'A' },
+  xPick = (c, kd, ab) =>
+    kd === 'BKJ2'
+      ? ab
+        ? c.find(z => z.kind === 'BKJ2' + ab) ||
+          (XAB[ab] ? c.find(z => z.kind === 'BKJ2' + XAB[ab]) : null) ||
+          null
+        : c.length === 1
+          ? c[0]
+          : null
+      : c[0]; /* 5.5.28: ชีต A เปลี่ยนชื่อเป็น R (กลุ่มเดียวกัน) */ /* Bangkok Jams 2 ต้องตรงชีต A / B */
 /* 5.5.10: ชีตแพค (DGT / ID) ที่เป็นแบบ 1 คอลัมน์ต่อจอ — รหัสจอแถวถัดจากแถว % อยู่คอลัมน์ติดกัน */
 const colCodesOf = ws => {
   const cr = avRowOf(ws) + 1,
@@ -7484,6 +7790,169 @@ function xCopyCol(doc, T, p, HR, c0) {
   }
 }
 /* เพิ่ม / เอาจอ Bangkok Jams / Metro LED ออก (เฉพาะใบเปล่า) — คืนแบบเดียวกับ arrangeWb: {buf, added, removed, notes, emptied} */
+/* 5.5.28: ย้ายจอ Bangkok Jams / Metro LED กลางเดือน — คอลัมน์จอใหม่ในชีตที่มีรายการแล้ว: วันที่ถ่ายของจอนี้จากใบเดิมลงแถวหนังเรื่องเดียวกัน (แถบวันที่เดียวกัน)
+   หนังที่ชีตนี้ยังไม่มี (มีวันที่ถ่าย) → ต่อท้ายตารางพร้อมแถบวันที่ แล้วตอนเติม ระบบจัดแถวให้ (แบบเดียวกับจอ DGT ที่ย้ายกลางเดือน) */
+function xHist(doc, ws, rows, row, cols, T, q, H) {
+  let s = T;
+  while (cols.includes(s - 1)) s--;
+  const LC = n2col(s - 1),
+    QC = n2col(q),
+    TC = n2col(T),
+    inB = v => typeof v === 'number' && v > 20000 && v < 80000,
+    vv = a => {
+      const x = ws[a];
+      return x ? cl(x.v) : '';
+    },
+    NCs = cols.filter(c => !cols.includes(c - 1)).map(c => n2col(c - 2)),
+    barV = r => {
+      for (const C of NCs) {
+        const x = ws[C + r];
+        if (x && inB(x.v)) return x.v;
+      }
+      return null;
+    },
+    cellAt = (r, C) => {
+      const R = rows.get(r);
+      return R
+        ? [...R.getElementsByTagNameNS(NS, 'c')].find(e => e.getAttribute('r') === C + r) || null
+        : null;
+    },
+    hasV = e =>
+      !!e && [...e.childNodes].some(n => n.localName === 'v' || n.localName === 'is' || n.localName === 'f'),
+    set = (r, C, v, st) => {
+      xTxt(doc, row(r), C + r, v, typeof v === 'number');
+      const e = cellAt(r, C);
+      if (e && st != null) e.setAttribute('s', st);
+      return e;
+    },
+    bump = (m, k) => {
+      if (k != null) m.set(k, (m.get(k) || 0) + 1);
+    },
+    mode = m => {
+      let b = null,
+        n = 0;
+      for (const [k, c] of m)
+        if (c > n) {
+          n = c;
+          b = k;
+        }
+      return b;
+    };
+  const rg = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null,
+    end = Math.min(rg ? rg.e.r + 1 : 700, 2500),
+    P = H.filter(h => h.ph != null);
+  let hr = 0;
+  for (let r = 12; r <= 60 && !hr; r++) if (barV(r) != null && !vv(LC + r)) hr = r;
+  if (!hr) return { car: 0, app: 0, lost: P.length };
+  const items = [],
+    pre = [];
+  let g = null,
+    lastR = hr,
+    lastBar = hr,
+    lastIt = 0;
+  for (let r = hr; r <= end; r++) {
+    const bv = barV(r),
+      nm = vv(LC + r);
+    if (bv != null && !nm) {
+      g = +s2d(bv);
+      lastBar = r;
+      lastR = r;
+      continue;
+    }
+    if (nm && g != null && !/^ออก(วันที่)?\s*\d/.test(nm)) {
+      items.push({ nm, g, r });
+      lastR = r;
+      lastIt = r;
+    }
+  }
+  for (let r = hr - 1; r >= 12; r--) {
+    const nm = vv(LC + r);
+    if (nm && /^#/.test(nm)) pre.push({ nm, r });
+    else break;
+  }
+  const RR = [...pre.map(p => p.r), ...items.map(i => i.r)],
+    M = new Map(),
+    M0 = new Map();
+  for (const r of RR)
+    for (const c of cols) {
+      const x = ws[n2col(c) + r];
+      if (x && typeof x.v === 'number' && Number.isInteger(x.v) && x.v >= 1 && x.v <= 31) {
+        const e = cellAt(r, n2col(c));
+        if (e) bump(M, e.getAttribute('s'));
+      }
+    }
+  for (const r of RR) {
+    const e = cellAt(r, TC);
+    if (e && !hasV(e)) bump(M0, e.getAttribute('s'));
+  }
+  const PS = mode(M),
+    BS0 = mode(M0); /* PS = ช่องวันที่ถ่ายของชีตนี้ (พื้นดำ ตัวเลขขาว) • BS0 = ช่องว่าง */
+  for (const r of RR) {
+    const t = cellAt(r, TC),
+      e = cellAt(r, QC);
+    if (!e) continue;
+    if (hasV(e)) {
+      while (e.firstChild) e.removeChild(e.firstChild);
+      e.removeAttribute('t');
+    }
+    if (hasV(t) && BS0 != null) e.setAttribute('s', BS0);
+  } /* คอลัมน์แบบมีวันที่ถ่ายของจออื่น → ล้าง */
+  const used = new Set(),
+    byK = new Map();
+  for (const it of items) {
+    const k = it.nm + '|' + it.g;
+    if (!byK.has(k)) byK.set(k, []);
+    byK.get(k).push(it);
+  }
+  let car = 0,
+    lost = 0;
+  const app = [];
+  for (const h of P) {
+    let t = null;
+    if (h.pre) t = pre.find(p => p.nm === h.nm && !used.has(p.r)) || null;
+    else {
+      t = (byK.get(h.nm + '|' + h.g) || []).find(z => !used.has(z.r)) || null;
+      if (!t) {
+        const L = items.filter(z => z.nm === h.nm && !used.has(z.r));
+        if (L.length === 1) t = L[0];
+      }
+    }
+    if (t) {
+      used.add(t.r);
+      set(t.r, QC, h.ph, typeof h.ph === 'number' ? PS : null);
+      car++;
+    } else if (h.pre) lost++;
+    else app.push(h);
+  }
+  if (app.length) {
+    const BR = rows.get(lastBar),
+      bc = BR ? [...BR.getElementsByTagNameNS(NS, 'c')] : [],
+      ne = cellAt(lastIt || lastR, LC),
+      nmSt = ne ? ne.getAttribute('s') : null,
+      ser = d => Math.round(d / 864e5) + 25569;
+    const bar = (r, d) => {
+      for (const c of bc) {
+        const C = c.getAttribute('r').match(/^[A-Z]+/)[0];
+        set(r, C, NCs.includes(C) ? ser(d) : '', c.getAttribute('s'));
+      }
+    };
+    let R = lastR + 1;
+    for (const d of [...new Set(app.map(h => h.g))].sort((a, b) => a - b)) {
+      bar(R++, d);
+      for (const h of app.filter(z => z.g === d)) {
+        set(R, LC, h.nm, nmSt);
+        set(R, QC, h.ph, typeof h.ph === 'number' ? PS : null);
+        R++;
+      }
+    }
+    if (lastBar >= lastIt) {
+      const x = barV(lastBar);
+      if (x != null) bar(R++, +s2d(x));
+    } /* แถบรอวันถัดไปท้ายตาราง (แบบเดิมของชีต) */
+    for (const d of [...doc.getElementsByTagNameNS(NS, 'dimension')]) d.parentNode.removeChild(d);
+  }
+  return { car, app: app.length, lost };
+}
 async function colWb(buf, o) {
   const out = { buf, added: [], removed: [], notes: [], emptied: [] },
     adds = o.adds || [],
@@ -7536,11 +8005,11 @@ async function colWb(buf, o) {
       const t = cl((ws[n2col(nc) + r] || {}).v);
       if (t && /[A-Za-z0-9\u0E00-\u0E7F]/.test(t) && !FIXR.test(t) && !/^#/.test(t)) filled = true;
     } /* “.” ที่ทีมใส่กันแถวว่าง ไม่นับเป็นหนัง */
-    if (filled) {
+    if (filled && !o.filled) {
       myA.forEach(x => bad(x, 1, 'ชีตนี้เติมไปแล้ว (เพิ่มได้เฉพาะใบเปล่า) ใส่เองในใบเช็ค'));
       myD.forEach(x => bad(x, 0, 'ชีตนี้เติมไปแล้ว (ย้ายได้เฉพาะใบเปล่า) เอาออกเองในใบเช็ค'));
       continue;
-    }
+    } /* 5.5.28: o.filled = ย้ายจอก่อนเติม (ย้ายทั้งคอลัมน์พร้อมวันที่ถ่าย) */
     const doc = P.parseFromString(await zip.file(p).async('string'), 'application/xml');
     let ch = false;
     arrangeWb.unshare(
@@ -7623,9 +8092,10 @@ async function colWb(buf, o) {
             c.removeAttribute('t');
           }
         }
+      const hx = A.hx && A.hist && A.hist.length ? xHist(doc, ws, rows, row, cols, T, q, A.hist) : {};
       cols.push(q);
       codes.push(A.code);
-      myAdded.push({ sheet: sn, code: A.code, n: q, pr });
+      myAdded.push({ sheet: sn, code: A.code, n: q, pr, ...hx });
       ch = true;
     }
     for (const D of myD) {
@@ -7656,7 +8126,16 @@ async function colWb(buf, o) {
       ch = true;
     }
     if (myD.length && !cols.length) out.emptied.push(sn);
-    for (const z of myAdded) out.added.push({ sheet: z.sheet, code: z.code, col: n2col(z.n), pr: z.pr });
+    for (const z of myAdded)
+      out.added.push({
+        sheet: z.sheet,
+        code: z.code,
+        col: n2col(z.n),
+        pr: z.pr,
+        car: z.car,
+        app: z.app,
+        lost: z.lost,
+      });
     if (ch) zip.file(p, ser(doc), { createFolders: false });
     if (ch && shifts.some(s => s[0] === sn)) {
       const rp = p.replace(/worksheets\/([^/]+)$/, 'worksheets/_rels/$1.rels'),
@@ -7946,7 +8425,7 @@ async function arrX(buf, opt) {
     };
   }
   if (A2.length || D2.length) {
-    const B = await colWb(R.buf, { adds: A2, dels: D2, empty: opt.empty });
+    const B = await colWb(R.buf, { adds: A2, dels: D2, empty: opt.empty, filled: !!opt.filled });
     R.buf = B.buf;
     R.added.push(...B.added);
     R.removed.push(...B.removed);
@@ -8049,6 +8528,113 @@ async function sdbApply(files, plan) {
   }
   return done;
 }
+/* 5.5.28: คนในฐานข้อมูลที่ยังไม่มีใบเช็ค → สร้างใบเปล่าใหม่จากใบเปล่าของคนอื่นที่มีชีตแพคตรงที่สุด
+   ใส่จอของคนนี้ตามฐานข้อมูล (จอที่อยู่ในใบของคนอื่นในชุดนี้ ย้ายมา • จอที่ไม่อยู่ในใบไหน เพิ่มให้) แล้วเอาจอของใบแบบออกทั้งหมด (ชีตที่ไม่มีจอ ซ่อนไว้) */
+async function sdbNewFile(w, files, blankNames) {
+  const D = sdb();
+  if (!D) return { err: 'ยังไม่ได้ใส่ฐานข้อมูลจอ' };
+  const p = sdbP(w),
+    mine = D.rows.filter(r => r.p === p);
+  if (!mine.length) return { err: 'ฐานข้อมูลไม่มีจอของ' + sdbW(w) };
+  const nm = sdbW(w) + '.xlsm';
+  if (files.some(f => f.name.toLowerCase() === nm.toLowerCase())) return { err: 'มีใบ ' + nm + ' อยู่แล้ว' };
+  const kindOf = r => {
+    if (isXk(r.k)) return xKd(r.k);
+    let m = mediaOf(r.pk || '');
+    if (!m) {
+      const q = DB.find(z => sdbK(z.c) === r.k);
+      if (q) m = mediaOf(String(q.m || '')) || (/spare/i.test(q.m || '') ? 'Spare' : null);
+    }
+    return m || '';
+  };
+  const need = mine.map(kindOf).filter(Boolean),
+    Q = sdbCheck(files.map(f => ({ name: f.name, codes: ndCodesX(f.nd) }))) || [];
+  const cand = files
+    .filter(f => blankNames.includes(f.name) && (Q.find(x => x.name === f.name) || {}).who)
+    .map(f => {
+      const S = (f.nd && f.nd.S) || [],
+        X = (f.nd && f.nd.X) || [],
+        has = k => S.some(z => z.media === k) || X.some(z => z.kind.startsWith(k));
+      return { f, sc: need.filter(has).length, n: S.length + X.length };
+    })
+    .sort((a, b) => b.sc - a.sc || b.n - a.n);
+  if (!cand.length) return { err: 'ไม่มีใบเปล่าของคนอื่นในชุดนี้ให้ใช้เป็นแบบ' };
+  const dn = cand[0].f,
+    nf = { name: nm, buf: u8buf(new Uint8Array(dn.buf.slice(0))), nd: null };
+  try {
+    nf.nd = sheetNeeds(nf.buf, nm);
+  } catch (_) {
+    return { err: 'อ่านใบแบบไม่ได้' };
+  }
+  const fs = [...files.map(f => ({ name: f.name, buf: f.buf, nd: f.nd })), nf],
+    M = sdbMovePlan(fs, []),
+    Q2 = sdbCheck(fs.map(f => ({ name: f.name, codes: ndCodesX(f.nd) }))) || [],
+    me = Q2.find(x => x.name === nm) || { unk: [] };
+  const mvIn = M.mv.filter(m => m.to === nm && !m.out),
+    mvOut = [
+      ...M.mv.filter(m => m.from === nm).map(m => (m.out ? m : { ...m, out: true, to: '', tsn: '' })),
+      ...(me.unk || []).map(r => ({
+        code: r.c,
+        k: sdbK(r.c),
+        loc: '',
+        fmt: '',
+        from: nm,
+        fsn: r.sn,
+        to: '',
+        tsn: '',
+        who: '',
+        out: true,
+        unk: true,
+      })),
+    ]; /* จอของใบแบบ (รวมจอที่ไม่มีในฐานข้อมูล) เอาออกจากใบใหม่ */
+  /* ใส่จอของคนนี้ก่อน (ใช้จอของใบแบบเป็นแบบ และแถวในชีต Analysis) แล้วค่อยเอาจอของใบแบบออก */
+  let R = { go: [], no: [], names: [], post: [] };
+  if (mvIn.length) {
+    R = await sdbMoveApply(fs, mvIn, null, {});
+    if (R.err) return { err: 'สร้างไม่ได้ (' + R.err + ')' };
+  }
+  let done = [];
+  try {
+    const AP = sdbAddPlan(fs).filter(x => x.name === nm);
+    if (AP.some(x => x.adds.length)) done = await sdbApply(fs, AP);
+  } catch (_) {
+    done = [];
+  }
+  if (mvOut.length) {
+    const R2 = await sdbMoveApply(fs, mvOut, null, {});
+    if (R2.err) return { err: 'เอาจอของใบแบบออกไม่ได้ (' + R2.err + ')' };
+    R.post = [...(R.post || []), ...(R2.post || [])];
+  }
+  const g = fs.find(z => z.name === nm),
+    left = (() => {
+      try {
+        return ndCodesX(sheetNeeds(g.buf, nm)).length;
+      } catch (_) {
+        return 0;
+      }
+    })(),
+    bad = done.flatMap(d => d.bad.map(b => String(b[1] || '')));
+  for (const sk of (sdbAddPlan(fs).find(x => x.name === nm) || { skip: [] }).skip)
+    bad.push(sk.code + ' — ' + String(sk.why || '').replace(/\s*—\s*$/, ''));
+  return {
+    nf: g,
+    from: dn.name,
+    n: left,
+    want: mine.length,
+    fs,
+    names: [
+      ...new Set([
+        nm,
+        ...R.names.filter(n => n !== nm),
+        ...done.filter(d => d.ok.length && d.name !== nm).map(d => d.name),
+      ]),
+    ],
+    go: R.go.filter(m => !(m.from === nm && m.out)),
+    no: R.no.filter(m => m.from !== nm),
+    post: R.post,
+    bad,
+  };
+}
 /* ===== 4.8: ฐานข้อมูลจอ — ไฟล์รายชื่อจอทั้งหมดพร้อมคนรับผิดชอบ (ชีต Data Base: Code / Location / New package / Format / รายชื่อคนรับผิดชอบ)
    ใส่ครั้งเดียว จำไว้ในเครื่อง (ps_sdb) • เทียบเฉพาะจอที่มีรหัส DGT / ID: ใบเช็คของคนนั้นขาดจอไหน มีจอที่ฐานข้อมูลบอกว่าเป็นของคนอื่นไหม ===== */
 const sdbK = c => {
@@ -8077,7 +8663,8 @@ const sdbW = w =>
   'คุณ' +
   String(w || '')
     .replace(/hello|in\s*mall/gi, '')
-    .trim();
+    .trim()
+    .replace(/^คุณ\s*/, ''); /* 5.5.28: ชื่อในฐานข้อมูลมีคำว่า คุณ อยู่แล้ว ไม่ใส่ซ้ำ */
 const ndCodes = nd => ((nd && nd.S) || []).flatMap(x => (x.codes || []).map(c => [x.sn, c]));
 let SDB,
   SDQ = null,
@@ -9765,7 +10352,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.27 (9 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.28 (9 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -11790,8 +12377,10 @@ function vSdbAdd() {
       A.sv ? 'ok' : 'wr',
       A.sv
         ? `บันทึกใบเช็คที่ย้ายจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
-        : `ย้ายจอแล้ว ${A.go.length} จอ — ยังไม่ได้บันทึก`,
-      `<p>${A.go.map(mvLine).join('<br>') || '–'}${A.no.length ? `<br>ย้ายไม่ได้: ${A.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${postTxt(A.post)}${A.sv ? ` • ไฟล์ก่อนย้ายเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
+        : A.newf
+          ? `สร้าง ${esc(A.newf.name)} แล้ว — ยังไม่ได้บันทึก`
+          : `ย้ายจอแล้ว ${A.go.length} จอ — ยังไม่ได้บันทึก`,
+      `<p>${A.newf ? `<b>${esc(A.newf.name)}</b> ใบเปล่าใหม่ แบบจากใบ ${esc(A.newf.from)} • จอ ${A.newf.n} จาก ${A.newf.want} จอในฐานข้อมูล${A.newf.bad.length ? ' • ใส่ไม่ได้: ' + esc(A.newf.bad.join(' / ')) + ' (ใส่เองในใบเช็ค)' : ''}<br>` : ''}${A.go.map(mvLine).join('<br>') || '–'}${A.no.length ? `<br>ย้ายไม่ได้: ${A.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${postTxt(A.post)}${A.sv ? ` • ไฟล์ก่อนย้ายเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
     );
   else if (A)
     h += alertHTML(
@@ -11938,7 +12527,7 @@ function vSdb() {
         ? `<p class="hint">ไม่ได้ตรวจ ${un.length} ไฟล์ (ชื่อไฟล์ไม่ตรงกับรายชื่อในฐานข้อมูล เช่น ไฟล์ MRT / CCTV / จอห้าง): ${esc(un.map(x => x.name).join(', '))}</p>`
         : '') +
       (left.length && M.length
-        ? `<p class="hint">ในฐานข้อมูลมีอีก ${left.length} คนที่ไม่ได้ใส่ใบเช็คในชุดนี้: ${esc(left.join(', '))}</p>`
+        ? `<p class="hint">ในฐานข้อมูลมีอีก ${left.length} คนที่ไม่ได้ใส่ใบเช็คในชุดนี้: ${esc(left.join(', '))}</p>${O.blank ? `<div class="cmpg"><h4>คนที่ยังไม่มีใบเช็ค (คนใหม่)</h4><p class="hint">ถ้าคนไหนยังไม่มีใบเช็คเลย กดสร้างใบเปล่าให้ได้ ระบบใช้ใบเปล่าของคนอื่นในชุดนี้เป็นแบบ ใส่จอของคนนั้นตามฐานข้อมูล (จอที่อยู่ในใบของคนอื่นในชุดนี้ ย้ายมาให้) • ถ้าคนนั้นมีใบเช็คอยู่แล้ว ให้ใส่ใบของเขาในชุดนี้แทน ไม่ต้องสร้าง</p><div class="picb">${[...new Map(D.rows.filter(r => !seen.has(r.p)).map(r => [r.p, r])).values()].map(r => `<button class="btn secondary" data-a="sdbnew" data-k="${esc(sdbW(r.w))}">สร้างใบเปล่าให้${esc(sdbW(r.w))} (${D.rows.filter(z => z.p === r.p).length} จอ)</button>`).join('')}</div></div>` : ''}`
         : '') +
       (pl
         ? ''
@@ -13925,6 +14514,7 @@ async function fillDays(G, list) {
   let cur = list;
   const L = [
     'รายงานการเติมใบเช็ครูป',
+    ...ohTxt(),
     ...amvTxt(AMV0),
     `เติมต่อกัน ${nD} วัน: ${G.map(g => thd(new Date(g.d))).join(', ')} — ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไป`,
   ];
@@ -15016,6 +15606,62 @@ const ACT = {
     MQN = n ? 'done' : 'warn';
     note = n ? `เพิ่มจอแล้ว ${n} จอ — บันทึก หรือดาวน์โหลด` : 'เพิ่มจอไม่ได้ — ดูรายละเอียดในกล่อง';
   },
+  sdbnew: async k => {
+    if (!sdb() || !TC.length || BUSY || FILLING || !k) return;
+    const PX = PICX && PICX.sig === ckSig() ? PICX : null,
+      bl = TC.filter(f => !PX || !PX.res.some(r => r.name === f.name)).map(f => f.name); /* 5.5.28 */
+    note = 'กำลังสร้างใบเปล่าให้' + k + ' …';
+    view();
+    await new Promise(r => setTimeout(r, 30));
+    for (const f of TC)
+      if (!f.nd) {
+        try {
+          f.nd = sheetNeeds(f.buf, f.name);
+        } catch (_) {
+          f.nd = { S: [] };
+        }
+      }
+    let R = null;
+    try {
+      R = await sdbNewFile(
+        k,
+        TC.map(f => ({ name: f.name, buf: f.buf, nd: f.nd })),
+        bl,
+      );
+    } catch (e) {
+      R = { err: String((e && e.message) || e) };
+    }
+    if (!R || R.err) {
+      MQN = 'err';
+      note = 'สร้างใบเปล่าไม่ได้ — ' + ((R && R.err) || '');
+      return;
+    }
+    for (const n of R.names) {
+      const g = R.fs.find(z => z.name === n),
+        f = TC.find(z => z.name === n);
+      if (!g) continue;
+      if (f) {
+        f.buf = g.buf;
+        f.nd = g.nd;
+      } else TC.push({ name: g.name, buf: g.buf, nd: g.nd });
+    }
+    const pv = PICX;
+    if (pv) pv.sig = ckSig();
+    SDA = {
+      kind: 'move',
+      newf: { name: R.nf.name, from: R.from, n: R.n, want: R.want, bad: R.bad },
+      go: R.go,
+      no: R.no,
+      names: R.names,
+      post: R.post,
+      sv: null,
+      sig: ckSig(),
+    };
+    SDQ = null;
+    await sdbRun();
+    MQN = 'done';
+    note = `สร้าง ${R.nf.name} แล้ว (${R.n} จอ) — บันทึก หรือดาวน์โหลด`;
+  },
   sdbmove: async () => {
     if (!sdb() || !TC.length || BUSY || FILLING) return;
     const O = sdbOps(),
@@ -15664,6 +16310,20 @@ const ACT = {
     FILLING = true;
     try {
       AMV0 = null;
+      OHX = [];
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        let z = null;
+        try {
+          z = await oldHdrFix(f.buf);
+        } catch (_) {
+          z = null;
+        }
+        if (z && z.fixed.length) {
+          list[i] = { ...f, buf: z.buf, nd: null, oh: z.fixed };
+          OHX.push([f.name, z.fixed]);
+        }
+      } /* 5.5.28: ใบแบบเก่า */
       {
         const AM = await autoMv(list);
         if (AM.names.length) list.splice(0, list.length, ...AM.list);
@@ -15675,7 +16335,7 @@ const ACT = {
         return;
       } /* 4.3: Playlist หลายวัน → เติมต่อกันทีละวัน */
       const out = new JSZip(),
-        L = ['รายงานการเติมใบเช็ครูป', ...plRep(), ...frzRep(), ...amvTxt(AMV0)],
+        L = ['รายงานการเติมใบเช็ครูป', ...plRep(), ...frzRep(), ...ohTxt(), ...amvTxt(AMV0)],
         T0 = performance.now();
       const res = await fillRun(list, o, L, out, 'กำลังเติมใบเช็ครูป');
 
