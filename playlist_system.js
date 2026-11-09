@@ -129,6 +129,7 @@
  *   เวอร์ชัน 5.5.24: ย้ายจอกลางเดือนทั้งก้อน (arrangeWb opt.filled + add.hist, autoMv)
  *   เวอร์ชัน 5.5.25: แถว # เหนือแถบแรก (BKJ / Metro) ในโฟลเดอร์แยกรูป • เลขจอ BKJ1_04 / METRO_05 (scrNum)
  *   เวอร์ชัน 5.5.26: หลายวันจากไฟล์ที่ไม่ได้ส่งทุกวัน (pfXL / pfVL)
+ *   เวอร์ชัน 5.5.27: ชื่อโฟลเดอร์ BKJ ตามกลุ่มในใบเช็ค (BANGKOK JAM2_R → (R)) (bkjAB / abTag)
  * ======================================================================
  */
 
@@ -2005,6 +2006,27 @@ const PMON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OC
   isMonD = n => /^\d{1,2}\s*[A-Za-z]{3}[A-Za-z]*\s*\d{2,4}$/.test(String(n).trim()),
   pck = c => String(c).replace(/-/g, '').toUpperCase(),
   pnm = t => nrm(t).replace(/^PIC/, '').replace(/^\d+/, '');
+/* 5.5.27: กลุ่มจอ BKJ ตามใบเช็ค — ป้ายแถว 10 “BANGKOK JAM2_R” ก่อน แล้วชื่อชีต (BangkokJams2R / BANGKOK_JAM2_B) • ตัวอักษรอะไรก็ได้ (A / B / R …) */
+const bkjAB = b => {
+    if (!b || !b.jam) return '';
+    const h = String((b.px && b.px.hd) || '').toUpperCase(),
+      q =
+        h.match(new RegExp('JAMS?\\s*' + b.jam + '\\s*[_.\\-]?\\s*([A-Z])(?![A-Z])')) ||
+        String(b.sn)
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, '')
+          .match(new RegExp('(?:JAMS?|BKJ)' + b.jam + '([A-Z])(?![A-Z])'));
+    return q ? q[1] : '';
+  },
+  abTag = (nm, ab) =>
+    ab
+      ? String(nm)
+          .replace(/\s*\([A-Z]\)\s*$/i, '')
+          .trim() +
+        ' (' +
+        ab +
+        ')'
+      : nm; /* ชื่อเดิม “… (A)” → “… (R)” ตามใบเช็ค */
 const scrNum = v => {
   const q = String(v == null ? '' : v)
     .replace(/\s+/g, '')
@@ -2325,13 +2347,7 @@ function pzScr(b, pack) {
       : [];
   }
   if (b.jam || b.metro) {
-    const ab =
-      b.jam === '2'
-        ? (String(b.sn)
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, '')
-            .match(/(?:JAMS?|BKJ)2([AB])/) || [])[1] || ''
-        : '';
+    const ab = bkjAB(b);
     for (const r of X.cols) {
       const a = num(r[0]),
         n = a != null ? a : num(r[1]);
@@ -2401,6 +2417,12 @@ function pzPlan(W, res, rs, upto, X) {
             const g = z.g ? (z.mid ? [z.mid, z.name] : [z.name]) : z.path.slice(z.pp.length ? 1 : 0);
             if (g.length) {
               if (z.pp.length && nrm(z.pp[0]) !== nrm(pack)) g[g.length - 1] = reTag(g[g.length - 1], pack);
+              const ab = bkjAB(b);
+              if (ab && z.g && !RS.some(R => z.rounds.has(rndK(y, m, R.h))))
+                g[g.length - 1] = abTag(
+                  g[g.length - 1],
+                  ab,
+                ); /* 5.5.27: รอบนี้ยังไม่มีโฟลเดอร์ → กลุ่ม (R) / (B) ตามใบเช็ค ไม่ใช่ตามรอบก่อน */
               path = g;
               ns = 'fd';
             }
@@ -2581,6 +2603,7 @@ async function picPlan(root, W, res, rs, upto) {
             films: RS.map(() => new Set()),
             src: new Set(),
           };
+        if (!e.ab) e.ab = bkjAB(b); /* 5.5.27 */
         fs.forEach((L, i) => L.forEach(f => e.films[i].add(f)));
         e.src.add(r.name + ' • ' + b.sn);
         T.set(key, e);
@@ -2693,14 +2716,17 @@ async function picPlan(root, W, res, rs, upto) {
           }
           const inG = gz.find(z => z.pp.join('/') === pp.join('/')),
             inO = os.find(z => z.pp.join('/') === pp.join('/')),
-            name = inG
-              ? inG.name
-              : inO
-                ? inO.path[inO.path.length - 1]
-                : reTag(
-                    (gz[0] && gz[0].name) || e.s.path[e.s.path.length - 1],
-                    pp[pp.length - 1] || root.name,
-                  ),
+            name = abTag(
+              inG
+                ? inG.name
+                : inO
+                  ? inO.path[inO.path.length - 1]
+                  : reTag(
+                      (gz[0] && gz[0].name) || e.s.path[e.s.path.length - 1],
+                      pp[pp.length - 1] || root.name,
+                    ),
+              e.ab,
+            ) /* 5.5.27: รอบใหม่ BKJ → (R) / (B) ตามใบเช็ค */,
             rf = rfOf(pp, R);
           const mid = (inG && inG.mid) || (!inG && !inO && ((gz[0] && gz[0].mid) || e.s.mid)) || '';
           let mh = null; /* 5.5.20: จอย่อย → สร้าง Pic @ BASE / 1. SCREEN A - B */
@@ -9739,7 +9765,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.26 (6 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.27 (9 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
