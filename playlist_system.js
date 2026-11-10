@@ -141,6 +141,7 @@
  *   เวอร์ชัน 5.5.36: ตั้งที่รับฟีดแบ็กของบริษัทในระบบแล้ว (ปุ่มแจ้งปัญหาพร้อมใช้)
  *   เวอร์ชัน 5.5.37: ลิงก์ใช้เวอร์ชันก่อนหน้า (versions/) ท้ายหน้า + แถบบอกเมื่อเปิดเวอร์ชันเก่า
  *   เวอร์ชัน 5.5.38: ปุ่มเปิดหน้า Playlist รายวัน (Apps Script ของบริษัท) ในขั้นใส่ Playlist และหน้าหลัก
+ *   เวอร์ชัน 5.5.39: แพค CITY → โฟลเดอร์ “Pic @ City TV” (ชื่อใหม่ใน Gallary)
  * ======================================================================
  */
 
@@ -2500,9 +2501,9 @@ const PZP = {
   '40Red': 'Pic @ Plan B TV 40 RED',
   '80Blue': 'Pic @ Plan B TV 80 BLUE',
   '80Red': 'Pic @ Plan B TV 80 RED',
-  CITY: 'Pic @ CITY TV 25',
+  CITY: 'Pic @ City TV',
   Spare: 'Pic @ Other',
-};
+}; /* 5.5.39: Gallary เปลี่ยนชื่อ “Pic @ CITY TV 25” → “Pic @ City TV” (โครงเก่ายังหาเจอผ่าน PKM) */
 const pzT = v =>
   String(v == null ? '' : v)
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '')
@@ -2789,9 +2790,9 @@ const PKM = {
   '40Red': /40RED/,
   '80Blue': /80BLUE/,
   '80Red': /80RED/,
-  CITY: /CITY/,
+  CITY: /CITYTV/,
   Spare: /OTHER|SPARE/,
-};
+}; /* 5.5.39: CITY ต้องเป็น CITY TV — ไม่ให้ไปโดน “Pic @ BTS & City Sync” */
 async function picPlan(root, W, res, rs, upto) {
   const D = new Date(W),
     y = D.getUTCFullYear(),
@@ -10772,7 +10773,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.38 (10 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.39 (10 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
