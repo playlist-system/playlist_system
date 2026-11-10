@@ -83,12 +83,27 @@ def run_fill(pw, html, fx, case, out):
     return errs
 
 
+def _col(x):
+    """สีแบบอ่านง่าย: rgb / theme:<เลข><tint> / idx:<เลข>"""
+    if x is None:
+        return None
+    t = getattr(x, 'type', None)
+    if t == 'rgb':
+        return x.rgb
+    if t == 'theme':
+        return 'theme:%s%+.2f' % (x.theme, x.tint or 0)
+    if t == 'indexed':
+        return 'idx:%s' % x.indexed
+    return str(t)
+
+
 def _fc(c):
     f = c.fill
-    try:
-        return f.fgColor.rgb if f and f.fill_type else None
-    except Exception:
-        return None
+    return _col(f.fgColor) if f and f.fill_type else None
+
+
+def _style(c):
+    return (_fc(c), c.font.b, _col(c.font.color), c.font.sz, c.font.name)
 
 
 def cmp_xlsm(fa, fb, limit=15):
@@ -109,8 +124,7 @@ def cmp_xlsm(fa, fb, limit=15):
                 if ca.value != cb.value:
                     diffs.append((s, ca.coordinate, 'ค่า', ca.value, cb.value))
                 else:
-                    ka = (_fc(ca), ca.font.b, ca.font.color and ca.font.color.rgb, ca.font.sz, ca.font.name)
-                    kb = (_fc(cb), cb.font.b, cb.font.color and cb.font.color.rgb, cb.font.sz, cb.font.name)
+                    ka, kb = _style(ca), _style(cb)
                     if ka != kb:
                         diffs.append((s, ca.coordinate, 'รูปแบบ', ka, kb))
     return len(diffs), diffs[:limit]
