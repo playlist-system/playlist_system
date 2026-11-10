@@ -46,13 +46,16 @@ const CONFIG = {
     { name: 'Signature Max', pattern: 'Signature' },
     { name: 'BKJ1', pattern: 'BKJ\\s*1' },
     { name: 'BKJ2', pattern: 'BKJ\\s*2' },
-    { name: 'Metro LED', pattern: 'Metro' }, // ตั้งแต่ พ.ย. 2569 มาทางอีเมลแล้ว (เดิมมาทาง LINE)
+    // Metro LED มาทางอีเมลแล้ว (ตั้งแต่ พ.ย. 2569 จาก Media Scheduling Center มาก่อนวันออกอากาศ 1 วัน) — อีเมลแนบ 2 ไฟล์ Excel:
+    //   "รายการหนังโฆษณา 7-Eleven Metro LED …" = ไฟล์ที่ระบบเติมใบเช็คใช้ • "Metro LED_… _Playlist" = ไฟล์ลำดับฉาย (Playlist เพิ่มเติม)
+    { name: 'Metro LED', pattern: 'รายการหนัง.*Metro' },
     { name: 'Rama9 Connect', pattern: 'Rama\\s*9[\\s_]*connect', extra: true },
     { name: 'Digital MRT', pattern: 'Digital[\\s_]*MRT', extra: true },
     { name: 'Gateway X', pattern: 'Gateway[\\s_]*X', extra: true },
     { name: 'Air Traveller', pattern: 'Air[\\s_]*Travell?er', extra: true },
     { name: 'The 20', pattern: 'The[\\s_]*20(?!\\d)', extra: true },
     { name: 'LA PlanB', pattern: 'LA[\\s_]*Plan[\\s_]*B', latest: true, extra: true },
+    { name: 'Metro LED ลำดับฉาย', pattern: '^Metro[\\s_]*LED', extra: true },
 
     { name: 'NTW 57Blue_1', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*1(?!\\d)', extra: true },
     { name: 'NTW 57Blue_2', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*2(?!\\d)', extra: true },
