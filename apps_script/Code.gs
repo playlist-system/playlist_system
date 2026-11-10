@@ -34,7 +34,8 @@ const CONFIG = {
   playlistWords: 'รายการหนัง|playlist',
   // Playlist ที่ระบบเติมใบเช็ครูปใช้ (ลำดับมีผล: ไฟล์เข้าแบบแรกที่ชื่อตรง)
   //   pattern = คำในชื่อไฟล์ • latest = ถ้าวันนี้ไม่มีฉบับใหม่ ใช้ฉบับล่าสุด
-  //   source: 'line' = ไม่ได้มาทางอีเมล (เตือนในอีเมลสรุป) • extra = Playlist เพิ่มเติม ไม่นับในแบบหลัก
+  //   source: 'line' = ไม่ได้มาทางอีเมล (เตือนในอีเมลสรุป) • extra = Playlist เพิ่มเติม ไม่นับในแบบหลัก (ใช้กับใบเช็คสื่ออื่น)
+  //   unused = ระบบเติมใบเช็คไม่ได้ใช้ (เก็บไว้เฉย ๆ ไม่รวมในปุ่ม "เลือกทั้งหมด")
   kinds: [
     { name: 'แยกจอ 40Blue', pattern: 'แยกจอ.*40\\s*Blue' },
     { name: 'แยกจอ 40Red', pattern: 'แยกจอ.*40\\s*Red' },
@@ -55,7 +56,7 @@ const CONFIG = {
     { name: 'Air Traveller', pattern: 'Air[\\s_]*Travell?er', extra: true },
     { name: 'The 20', pattern: 'The[\\s_]*20(?!\\d)', extra: true },
     { name: 'LA PlanB', pattern: 'LA[\\s_]*Plan[\\s_]*B', latest: true, extra: true },
-    { name: 'Metro LED ลำดับฉาย', pattern: '^Metro[\\s_]*LED', extra: true },
+    { name: 'Metro LED ลำดับฉาย', pattern: '^Metro[\\s_]*LED', extra: true, unused: true }, // ระบบเติมใบเช็คไม่ได้ใช้ — ไม่รวมในปุ่ม "เลือกทั้งหมด"
 
     { name: 'NTW 57Blue_1', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*1(?!\\d)', extra: true },
     { name: 'NTW 57Blue_2', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*2(?!\\d)', extra: true },
@@ -402,7 +403,7 @@ function webDay(day) {
     today: today,
     folderUrl: folder ? folder.getUrl() : '',
     parentUrl: parent.getUrl(),
-    kinds: CONFIG.kinds.map(k => ({ name: k.name, line: k.source === 'line', extra: !!k.extra, latest: !!k.latest })),
+    kinds: CONFIG.kinds.map(k => ({ name: k.name, line: k.source === 'line', extra: !!k.extra, latest: !!k.latest, unused: !!k.unused })),
     files: files,
     auto: auto,
     startHour: CONFIG.startHour,
@@ -531,7 +532,7 @@ function defaults() {
   D.kinds.forEach(function (k) { var L = g.by[k.name]; if (!L || k.extra) return; SEL[L[L.length - 1].id] = true; });
 }
 function picked() { return D ? D.files.filter(function (f) { return SEL[f.id]; }) : []; }
-function extraFiles(g) { var L = []; D.kinds.forEach(function (k) { if (k.extra && g.by[k.name]) L = L.concat(g.by[k.name]); }); return L; }
+function extraFiles(g) { var L = []; D.kinds.forEach(function (k) { if (k.extra && !k.unused && g.by[k.name]) L = L.concat(g.by[k.name]); }); return L; }
 function selBtn(L, grp) { var all = L.length && L.every(function (f) { return SEL[f.id]; }); return '<button class="ib sm" data-a="sel" data-g="' + grp + '">' + (all ? 'ไม่เลือก' : 'เลือกทั้งหมด') + '</button>'; }
 function fileRow(f, label, first, multi) {
   var meta = ['เข้าโฟลเดอร์ ' + f.time, kb(f.size)];
@@ -581,8 +582,8 @@ function draw() {
   if (multi.length) h += '<p class="warnbox">' + multi.map(function (k) { return esc(k.name); }).join(', ') + ' มีมากกว่า 1 ไฟล์ (มีฉบับแก้มา) — ติ๊กไว้ให้เฉพาะไฟล์ที่เข้ามาล่าสุด ตรวจก่อนดาวน์โหลด</p>';
   h += '</section>';
   if (extra.length) {
-    h += '<section class="card"><div class="hd"><div><h2>Playlist เพิ่มเติม</h2><p class="note">ระบบเติมใบเช็คไม่ได้ใช้ ติ๊กถ้าต้องการดาวน์โหลดไปด้วย</p></div>' + selBtn(extraFiles(g), 'extra') + '</div><div class="list">';
-    extra.forEach(function (k) { g.by[k.name].forEach(function (f, i) { h += fileRow(f, k.name, i === 0, 0); }); });
+    h += '<section class="card"><div class="hd"><div><h2>Playlist เพิ่มเติม</h2><p class="note">ใช้กับใบเช็คสื่ออื่น (CCTV, MRT, NTW, Paragon ฯลฯ) — ติ๊กถ้าวันนี้จะเติมใบเช็คเหล่านั้นด้วย</p></div>' + selBtn(extraFiles(g), 'extra') + '</div><div class="list">';
+    extra.forEach(function (k) { g.by[k.name].forEach(function (f, i) { h += fileRow(f, k.name + (k.unused ? ' (ระบบไม่ได้ใช้)' : ''), i === 0, 0); }); });
     h += '</div></section>';
   }
   if (g.oth.length) {
