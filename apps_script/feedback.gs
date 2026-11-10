@@ -21,14 +21,20 @@ function doGet() {
   return json_({ ok: true, ready: true, name: 'PHOTO CHECK STUDIO feedback' });
 }
 
-/** ระบบส่งคำแจ้งมาที่นี่ (JSON) */
+/** ระบบส่งคำแจ้งมาที่นี่
+ *  - แบบฟอร์ม (ช่อง p = JSON) เปิดในแท็บใหม่ → ตอบเป็นหน้าเว็บ “ส่งเรื่องแล้ว เลขที่ …” (ใช้ได้เมื่อ deploy แบบ “ทุกคนในบริษัท”)
+ *  - แบบ JSON ล้วน → ตอบเป็น JSON (deploy แบบ “ทุกคน”) */
 function doPost(e) {
+  const form = !!(e && e.parameter && e.parameter.p);
+  const out = function (o) { return form ? page_(o) : json_(o); };
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    const p = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const p = JSON.parse(form ? e.parameter.p : ((e && e.postData && e.postData.contents) || '{}'));
     const text = String(p.text || '');
-    if (!text.trim() && !(p.images || []).length) return json_({ ok: false, err: 'ไม่มีรายละเอียด' });
+    if (!text.trim() && !(p.images || []).length) return out({ ok: false, err: 'ไม่มีรายละเอียด' });
+    let mail = ''; try { mail = Session.getActiveUser().getEmail() || ''; } catch (_) {}
+    if (mail) p.name = (p.name ? p.name + ' ' : '') + '(' + mail + ')';
     const root = root_(), sh = sheet_(root);
     const no = '#' + String(sh.getLastRow()).padStart(4, '0'); // แถว 1 = หัวตาราง → เรื่องแรก #0001
     const when = new Date();
@@ -44,14 +50,23 @@ function doPost(e) {
     if (hasFile) dir.createFile(Utilities.newBlob(Utilities.base64Decode(p.file.data), 'application/vnd.ms-excel.sheet.macroEnabled.12', clean_(p.file.name) || 'ใบเช็ค.xlsm'));
     if (p.sys) dir.createFile('ข้อมูลระบบ.txt', JSON.stringify(p.sys, null, 1), MimeType.PLAIN_TEXT);
     sh.appendRow([no, when, p.name || '', p.topic || '', p.where || '', text.length > 500 ? text.slice(0, 500) + ' …' : text, n, hasFile ? 'มี' : '', dir.getUrl(), 'ใหม่', p.ver || '']);
-    return json_({ ok: true, no: no });
+    return out({ ok: true, no: no });
   } catch (err) {
-    return json_({ ok: false, err: String(err && err.message || err) });
+    return out({ ok: false, err: String(err && err.message || err) });
   } finally {
     lock.releaseLock();
   }
 }
 
+/** หน้าเว็บผลการส่ง (แท็บใหม่) • บอกหน้าระบบด้วย ถ้าเบราว์เซอร์ยอม */
+function page_(o) {
+  const esc = function (t) { return String(t || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  const h = '<div style="font-family:Tahoma,sans-serif;max-width:560px;margin:64px auto;text-align:center;line-height:1.6">' +
+    (o.ok ? '<h2 style="color:#1d7546">ส่งเรื่องแล้ว · เลขที่ ' + esc(o.no) + '</h2><p>ขอบคุณครับ คนดูแลระบบจะเห็นในตารางรวมคำแจ้ง<br>ปิดแท็บนี้ได้เลย</p>'
+          : '<h2 style="color:#b3261e">ส่งไม่ได้</h2><p>' + esc(o.err) + '</p><p>กลับไปที่หน้าระบบ แล้วกดส่งอีกครั้ง</p>') +
+    '</div><script>try{var w=window.top.opener;if(w)w.postMessage({psfb:1,ok:' + (o.ok ? 'true' : 'false') + ',no:' + JSON.stringify(o.no || '') + ',err:' + JSON.stringify(o.err || '') + '},"*")}catch(e){}</script>';
+  return HtmlService.createHtmlOutput(h).setTitle(o.ok ? 'ส่งเรื่องแล้ว' : 'ส่งไม่ได้');
+}
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 function clean_(s) { return String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80); }
 function root_() { const it = DriveApp.getFoldersByName(ROOT_NAME); return it.hasNext() ? it.next() : DriveApp.createFolder(ROOT_NAME); }
