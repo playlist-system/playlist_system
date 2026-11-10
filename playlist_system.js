@@ -134,6 +134,7 @@
  *   เวอร์ชัน 5.5.29: สร้างโฟลเดอร์แยกรูปจากใบเปล่า (chkRead blank) • ชื่อจอใบเปล่าแถวเลื่อน (pzScr)
  *   เวอร์ชัน 5.5.30: โฟลเดอร์แยกรูปแพค Digital MRT / The 20 / Air Traveller / Gateway X / Rama 9 (FXP, fxScr, fxIdx)
  *   เวอร์ชัน 5.5.31: แถวหมายเหตุในช่องชื่อหนังของ Playlist ไม่ใส่ บอกใน ต้องแก้ (RMK)
+ *   เวอร์ชัน 5.5.32: แถว Playlist ช่องเลื่อน — ช่องสถานะเป็นวันที่ (stDate, r.shf)
  * ======================================================================
  */
 
@@ -669,6 +670,7 @@ function chkRows(scr, o, kind) {
     ...sdOf(r),
     st: stl && /ขึ้นใหม่|สัญญาใหม่/.test(r.st || '') ? 'ฉบับก่อนหน้า' : r.st || '',
     off: r.off,
+    shf: r.shf ? 1 : 0,
     note: r.note || '',
     loc: r.loc || '',
   }));
@@ -1417,8 +1419,9 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     for (const r of b.rows) {
       if (r.sp) continue;
       if (jn && (b.kind === 'jam' ? jamSkip(r.note, jn) || nameSkip(r.ad, jn) : locSkip(r.loc, jn))) continue;
-      if (r.bd)
-        (b.badD || (b.badD = [])).push(r); /* ยังอยู่ใน Playlist = ยังออนอยู่ แม้วันหมดในไฟล์ผ่านไปแล้ว */
+      if (r.bd) (b.badD || (b.badD = [])).push(r);
+      if (r.shf)
+        (b.shfD || (b.shfD = [])).push(r); /* ยังอยู่ใน Playlist = ยังออนอยู่ แม้วันหมดในไฟล์ผ่านไปแล้ว */
       let g = r.sd && +r.sd > +P ? +r.sd : +P;
       const stl =
         CONTM &&
@@ -1928,6 +1931,17 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     dates: dates.length,
     later: B.reduce((n, b) => n + b.later.length, 0),
     rmkL: B.filter(b => b.rmk && b.rmk.length).map(b => [b.scr.c, b.rmk]),
+    shfL: B.filter(b => b.shfD && b.shfD.length).map(b => [
+      b.scr.c,
+      [
+        ...new Set(
+          b.shfD.map(
+            r =>
+              r.ad + ' (เริ่ม ' + (r.sd ? thdS(r.sd) : '?') + ' สิ้นสุด ' + (r.ed ? thdS(r.ed) : '?') + ')',
+          ),
+        ),
+      ],
+    ]),
     badDL: B.map(b => [
       b.scr.c,
       [
@@ -5949,6 +5963,14 @@ async function fillWb(f, on, metro, o) {
             ),
           0,
         ]);
+        for (const [c, l] of L.shfL || [])
+          rep.push([
+            sn,
+            c,
+            'ตรวจ: แถวใน Playlist ช่องเลื่อน (ช่องสถานะเป็นวันที่) ระบบใช้วันสิ้นสุดเป็นวันเริ่ม — ตรวจกับ Playlist → ' +
+              l.join(', '),
+            0,
+          ]); /* 5.5.32 */
         for (const [c, l] of L.rmkL || [])
           rep.push([
             sn,
@@ -10351,14 +10373,37 @@ function parsePlaylist(f) {
 /* ด่านตรวจ Playlist: สถานะที่ไม่รู้จัก และวันที่ที่อ่านไม่ได้ (ทุกแบบไฟล์) */
 const KST = /ขึ้นใหม่|ไฟล์เดิม|ต่อสัญญา|อัปเดต|ถอด|ปรับความถี่|ชดเชย|On-?Air/i,
   NOEND = /กำหนด|จนกว่า|ปลด|ไม่มี|^x{3,}$|^\*{3,}$/i;
+/* 5.5.32: ช่องสถานะเป็นวันที่ (Excel เก็บเป็นเลข เช่น 46341 = 15/11/2569) = แถวใน Playlist เลื่อนไป 1 ช่อง (เริ่ม / สิ้นสุด / สถานะ)
+   ถ้า วันเริ่ม ≤ วันสิ้นสุด ≤ วันในช่องสถานะ → เริ่ม = วันสิ้นสุด • สิ้นสุด = วันในช่องสถานะ • สถานะว่าง แล้วบอกให้ตรวจ (ไม่หยุดการเติม) */
+const stDate = v => {
+  const x = String(v == null ? '' : v).trim();
+  if (/^\d{5}(\.\d+)?$/.test(x) && +x > 20000 && +x < 80000)
+    return new Date(Date.UTC(1899, 11, 30) + Math.round(+x) * 864e5);
+  return /^\d{1,2}[-\/.](\d{1,2}|[A-Za-z]{3})[-\/.]\d{2,4}$/.test(x) ? parseD(x) : null;
+};
 function plCheck(p, I) {
   const st = new Map(),
     bad = new Map(),
-    all = new Set();
+    all = new Set(),
+    shf = [];
   for (const s of p)
     for (const r of s.rows) {
       if (!r.ad || r.ad === s.c || JUNK.test(String(r.ad).trim())) continue;
       all.add(r.ad);
+      {
+        const sd = stDate(r.st);
+        if (sd) {
+          const a = parseD(r.s),
+            b = parseD(r.e);
+          if (a && b && +a <= +b && +b <= +sd) {
+            r.shf = { s: r.s, e: r.e, st: r.st };
+            r.s = r.e;
+            r.e = fdU(sd);
+            r.st = '';
+            shf.push(`${s.c}: ${r.ad} → เริ่ม ${thdS(b)} สิ้นสุด ${thdS(sd)}`);
+          } else r.st = 'วันที่ ' + thdS(sd) + ' ' + sd.getUTCFullYear();
+        }
+      }
       const x = String(r.st || '').trim();
       if (x && !KST.test(x)) {
         if (!st.has(x)) st.set(x, new Set());
@@ -10372,6 +10417,11 @@ function plCheck(p, I) {
         }
       }
     }
+  if (shf.length)
+    I.push({
+      lv: 'info',
+      t: `แถวที่ช่องเลื่อน ${shf.length} เรื่อง (ช่องสถานะเป็นวันที่): ระบบใช้วันสิ้นสุดเป็นวันเริ่ม และวันในช่องสถานะเป็นวันสิ้นสุด — ${shf.slice(0, 3).join(' • ')}${shf.length > 3 ? ' …' : ''}`,
+    }); /* 5.5.32 */
   for (const [x, a] of st)
     I.push({
       lv: 'stop',
@@ -10689,7 +10739,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.31 (9 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.32 (10 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
