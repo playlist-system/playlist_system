@@ -944,6 +944,9 @@ details.files{border-radius:16px}
 @keyframes bootin{to{opacity:1}}
 .oldv{background:#FFF4D6;color:#5A3B00;border-bottom:1px solid #E9B949;padding:10px clamp(16px,3vw,32px);font-size:14px;line-height:1.6;text-align:center}
 .oldv a{color:#7A4A00;font-weight:700;text-decoration:underline;margin:0 6px;white-space:nowrap}
+/* 5.5.38: ปุ่มเปิดหน้า Playlist รายวัน */
+.plrow{display:flex;flex-wrap:wrap;column-gap:8px}
+a.btn{text-decoration:none}
 </style></head><body>
 <div class="wrap"><header class="hdr"><div class="brand"><span class="logo5" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="3.5"/><path d="M8 7l2-3h4l2 3"/><path d="M9.2 13.6l2 2 3.8-4"/></svg></span><div><b>PHOTO CHECK STUDIO</b><small>BUILT WITH AI • 2026</small></div></div><nav id="hnav" class="hnav" aria-label="เมนูหลัก"></nav></header><div class="shell"><nav id="side" class="side" aria-label="เมนู" data-tour="steps"></nav><div class="mainc"><nav id="sect" class="sect" aria-label="ส่วนของระบบ"></nav><nav id="steps" class="band" aria-label="ขั้นตอน"></nav><main id="app"><div class="boot">กำลังเปิดระบบ …<p class="bootx">ถ้าค้างอยู่หน้านี้นาน หรือระบบเปิดไม่ขึ้น ลองกด Ctrl+F5 ก่อน — ถ้ายังไม่ได้ <a href="https://playlist-system.github.io/playlist_system/versions/">ใช้เวอร์ชันก่อนหน้า</a></p></div></main></div></div><footer class="foot"><span id="ver"></span><span>ไฟล์ทั้งหมดประมวลผลในเครื่องนี้ ไม่ถูกส่งออกไปที่ใด</span><a id="prevv" class="prevv" href="https://playlist-system.github.io/playlist_system/versions/" title="ใช้เมื่อเวอร์ชันล่าสุดมีปัญหา เช่น เปิดไม่ขึ้น หรือเติมผิด">ใช้เวอร์ชันก่อนหน้า</a></footer></div><input type="color" id="colpick" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="picker" class="sr" tabindex="-1" aria-hidden="true" multiple><input type="file" id="pickdir" class="sr" tabindex="-1" aria-hidden="true" webkitdirectory multiple><div id="ovl"></div><div id="busy"></div><div id="tour"></div><div id="msg" role="status" aria-live="polite"></div><div id="mq"></div>
 <script>/*! xlsx.js (C) 2013-present SheetJS -- http://sheetjs.com */
@@ -3875,7 +3878,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.37 (10 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.38 (10 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4087,7 +4090,7 @@ function vData(){const has=DB.length>0,wd=has?workDate():null,sdc=KINDS.filter(K
  const ds=[...new Set(fl.filter(x=>!isSdc(x)).map(x=>x[1]).filter(Boolean))].sort((a,b)=>a-b);
  return`${shead('ใส่ Playlist ของวันนี้','ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว • หยุดหลายวัน ใส่ของทุกวันพร้อมกันได้ ระบบจะเติมต่อกันให้ทีละวัน')}
  <div class="s1">${drop('pl',has?'เพิ่มหรือเปลี่ยนไฟล์ Playlist':'ลากไฟล์ Playlist มาวางที่นี่','หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม • ลากโฟลเดอร์ของแต่ละวันมาทั้งโฟลเดอร์ก็ได้','.xlsx,.xls,.xlsm','drop-pl',has)}${vDateCard(wd,has)}</div>
- <button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>
+ <div class="plrow"><button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>${plwBtn('quiet ckdir pldir')}</div>
  ${vDays(MD)}${vWall(wd)}
  <div class="stack">${PLX.length?alertHTML('er',`อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`,`<ul>${PLX.map(x=>`<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`):''}
  ${vPLI()}
@@ -4538,7 +4541,7 @@ function vHome(){const has=DB.length>0,nk=KINDS.filter(K=>!K.x&&DB.some(K.has)).
  /* คอลัมน์ขวา */
  const fl=(()=>{const M=new Map();for(const x of DB)if(x.pf&&(!M.has(x.pf)||x.pd>M.get(x.pf)))M.set(x.pf,x.pd||0);return[...M]})();
  const plCard=`<section class="hcard" aria-labelledby="hpl"><div class="hch"><h2 id="hpl">ไฟล์ Playlist</h2>${has?'<button class="linkb" data-a="tab" data-k="dat">ดูทั้งหมด</button>':''}</div>${fl.length?fl.slice(0,4).map(([f,d])=>`<div class="hfile"><span class="xi" aria-hidden="true">X</span><span><b title="${esc(f)}">${esc(f)}</b><small>${d?'วันที่ '+thd(new Date(d)):'ใส่แล้ว'}</small></span><span class="hok" aria-hidden="true">${IC.okc}</span></div>`).join('')+`<p class="hint">${fl.length>4?`และอีก ${fl.length-4} ไฟล์ • `:''}ครบ ${nk} จาก 11 แบบ${PLX.length?` • อ่านไม่ได้ ${PLX.length} ไฟล์`:''}</p>`
-  :`<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns"><button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button></div>`}</section>`;
+  :`<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns"><button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button>${plwBtn('secondary')}</div>`}</section>`;
  const resCard=`<section class="hcard" aria-labelledby="hrs"><h2 id="hrs">ผลการเติมล่าสุด</h2>${L?`<div class="hfile"><span class="xi z" aria-hidden="true">${IC.fillI}</span><span><b>ใบเช็ครูป_เติมแล้ว.zip</b><small>${nf} ไฟล์ • ${ns.toLocaleString()} จอ${nw?` • ต้องแก้ ${nw}`:''}</small></span><button class="ib" data-a="dlz" aria-label="ดาวน์โหลดใบเช็คที่เติมแล้ว (.zip)" title="ดาวน์โหลด (.zip)">${IC.dl}</button></div>${L.saved?'<p class="hint">บันทึก / ดาวน์โหลดแล้ว</p>':''}<div class="hbtns">${FSA&&!L.saved?`<button class="btn primary" data-a="savedir">${IC.save}บันทึกทับไฟล์เดิม</button>`:''}<button class="btn secondary" data-a="tab" data-k="res">ดูผลการเติม</button></div>`
   :'<p class="hint" style="margin-top:0">ยังไม่ได้เติมใบเช็คในรอบนี้ เติมเสร็จแล้วไฟล์จะขึ้นที่นี่</p>'}</section>`;
  const logCard=`<section class="hcard h5log" aria-labelledby="hlg"><div class="hch"><h2 id="hlg">บันทึกการทำงาน</h2><small class="h5lt">รอบนี้</small></div><ol>${LOG.slice(-8).map(x=>`<li><time>${x.t}</time><span><b class="k ${x.c}">${x.k}</b> ${esc(x.m)}</span></li>`).join('')}</ol></section>`;
@@ -4759,6 +4762,9 @@ function view(){logTick();const ae=document.activeElement,fk=focusKey(ae);let se
    ข้อความยาวไม่จำกัด แนบรูปได้หลายรูป (ลากมาวาง / Ctrl+V / เลือกไฟล์ — รูปใหญ่ย่อก่อนส่ง) แนบไฟล์ใบเช็คได้ • FB_URL = ที่อยู่ Web app ที่ deploy แล้ว (ยังไม่ตั้ง = ส่งไม่ได้ คัดลอกข้อความแทน) ===== */
 /* 5.5.36: ที่รับของบริษัท (เปิดได้เฉพาะบัญชี Google ของบริษัท) */
 const FB_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbyhGIBAGh4Bi2pFPtqiWYiPPPAZldjjnbH0kXZOl7TySZddGNmbP3Ga1sFMv3fkDu1F/exec';
+/* 5.5.38: หน้า "Playlist รายวัน" (Apps Script ของบริษัท ดึง Playlist จากอีเมลลง Google Drive ทุกชั่วโมง) — ปุ่มในขั้นใส่ Playlist และหน้าหลัก */
+const PLW_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbzQ1xQ1-tZMflduU9R6xqntXhieDfzR0cJsBwb1ymsn0jVIF-kOtx2Fo0ELrAFeekDjlA/exec',PLW_TIP='ดาวน์โหลด Playlist ทุกไฟล์ของวันนี้จาก Google Drive ของบริษัทเป็น .zip ไฟล์เดียว แล้วลากมาวางที่นี่ (ต้องล็อกอินบัญชี Google ของบริษัท)',
+ plwBtn=c=>PLW_URL?`<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิดหน้า Playlist รายวัน</a>`:'';
 /* 5.5.37: เวอร์ชันก่อนหน้า — หน้านี้เปิดจาก versions/ (สำเนาเวอร์ชันเก่าที่เก็บไว้ใช้ตอนเวอร์ชันล่าสุดมีปัญหา) → แถบบอก + ลิงก์กลับเวอร์ชันล่าสุด */
 const SITE='https://playlist-system.github.io/playlist_system/',OLDVER=/\/versions\/[^\/]*$/.test(location.pathname);
 if(OLDVER){const a=document.getElementById('prevv');if(a){a.href=SITE+'playlist_system.html';a.textContent='กลับไปเวอร์ชันล่าสุด'}
