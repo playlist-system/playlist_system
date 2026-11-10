@@ -28,6 +28,10 @@ const CONFIG = {
   // แบบที่ไม่ได้ส่งทุกวัน (latest: true) ค้นอีเมลย้อนหลังกี่วัน และใช้คำค้นอะไร
   latestDays: 14,
   latestSearch: 'showdc OR "show dc" OR "LA PlanB" OR LA_PlanB',
+  // เก็บ Playlist ทุกไฟล์ของวันนี้ แม้ไม่อยู่ในรายการ kinds ด้านล่าง (ชื่อไฟล์ต้องมีคำใน playlistWords)
+  //   false = เก็บเฉพาะแบบที่อยู่ในรายการ • ไฟล์ Excel ที่ชื่อไม่มีคำเหล่านี้ (เช่น ใบแจ้งหนี้) ไม่เก็บ แค่แจ้งในอีเมลสรุป
+  collectAll: true,
+  playlistWords: 'รายการหนัง|playlist',
   // Playlist ที่ระบบเติมใบเช็ครูปใช้ (ลำดับมีผล: ไฟล์เข้าแบบแรกที่ชื่อตรง)
   //   pattern = คำในชื่อไฟล์ • latest = ถ้าวันนี้ไม่มีฉบับใหม่ ใช้ฉบับล่าสุด
   //   source: 'line' = ไม่ได้มาทางอีเมล (เตือนในอีเมลสรุป) • extra = Playlist เพิ่มเติม ไม่นับใน 10 แบบ
@@ -49,10 +53,26 @@ const CONFIG = {
     { name: 'Air Traveller', pattern: 'Air[\\s_]*Travell?er', extra: true },
     { name: 'The 20', pattern: 'The[\\s_]*20(?!\\d)', extra: true },
     { name: 'LA PlanB', pattern: 'LA[\\s_]*Plan[\\s_]*B', latest: true, extra: true },
+
+    { name: 'NTW 57Blue_1', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*1(?!\\d)', extra: true },
+    { name: 'NTW 57Blue_2', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*2(?!\\d)', extra: true },
+    { name: 'NTW 57Red_1', pattern: 'NTW[\\s_]*57[\\s_]*Red[\\s_]*1(?!\\d)', extra: true },
+    { name: 'NTW 57Red_2', pattern: 'NTW[\\s_]*57[\\s_]*Red[\\s_]*2(?!\\d)', extra: true },
+    { name: 'NTW Full Only', pattern: 'NTW[\\s_]*Full', extra: true },
+    { name: 'NTW Spare', pattern: 'NTW[\\s_]*Spare', extra: true },
+    { name: 'Central Network', pattern: 'Central[\\s_]*Network', extra: true },
+    { name: 'Parc Paragon', pattern: 'Parc[\\s_]*Paragon', extra: true },
+    { name: 'Paragon Max', pattern: 'Paragon[\\s_]*Max', extra: true },
+    { name: 'Siam Paragon in mall', pattern: 'Siam[\\s_]*Paragon[\\s_]*in[\\s_]*mall', extra: true },
+    { name: 'Siam Paragon Facade', pattern: 'Siam[\\s_]*Paragon[\\s_]*Facade', extra: true },
+    { name: 'The District EM', pattern: 'District[\\s_]*EM', extra: true },
+    { name: 'The Panoramix', pattern: 'Panoramix', extra: true },
+    { name: 'LIDO Connect', pattern: 'LIDO', extra: true },
   ],
 };
 
 const TZ = 'Asia/Bangkok';
+const OTHER_ = 'Playlist อื่น';
 const PROP_FOLDER = 'parentFolderId';
 const PROP_WEB = 'webUrl';
 const STUDIO_URL = 'https://playlist-system.github.io/playlist_system/';
@@ -147,8 +167,10 @@ function nameDate_(n, thisYear) {
 function pick_(atts, today) {
   const kinds = CONFIG.kinds.map(k => Object.assign({}, k, { re: new RegExp(k.pattern, 'i') }));
   const thisYear = +today.slice(0, 4);
+  const word = CONFIG.collectAll && CONFIG.playlistWords ? new RegExp(CONFIG.playlistWords, 'i') : null;
   const byKind = {};
   const others = {};
+  const more = {}; // Playlist ของวันนี้ที่ไม่อยู่ในรายการ (collectAll)
   for (const a of atts) {
     const name = String(a.name || '').normalize('NFC');
     if (!/\.xlsx?$/i.test(name)) continue;
@@ -156,7 +178,11 @@ function pick_(atts, today) {
     if (!day || day > today) continue; // ไฟล์ของวันข้างหน้า รอวันนั้น
     const kind = kinds.find(k => k.re.test(name));
     if (!kind) {
-      if (day === today) others[name] = 1;
+      if (day !== today) continue;
+      if (word && word.test(name)) {
+        const k2 = name + '|' + a.size;
+        if (!more[k2]) more[k2] = { kind: OTHER_, name: name, key: k2, day: day, when: a.when, blob: a.blob, size: a.size };
+      } else others[name] = 1;
       continue;
     }
     if (day !== today && !kind.latest) continue; // ไฟล์ของวันก่อน
@@ -174,6 +200,7 @@ function pick_(atts, today) {
       chosen.push(list[list.length - 1]); // ฉบับล่าสุดที่มี
     }
   }
+  chosen.push(...Object.values(more));
   return { chosen: chosen, others: Object.keys(others) };
 }
 
@@ -266,6 +293,7 @@ function summary_(folder, today, added, others, trashed) {
   const kinds = CONFIG.kinds.map(k => Object.assign({}, k, { re: new RegExp(k.pattern, 'i') }));
   const counts = {};
   const files = [];
+  const more = [];
   if (folder) {
     const it = folder.getFiles();
     while (it.hasNext()) {
@@ -273,6 +301,7 @@ function summary_(folder, today, added, others, trashed) {
       files.push(n);
       const k = kinds.find(x => x.re.test(n));
       if (k) counts[k.name] = (counts[k.name] || 0) + 1;
+      else more.push(n);
     }
   }
   const mail = kinds.filter(k => k.source !== 'line' && !k.extra).map(k => k.name);
@@ -296,10 +325,11 @@ function summary_(folder, today, added, others, trashed) {
       ? '<p>ยังขาด <b>' + missing.length + '</b> แบบ: ' + missing.map(esc).join(', ') + '</p><p>ระบบเช็กอีเมลทุกชั่วโมงจนถึง ' + CONFIG.endHour + ':00</p>'
       : '<p><b>ครบ ' + mail.length + ' แบบที่มาทางอีเมลแล้ว</b> ดาวน์โหลดทั้งโฟลเดอร์ แล้วลากลง PHOTO CHECK STUDIO ได้เลย</p>') +
     (line.length ? '<p style="color:#1d4f91"><b>มาทาง LINE:</b> ' + line.map(esc).join(', ') + ' — ดาวน์โหลดจาก LINE แล้วใส่ในระบบเอง</p>' : '') +
-    (extra.length ? '<p>Playlist เพิ่มเติม (สำหรับใบเช็ค CCTV / MRT / LA PlanB): ' + extra.map(esc).join(', ') + '</p>' : '') +
+    (extra.length ? '<p>Playlist เพิ่มเติม (ไม่นับใน ' + mail.length + ' แบบ): ' + extra.map(esc).join(', ') + '</p>' : '') +
+    (more.length ? '<p>Playlist อื่น ๆ ที่ไม่อยู่ในรายการ (เก็บไว้ให้ด้วย ' + more.length + ' ไฟล์): ' + more.map(esc).join(', ') + '</p>' : '') +
     (multi.length ? '<p style="color:#b35a14"><b>บางแบบมีมากกว่า 1 ไฟล์:</b> ' + multi.map(k => esc(k) + ' (' + counts[k] + ' ไฟล์)').join(', ') + ' — ตรวจว่าต้องใช้ฉบับไหนก่อนลากลงระบบ</p>' : '') +
     (trashed && trashed.length ? '<p style="color:#586274">ได้ฉบับของวันนี้แล้ว ย้ายฉบับเก่าไปถังขยะของ Drive: ' + trashed.map(esc).join(', ') + '</p>' : '') +
-    (others.length ? '<p style="color:#586274">ไฟล์ Excel อื่นของวันนี้ (ไม่ได้เก็บ เพราะชื่อไม่ตรงแบบที่ใช้):</p><ul style="color:#586274">' + others.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '') +
+    (others.length ? '<p style="color:#586274">ไฟล์ Excel อื่นของวันนี้ (ไม่ได้เก็บ เพราะชื่อไม่เหมือน Playlist):</p><ul style="color:#586274">' + others.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '') +
     (webUrl_() ? '<p><a href="' + webUrl_() + '"><b>เปิดหน้า Playlist รายวัน</b></a> — ดูเช็กลิสต์และดาวน์โหลดทั้งหมดเป็นไฟล์ .zip ไฟล์เดียว</p>' : '') +
     (folder ? '<p><a href="' + folder.getUrl() + '">เปิดโฟลเดอร์ Google Drive ของวันนี้</a></p>' : '') +
     '</div>';
@@ -426,6 +456,8 @@ input[type=date].ib{padding:0 8px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0;box-shadow:var(--sh)}
 .card h2{font-size:15px;margin:0 0 2px}
 .card .note{color:var(--sub);font-size:13.5px;margin:0}
+.hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.ib.sm{height:32px;font-size:13.5px;white-space:nowrap;flex:none}
 .st{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .big{font-size:38px;font-weight:bold;line-height:1}
 .big small{font-size:16px;color:var(--sub);font-weight:normal;margin-left:6px}
@@ -496,6 +528,8 @@ function defaults() {
   D.kinds.forEach(function (k) { var L = g.by[k.name]; if (!L || k.extra) return; SEL[L[L.length - 1].id] = true; });
 }
 function picked() { return D ? D.files.filter(function (f) { return SEL[f.id]; }) : []; }
+function extraFiles(g) { var L = []; D.kinds.forEach(function (k) { if (k.extra && g.by[k.name]) L = L.concat(g.by[k.name]); }); return L; }
+function selBtn(L, grp) { var all = L.length && L.every(function (f) { return SEL[f.id]; }); return '<button class="ib sm" data-a="sel" data-g="' + grp + '">' + (all ? 'ไม่เลือก' : 'เลือกทั้งหมด') + '</button>'; }
 function fileRow(f, label, first, multi) {
   var meta = ['เข้าโฟลเดอร์ ' + f.time, kb(f.size)];
   return '<label class="row"><input type="checkbox" data-id="' + esc(f.id) + '"' + (SEL[f.id] ? ' checked' : '') + '>' +
@@ -544,12 +578,12 @@ function draw() {
   if (multi.length) h += '<p class="warnbox">' + multi.map(function (k) { return esc(k.name); }).join(', ') + ' มีมากกว่า 1 ไฟล์ (มีฉบับแก้มา) — ติ๊กไว้ให้เฉพาะไฟล์ที่เข้ามาล่าสุด ตรวจก่อนดาวน์โหลด</p>';
   h += '</section>';
   if (extra.length) {
-    h += '<section class="card"><h2>Playlist เพิ่มเติม</h2><p class="note">ระบบเติมใบเช็คไม่ได้ใช้ ติ๊กถ้าต้องการดาวน์โหลดไปด้วย</p><div class="list">';
+    h += '<section class="card"><div class="hd"><div><h2>Playlist เพิ่มเติม</h2><p class="note">ระบบเติมใบเช็คไม่ได้ใช้ ติ๊กถ้าต้องการดาวน์โหลดไปด้วย</p></div>' + selBtn(extraFiles(g), 'extra') + '</div><div class="list">';
     extra.forEach(function (k) { g.by[k.name].forEach(function (f, i) { h += fileRow(f, k.name, i === 0, 0); }); });
     h += '</div></section>';
   }
   if (g.oth.length) {
-    h += '<section class="card"><h2>ไฟล์อื่นในโฟลเดอร์</h2><div class="list">';
+    h += '<section class="card"><div class="hd"><div><h2>Playlist อื่น ๆ</h2><p class="note">ไม่อยู่ในรายการที่ตั้งไว้ ระบบเก็บไว้ให้ด้วย ติ๊กถ้าต้องการ</p></div>' + selBtn(g.oth, 'oth') + '</div><div class="list">';
     g.oth.forEach(function (f, i) { h += fileRow(f, 'อื่น ๆ', i === 0, 0); });
     h += '</div></section>';
   }
@@ -629,6 +663,10 @@ document.addEventListener('click', function (e) {
   if (b.dataset.go) { if (b.dataset.go <= D.today) load(b.dataset.go); }
   else if (b.dataset.a === 'zip') zip();
   else if (b.dataset.a === 'collect') collect();
+  else if (b.dataset.a === 'sel') {
+    var g = byKind(), L = b.dataset.g === 'oth' ? g.oth : extraFiles(g), all = L.every(function (f) { return SEL[f.id]; });
+    L.forEach(function (f) { SEL[f.id] = !all; }); draw();
+  }
 });
 document.addEventListener('change', function (e) {
   var t = e.target;
