@@ -136,6 +136,7 @@
  *   เวอร์ชัน 5.5.31: แถวหมายเหตุในช่องชื่อหนังของ Playlist ไม่ใส่ บอกใน ต้องแก้ (RMK)
  *   เวอร์ชัน 5.5.32: แถว Playlist ช่องเลื่อน — ช่องสถานะเป็นวันที่ (stDate, r.shf)
  *   เวอร์ชัน 5.5.33: ชื่อหนังมีเลขเกินท้าย “_15s 15” ตัดออก ทั้ง Playlist และใบเช็ค (durTail)
+ *   เวอร์ชัน 5.5.34: เตือนแถวหมายเหตุเฉพาะแถวที่จะถูกใส่จริง (ไม่นับ เวลารวม …)
  * ======================================================================
  */
 
@@ -651,16 +652,18 @@ function chkRows(scr, o, kind) {
   let L = scr.rows.filter(r => o.off || !r.off);
   if (o.newOnly) L = L.filter(isNew);
   const stl = !!(o.W && scr.pd && +scr.pd < +o.W && KINDS.some(K => K.v && K.has(scr))); /* 4.4 */
-  return L.filter(
+  const RM =
+    new Set(); /* 5.5.34: แถวหมายเหตุที่ระบบตัดออกจริง (แถวที่กฎอื่นตัดอยู่แล้ว เช่น “เวลารวม 00:30:00” จำนวนครั้ง 0 ไม่นับ) */
+  const OUT = L.filter(
     r =>
       r.ad &&
       !JUNK.test(r.ad.trim()) &&
-      !RMK(r.ad) &&
       r.ad !== scr.c &&
       !FASTN.test(r.ad) &&
       !skipRow(scr, r) &&
       !(SIGAL[scr.c] && r.cnt == null && /^Content/i.test(r.ty || '')) &&
-      !(kind === 'jam' && (/^BJ\d*_\d+_/i.test(r.ad) || /weather/i.test(r.ad))),
+      !(kind === 'jam' && (/^BJ\d*_\d+_/i.test(r.ad) || /weather/i.test(r.ad))) &&
+      !(RMK(r.ad) && (r.off || RM.add(String(r.ad).trim()))),
   ).map(r => ({
     ad: (kind === 'jam' ? r.ad.replace(/^BKJ[12]?_/i, '') : r.ad).replace(
       /\s*\((?:O\/A|ออน)[^)]*\)\s*$/i,
@@ -675,6 +678,8 @@ function chkRows(scr, o, kind) {
     note: r.note || '',
     loc: r.loc || '',
   }));
+  OUT.rmk = [...RM];
+  return OUT;
 }
 function mkStyles(doc) {
   const g = n => doc.getElementsByTagNameNS(NS, n)[0],
@@ -1020,14 +1025,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   const B = jobs.map(j => {
     const kind = j[4],
       all = kind === 'keep' ? [] : chkRows(j[3], { ...o, off: true }, kind),
-      rmk =
-        kind === 'keep'
-          ? []
-          : [
-              ...new Set(
-                ((j[3] || {}).rows || []).filter(r => !r.off && RMK(r.ad)).map(r => String(r.ad).trim()),
-              ),
-            ],
+      rmk = kind === 'keep' ? [] : all.rmk || [],
       lc = j[1],
       nc = pv(lc),
       pc = nx(lc);
@@ -10770,7 +10768,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.33 (10 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.34 (10 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
