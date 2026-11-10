@@ -140,6 +140,7 @@
  *   เวอร์ชัน 5.5.35: ปุ่มแจ้งปัญหาส่งแบบฟอร์มในแท็บใหม่ (ที่รับแบบทุกคนในบริษัท)
  *   เวอร์ชัน 5.5.36: ตั้งที่รับฟีดแบ็กของบริษัทในระบบแล้ว (ปุ่มแจ้งปัญหาพร้อมใช้)
  *   เวอร์ชัน 5.5.37: ลิงก์ใช้เวอร์ชันก่อนหน้า (versions/) ท้ายหน้า + แถบบอกเมื่อเปิดเวอร์ชันเก่า
+ *   เวอร์ชัน 5.5.38: ปุ่มเปิดหน้า Playlist รายวัน (Apps Script ของบริษัท) ในขั้นใส่ Playlist และหน้าหลัก
  * ======================================================================
  */
 
@@ -10771,7 +10772,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.37 (10 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.38 (10 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -11618,7 +11619,7 @@ function vData() {
   ].sort((a, b) => a - b);
   return `${shead('ใส่ Playlist ของวันนี้', 'ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว • หยุดหลายวัน ใส่ของทุกวันพร้อมกันได้ ระบบจะเติมต่อกันให้ทีละวัน')}
  <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม • ลากโฟลเดอร์ของแต่ละวันมาทั้งโฟลเดอร์ก็ได้', '.xlsx,.xls,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
- <button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>
+ <div class="plrow"><button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>${plwBtn('quiet ckdir pldir')}</div>
  ${vDays(MD)}${vWall(wd)}
  <div class="stack">${PLX.length ? alertHTML('er', `อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`, `<ul>${PLX.map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`) : ''}
  ${vPLI()}
@@ -13423,7 +13424,7 @@ function vHome() {
           )
           .join('') +
         `<p class="hint">${fl.length > 4 ? `และอีก ${fl.length - 4} ไฟล์ • ` : ''}ครบ ${nk} จาก 11 แบบ${PLX.length ? ` • อ่านไม่ได้ ${PLX.length} ไฟล์` : ''}</p>`
-      : `<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns"><button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button></div>`
+      : `<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns"><button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button>${plwBtn('secondary')}</div>`
   }</section>`;
   const resCard = `<section class="hcard" aria-labelledby="hrs"><h2 id="hrs">ผลการเติมล่าสุด</h2>${
     L
@@ -14224,6 +14225,15 @@ function view() {
 /* 5.5.36: ที่รับของบริษัท (เปิดได้เฉพาะบัญชี Google ของบริษัท) */
 const FB_URL =
   'https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbyhGIBAGh4Bi2pFPtqiWYiPPPAZldjjnbH0kXZOl7TySZddGNmbP3Ga1sFMv3fkDu1F/exec';
+/* 5.5.38: หน้า "Playlist รายวัน" (Apps Script ของบริษัท ดึง Playlist จากอีเมลลง Google Drive ทุกชั่วโมง) — ปุ่มในขั้นใส่ Playlist และหน้าหลัก */
+const PLW_URL =
+    'https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbzQ1xQ1-tZMflduU9R6xqntXhieDfzR0cJsBwb1ymsn0jVIF-kOtx2Fo0ELrAFeekDjlA/exec',
+  PLW_TIP =
+    'ดาวน์โหลด Playlist ทุกไฟล์ของวันนี้จาก Google Drive ของบริษัทเป็น .zip ไฟล์เดียว แล้วลากมาวางที่นี่ (ต้องล็อกอินบัญชี Google ของบริษัท)',
+  plwBtn = c =>
+    PLW_URL
+      ? `<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิดหน้า Playlist รายวัน</a>`
+      : '';
 /* 5.5.37: เวอร์ชันก่อนหน้า — หน้านี้เปิดจาก versions/ (สำเนาเวอร์ชันเก่าที่เก็บไว้ใช้ตอนเวอร์ชันล่าสุดมีปัญหา) → แถบบอก + ลิงก์กลับเวอร์ชันล่าสุด */
 const SITE = 'https://playlist-system.github.io/playlist_system/',
   OLDVER = /\/versions\/[^\/]*$/.test(location.pathname);
