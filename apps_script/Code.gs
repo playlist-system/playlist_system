@@ -34,7 +34,7 @@ const CONFIG = {
   playlistWords: 'รายการหนัง|playlist',
   // Playlist ที่ระบบเติมใบเช็ครูปใช้ (ลำดับมีผล: ไฟล์เข้าแบบแรกที่ชื่อตรง)
   //   pattern = คำในชื่อไฟล์ • latest = ถ้าวันนี้ไม่มีฉบับใหม่ ใช้ฉบับล่าสุด
-  //   source: 'line' = ไม่ได้มาทางอีเมล (เตือนในอีเมลสรุป) • extra = Playlist เพิ่มเติม ไม่นับใน 10 แบบ
+  //   source: 'line' = ไม่ได้มาทางอีเมล (เตือนในอีเมลสรุป) • extra = Playlist เพิ่มเติม ไม่นับในแบบหลัก
   kinds: [
     { name: 'แยกจอ 40Blue', pattern: 'แยกจอ.*40\\s*Blue' },
     { name: 'แยกจอ 40Red', pattern: 'แยกจอ.*40\\s*Red' },
@@ -46,7 +46,7 @@ const CONFIG = {
     { name: 'Signature Max', pattern: 'Signature' },
     { name: 'BKJ1', pattern: 'BKJ\\s*1' },
     { name: 'BKJ2', pattern: 'BKJ\\s*2' },
-    { name: 'Metro LED', pattern: 'Metro', source: 'line' },
+    { name: 'Metro LED', pattern: 'Metro' }, // ตั้งแต่ พ.ย. 2569 มาทางอีเมลแล้ว (เดิมมาทาง LINE)
     { name: 'Rama9 Connect', pattern: 'Rama\\s*9[\\s_]*connect', extra: true },
     { name: 'Digital MRT', pattern: 'Digital[\\s_]*MRT', extra: true },
     { name: 'Gateway X', pattern: 'Gateway[\\s_]*X', extra: true },
@@ -566,7 +566,7 @@ function draw() {
   if (isToday) meta.push(D.auto === false ? 'ดึงอัตโนมัติ: ปิดอยู่ (กด setup ในหน้าโค้ดเพื่อเปิด)' : 'ระบบเช็กอีเมลเองทุกชั่วโมง ' + D.startHour + ':00–' + D.endHour + ':59');
   if (meta.length) h += '<p class="meta">' + meta.join(' • ') + '</p>';
   h += '</section>';
-  // รายการ 10 แบบ + Metro LED
+  // รายการแบบหลัก (11 แบบ รวม Metro LED)
   h += '<section class="card"><h2>Playlist ที่ใช้ในระบบเติมใบเช็ค</h2><p class="note">ติ๊กไฟล์ที่จะดาวน์โหลด</p><div class="list">';
   main.concat(line).forEach(function (k) {
     var L = g.by[k.name];
@@ -587,7 +587,7 @@ function draw() {
     g.oth.forEach(function (f, i) { h += fileRow(f, 'อื่น ๆ', i === 0, 0); });
     h += '</div></section>';
   }
-  h += '<section class="card"><h2>วิธีใช้</h2><ol class="how"><li>กด <b>ดาวน์โหลด</b> ด้านล่าง ได้ไฟล์ .zip ไฟล์เดียว</li><li>ดาวน์โหลด Metro LED จาก LINE</li><li>เปิด PHOTO CHECK STUDIO แล้วลากไฟล์ .zip กับไฟล์ Metro LED ลงขั้นที่ 1 พร้อมกัน — <b>ไม่ต้องแตกไฟล์</b></li></ol></section>';
+  h += '<section class="card"><h2>วิธีใช้</h2><ol class="how"><li>กด <b>ดาวน์โหลด</b> ด้านล่าง ได้ไฟล์ .zip ไฟล์เดียว</li><li>เปิด PHOTO CHECK STUDIO แล้วลากไฟล์ .zip ลงขั้นที่ 1 — <b>ไม่ต้องแตกไฟล์</b></li></ol></section>';
   app.innerHTML = h;
   app.style.opacity = BUSY === 'load' ? '.55' : '';
   drawBar();
