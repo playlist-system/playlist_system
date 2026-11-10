@@ -7,16 +7,25 @@
 - playlist_system.html  : VERTXT = '… เวอร์ชัน X (วันที่)'
 - README.md             : **เวอร์ชัน X · วันที่**  (+ บรรทัดแรกใต้ "## ประวัติเวอร์ชัน" ถ้าใส่ --history)
 - คู่มือ…txt             : เวอร์ชัน X  •  ปรับปรุงล่าสุด วันที่
+และก่อนเปลี่ยน เก็บสำเนาเวอร์ชันที่อยู่บนเว็บตอนนี้ (git HEAD) ไว้ใน versions/ ด้วย dev/snapshot.py
+(ปิดได้ด้วย --no-snapshot) — ทีมกด "ใช้เวอร์ชันก่อนหน้า" ท้ายหน้าระบบเมื่อเวอร์ชันใหม่มีปัญหา
 ส่วนหัวของ playlist_system.js ใช้ dev/build_js.py --note
 """
-import re, sys, os, argparse
+import re, sys, os, argparse, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from docs_edit import edit, MANUAL
 
 ap = argparse.ArgumentParser()
 ap.add_argument('ver'); ap.add_argument('date')
 ap.add_argument('--history', help='ข้อความ (markdown) ต่อจาก "— " ในประวัติเวอร์ชัน')
+ap.add_argument('--no-snapshot', action='store_true', help='ไม่เก็บสำเนาเวอร์ชันเดิมใน versions/')
 a = ap.parse_args()
+
+if not a.no_snapshot:
+    head = subprocess.run(['git', 'show', 'HEAD:playlist_system.html'], capture_output=True).stdout.decode('utf-8', 'replace')
+    m = re.search(r"const VERTXT='[^']*?เวอร์ชัน ([0-9.]+) \(", head)
+    if m and m.group(1) != a.ver:
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'snapshot.py')], check=True)
 
 
 def sub1(path, pat, rep, crlf=False):
