@@ -3866,7 +3866,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.35 (10 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.36 (10 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4748,7 +4748,8 @@ function view(){logTick();const ae=document.activeElement,fk=focusKey(ae);let se
 /* 5.1: ค้นหา (Ctrl K) — หน้า / เครื่องมือ / ใบเช็คที่ใส่ / จอใน Playlist (รหัสหรือชื่อจอ) */
 /* ===== 5.5.23: แจ้งปัญหา / เสนอแนะ — ส่งเข้า Google Drive ของบริษัท (Google Apps Script ดู apps_script/feedback.gs)
    ข้อความยาวไม่จำกัด แนบรูปได้หลายรูป (ลากมาวาง / Ctrl+V / เลือกไฟล์ — รูปใหญ่ย่อก่อนส่ง) แนบไฟล์ใบเช็คได้ • FB_URL = ที่อยู่ Web app ที่ deploy แล้ว (ยังไม่ตั้ง = ส่งไม่ได้ คัดลอกข้อความแทน) ===== */
-const FB_URL='';
+/* 5.5.36: ที่รับของบริษัท (เปิดได้เฉพาะบัญชี Google ของบริษัท) */
+const FB_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbyhGIBAGh4Bi2pFPtqiWYiPPPAZldjjnbH0kXZOl7TySZddGNmbP3Ga1sFMv3fkDu1F/exec';
 IC.chat='<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></svg>';
 let FBK=false,FBI=[],FBS='',FBB=false;
 const fbUrl=()=>{try{return store.get('ps_fburl')||FB_URL}catch(_){return FB_URL}};
