@@ -1,11 +1,8 @@
-# ข้อมูลลูกค้า — ห้ามขึ้น repo
-*.xlsx
+__pycache__/
+*.pyc
+# ชุดทดสอบมี Playlist / ใบเช็คจริง — เก็บใน Google Drive ของบริษัทเท่านั้น
+photo-check-tests/
+photo-check-tests*.zip
 *.xlsm
 *.xls
-*.csv
-*.txt
-*.zip
-# ไฟล์ระบบ
-.DS_Store
-Thumbs.db
-~$*
+*.xlsx
