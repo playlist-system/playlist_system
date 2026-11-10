@@ -137,6 +137,7 @@
  *   เวอร์ชัน 5.5.32: แถว Playlist ช่องเลื่อน — ช่องสถานะเป็นวันที่ (stDate, r.shf)
  *   เวอร์ชัน 5.5.33: ชื่อหนังมีเลขเกินท้าย “_15s 15” ตัดออก ทั้ง Playlist และใบเช็ค (durTail)
  *   เวอร์ชัน 5.5.34: เตือนแถวหมายเหตุเฉพาะแถวที่จะถูกใส่จริง (ไม่นับ เวลารวม …)
+ *   เวอร์ชัน 5.5.35: ปุ่มแจ้งปัญหาส่งแบบฟอร์มในแท็บใหม่ (ที่รับแบบทุกคนในบริษัท)
  * ======================================================================
  */
 
@@ -10768,7 +10769,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.34 (10 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.35 (10 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -14281,6 +14282,34 @@ const fbSay = t => {
   const e = $('#fb_st');
   if (e) e.innerHTML = t;
 };
+/* 5.5.35: แท็บผลการส่งบอกกลับมา (ถ้าเบราว์เซอร์ยอม) → ล้างฟอร์ม แสดงเลขที่ */
+let FBW = '';
+addEventListener('message', e => {
+  const d = e.data;
+  if (
+    !d ||
+    !d.psfb ||
+    !FBW ||
+    !/(^https:\/\/script\.google\.com$)|(\.googleusercontent\.com$)/.test(e.origin || '')
+  )
+    return;
+  FBW = '';
+  if (d.ok) {
+    FBI = [];
+    fbThumbs();
+    {
+      const t = $('#fb_tx');
+      if (t) t.value = '';
+    }
+    fbSay(
+      `<b>ส่งแล้ว · เลขที่ ${esc(d.no || '')}</b> — ขอบคุณครับ คนดูแลระบบจะเห็นในตารางรวมคำแจ้ง ปิดแท็บผลการส่งได้เลย`,
+    );
+    MQN = 'done';
+    note = 'ส่งฟีดแบ็กแล้ว' + (d.no ? ' เลขที่ ' + d.no : '');
+    view();
+  } else
+    fbSay(`<b>ส่งไม่ได้</b> (${esc(d.err || '')}) — กดส่งอีกครั้ง หรือกด “คัดลอกข้อความ” ส่งทาง LINE แทน`);
+});
 async function fbAdd(files) {
   for (const f of files) {
     if (!f || !/^image\//.test(f.type || '')) continue;
@@ -15117,6 +15146,20 @@ const ACT = {
       fbSay('<b>ยังไม่ได้เขียนรายละเอียด</b> — เขียนสั้น ๆ ว่าเกิดอะไรขึ้น หรือแนบรูป');
       return;
     }
+    /* 5.5.35: ส่งแบบฟอร์มในแท็บใหม่ — ที่รับตั้งเป็น “ทุกคนในบริษัท” ได้ (ใช้บัญชี Google ของบริษัทที่ล็อกอินอยู่) • เปิดแท็บทันทีตอนกด ไม่ให้ถูกบล็อกป๊อปอัป */
+    const wn = 'psfb' + Date.now(),
+      w = window.open('', wn);
+    if (!w) {
+      fbSay(
+        '<b>เบราว์เซอร์บล็อกแท็บใหม่</b> — กดอนุญาตป๊อปอัปของหน้านี้ (ไอคอนที่ช่องที่อยู่เว็บ) แล้วกดส่งอีกครั้ง',
+      );
+      return;
+    }
+    try {
+      w.document.write(
+        '<!doctype html><meta charset="utf-8"><title>กำลังส่ง …</title><p style="font:16px Tahoma,sans-serif;padding:40px;text-align:center">กำลังส่งเรื่องให้คนดูแลระบบ …</p>',
+      );
+    } catch (_) {}
     try {
       store.set('ps_fbname', p.name);
     } catch (_) {}
@@ -15145,24 +15188,27 @@ const ACT = {
           g = n && fbFiles().get(n);
         if (g) body.file = { name: n, data: await b64of(g()) };
       }
-      const r = await fetch(u, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(body),
-          redirect: 'follow',
-        }),
-        j = await r.json().catch(() => null);
-      if (!j || !j.ok) throw new Error((j && j.err) || 'HTTP ' + r.status);
-      FBI = [];
-      fbThumbs();
-      {
-        const t = $('#fb_tx');
-        if (t) t.value = '';
-      }
-      fbSay(`<b>ส่งแล้ว · เลขที่ ${esc(j.no || '')}</b> — ขอบคุณครับ คนดูแลระบบจะเห็นในตารางรวมคำแจ้ง`);
-      MQN = 'done';
-      note = 'ส่งฟีดแบ็กแล้ว' + (j.no ? ' เลขที่ ' + j.no : '');
+      const f = document.createElement('form');
+      f.method = 'POST';
+      f.action = u;
+      f.target = wn;
+      f.acceptCharset = 'UTF-8';
+      f.style.display = 'none';
+      const ta = document.createElement('textarea');
+      ta.name = 'p';
+      ta.value = JSON.stringify(body);
+      f.appendChild(ta);
+      document.body.appendChild(f);
+      f.submit();
+      f.remove();
+      FBW = wn;
+      fbSay(
+        '<b>เปิดแท็บใหม่เพื่อส่งแล้ว</b> — ถ้าแท็บนั้นขึ้น “ส่งเรื่องแล้ว · เลขที่ …” แปลว่าเรียบร้อย • ถ้าขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชี Google ของบริษัท แล้วกลับมากดส่งอีกครั้ง (ข้อความยังอยู่)',
+      );
     } catch (x) {
+      try {
+        w.close();
+      } catch (_) {}
       fbSay(
         `<b>ส่งไม่ได้</b> (${esc(x.message || x)}) — ตรวจว่าต่ออินเทอร์เน็ตอยู่ แล้วกดส่งอีกครั้ง หรือกด “คัดลอกข้อความ” ส่งทาง LINE แทน`,
       );

@@ -3866,7 +3866,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.34 (10 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.35 (10 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4773,6 +4773,10 @@ function vFb(){const nm=store.get('ps_fbname')||'',fs=[...fbFiles().keys()],u=fb
  <div class="dlgf">${u?`<button class="btn primary" data-a="fbsend" ${FBB?'disabled':''}>${IC.chat}ส่งให้คนดูแลระบบ</button>`:''}<button class="btn ${u?'ghost':'secondary'}" data-a="fbcopy">คัดลอกข้อความ</button><button class="btn ghost" data-a="fb">ปิด</button></div></div></div>`}
 function fbThumbs(){const t=$('#fb_th');if(!t)return;t.innerHTML=FBI.map((x,i)=>`<figure><img src="${x.url}" alt="${esc(x.name)}"><figcaption>${esc(x.name)} · ${Math.max(1,Math.round(x.size/1024))} KB</figcaption><button class="ib del" data-a="fbdel" data-k="${i}" aria-label="เอา ${esc(x.name)} ออก">${IC.x}</button></figure>`).join('')}
 const fbSay=t=>{FBS=t;const e=$('#fb_st');if(e)e.innerHTML=t};
+/* 5.5.35: แท็บผลการส่งบอกกลับมา (ถ้าเบราว์เซอร์ยอม) → ล้างฟอร์ม แสดงเลขที่ */
+let FBW='';addEventListener('message',e=>{const d=e.data;if(!d||!d.psfb||!FBW||!/(^https:\/\/script\.google\.com$)|(\.googleusercontent\.com$)/.test(e.origin||''))return;FBW='';
+ if(d.ok){FBI=[];fbThumbs();{const t=$('#fb_tx');if(t)t.value=''}fbSay(`<b>ส่งแล้ว · เลขที่ ${esc(d.no||'')}</b> — ขอบคุณครับ คนดูแลระบบจะเห็นในตารางรวมคำแจ้ง ปิดแท็บผลการส่งได้เลย`);MQN='done';note='ส่งฟีดแบ็กแล้ว'+(d.no?' เลขที่ '+d.no:'');view()}
+ else fbSay(`<b>ส่งไม่ได้</b> (${esc(d.err||'')}) — กดส่งอีกครั้ง หรือกด “คัดลอกข้อความ” ส่งทาง LINE แทน`)});
 async function fbAdd(files){for(const f of files){if(!f||!/^image\//.test(f.type||''))continue;
   let url=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=()=>r('');rd.readAsDataURL(f)});if(!url)continue;let type=f.type,size=f.size;
   if(size>1.5e6){try{const im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url}),k=Math.min(1,1920/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);const u2=cv.toDataURL('image/jpeg',0.85);url=u2;type='image/jpeg';size=Math.round(u2.length*0.75)}catch(_){}}
@@ -4915,14 +4919,16 @@ async function fillDays(G,list){const T0=performance.now(),out=new JSZip(),keep=
 const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const f=$('#fb_file');if(f)f.click()},fbdel:k=>{FBI.splice(+k,1);fbThumbs()}, /* 5.5.23 */
  fbcopy:async()=>{const p=fbText(),t=['แจ้งปัญหา / เสนอแนะ — PHOTO CHECK STUDIO','ผู้แจ้ง: '+p.name,'เรื่อง: '+p.topic,'เกี่ยวกับ: '+p.where,VERTXT,'',p.text,FBI.length?`\n(มีรูป ${FBI.length} รูป — ส่งรูปแยก)`:''].join('\n');try{await navigator.clipboard.writeText(t);fbSay('คัดลอกข้อความแล้ว — วางใน LINE หรืออีเมลถึงคนดูแลระบบได้เลย')}catch(_){fbSay('คัดลอกไม่ได้ — เลือกข้อความในช่องรายละเอียดแล้วกด Ctrl+C')}},
  fbsend:async()=>{const u=fbUrl();if(!u||FBB)return;const p=fbText();if(!p.text.trim()&&!FBI.length){fbSay('<b>ยังไม่ได้เขียนรายละเอียด</b> — เขียนสั้น ๆ ว่าเกิดอะไรขึ้น หรือแนบรูป');return}
+  /* 5.5.35: ส่งแบบฟอร์มในแท็บใหม่ — ที่รับตั้งเป็น “ทุกคนในบริษัท” ได้ (ใช้บัญชี Google ของบริษัทที่ล็อกอินอยู่) • เปิดแท็บทันทีตอนกด ไม่ให้ถูกบล็อกป๊อปอัป */
+  const wn='psfb'+Date.now(),w=window.open('',wn);if(!w){fbSay('<b>เบราว์เซอร์บล็อกแท็บใหม่</b> — กดอนุญาตป๊อปอัปของหน้านี้ (ไอคอนที่ช่องที่อยู่เว็บ) แล้วกดส่งอีกครั้ง');return}
+  try{w.document.write('<!doctype html><meta charset="utf-8"><title>กำลังส่ง …</title><p style="font:16px Tahoma,sans-serif;padding:40px;text-align:center">กำลังส่งเรื่องให้คนดูแลระบบ …</p>')}catch(_){}
   try{store.set('ps_fbname',p.name)}catch(_){}FBB=true;const bt=document.querySelector('[data-a="fbsend"]');if(bt)bt.disabled=true;fbSay('กำลังส่ง …');
   try{const body={...p,ver:VERTXT,at:new Date().toISOString(),images:FBI.map(x=>({name:x.name,type:x.type,data:x.url.split(',')[1]||''}))};
    if(($('#fb_sys')||{}).checked)body.sys={ver:VERTXT,ua:navigator.userAgent,lang:navigator.language,screen:innerWidth+'x'+innerHeight,files:C.map(f=>f.name),report:last&&last.txt?String(last.txt).slice(0,30000):''};
    if(($('#fb_ckon')||{}).checked){const n=($('#fb_ck')||{}).value,g=n&&fbFiles().get(n);if(g)body.file={name:n,data:await b64of(g())}}
-   const r=await fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'}),j=await r.json().catch(()=>null);
-   if(!j||!j.ok)throw new Error(j&&j.err||('HTTP '+r.status));
-   FBI=[];fbThumbs();{const t=$('#fb_tx');if(t)t.value=''}fbSay(`<b>ส่งแล้ว · เลขที่ ${esc(j.no||'')}</b> — ขอบคุณครับ คนดูแลระบบจะเห็นในตารางรวมคำแจ้ง`);MQN='done';note='ส่งฟีดแบ็กแล้ว'+(j.no?' เลขที่ '+j.no:'')}
-  catch(x){fbSay(`<b>ส่งไม่ได้</b> (${esc(x.message||x)}) — ตรวจว่าต่ออินเทอร์เน็ตอยู่ แล้วกดส่งอีกครั้ง หรือกด “คัดลอกข้อความ” ส่งทาง LINE แทน`)}
+   const f=document.createElement('form');f.method='POST';f.action=u;f.target=wn;f.acceptCharset='UTF-8';f.style.display='none';const ta=document.createElement('textarea');ta.name='p';ta.value=JSON.stringify(body);f.appendChild(ta);document.body.appendChild(f);f.submit();f.remove();FBW=wn;
+   fbSay('<b>เปิดแท็บใหม่เพื่อส่งแล้ว</b> — ถ้าแท็บนั้นขึ้น “ส่งเรื่องแล้ว · เลขที่ …” แปลว่าเรียบร้อย • ถ้าขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชี Google ของบริษัท แล้วกลับมากดส่งอีกครั้ง (ข้อความยังอยู่)')}
+  catch(x){try{w.close()}catch(_){}fbSay(`<b>ส่งไม่ได้</b> (${esc(x.message||x)}) — ตรวจว่าต่ออินเทอร์เน็ตอยู่ แล้วกดส่งอีกครั้ง หรือกด “คัดลอกข้อความ” ส่งทาง LINE แทน`)}
   finally{FBB=false;const b2=document.querySelector('[data-a="fbsend"]');if(b2)b2.disabled=false}},
  help:()=>{HELP=!HELP;HOW=false},how:()=>{HOW=!HOW;HELP=false},hhow:()=>{HELP=false;HOW=true},
  tour:()=>{HELP=HOW=false;pendTour=tourKey()},htour:()=>{HELP=false;pendTour=tourKey()},howtour:()=>{HOW=false;store.set('ps_tours','on');pendTour=tourKey()},
