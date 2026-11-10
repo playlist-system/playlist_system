@@ -135,6 +135,7 @@
  *   เวอร์ชัน 5.5.30: โฟลเดอร์แยกรูปแพค Digital MRT / The 20 / Air Traveller / Gateway X / Rama 9 (FXP, fxScr, fxIdx)
  *   เวอร์ชัน 5.5.31: แถวหมายเหตุในช่องชื่อหนังของ Playlist ไม่ใส่ บอกใน ต้องแก้ (RMK)
  *   เวอร์ชัน 5.5.32: แถว Playlist ช่องเลื่อน — ช่องสถานะเป็นวันที่ (stDate, r.shf)
+ *   เวอร์ชัน 5.5.33: ชื่อหนังมีเลขเกินท้าย “_15s 15” ตัดออก ทั้ง Playlist และใบเช็ค (durTail)
  * ======================================================================
  */
 
@@ -1359,6 +1360,13 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       let nm = vOf(b.lc, r);
       if (!nm || /^ออก(วันที่)?\s*\d/.test(nm)) continue;
       if (b.scr && b.scr.m === 'Rama9 Connect') nm = bmnCut(nm); /* 5.5.12 */
+      {
+        const n2 = durTail(nm);
+        if (n2 !== nm) {
+          (b.tailFix || (b.tailFix = new Set())).add(nm + ' → ' + n2);
+          nm = n2;
+        }
+      } /* 5.5.33: แถวในใบเช็คที่ชื่อมีเลขเกินท้าย → เขียนชื่อที่ถูก วันที่ถ่ายตามไปด้วย */
       const fx = FASTN.test(nm);
       let t = null;
       for (let i = 0; i < b.pcs.length; i++) {
@@ -1931,6 +1939,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     dates: dates.length,
     later: B.reduce((n, b) => n + b.later.length, 0),
     rmkL: B.filter(b => b.rmk && b.rmk.length).map(b => [b.scr.c, b.rmk]),
+    tailL: B.filter(b => b.tailFix && b.tailFix.size).map(b => [b.scr.c, [...b.tailFix]]),
     shfL: B.filter(b => b.shfD && b.shfD.length).map(b => [
       b.scr.c,
       [
@@ -3226,8 +3235,8 @@ async function chkFold(f) {
         fold.push({
           sn: x.sn,
           lc: b.lc,
-          items: b.items.filter(i => !RMK(i[0])),
-          /* 5.5.31 */ blank: x.blank ? 1 : 0,
+          items: b.items.filter(i => !RMK(i[0])).map(i => [durTail(i[0]), ...i.slice(1)]),
+          /* 5.5.31 • 5.5.33 */ blank: x.blank ? 1 : 0,
           ...picId(x.ws, x.sn, b.lc),
         });
   return { fold, mx: R.mx };
@@ -5963,6 +5972,13 @@ async function fillWb(f, on, metro, o) {
             ),
           0,
         ]);
+        for (const [c, l] of L.tailL || [])
+          rep.push([
+            sn,
+            c,
+            'ข้อมูล: แก้ชื่อหนังในใบเช็คที่มีเลขเกินท้ายชื่อ (Playlist พิมพ์เกิน) → ' + l.join(', '),
+            0,
+          ]); /* 5.5.33 */
         for (const [c, l] of L.shfL || [])
           rep.push([
             sn,
@@ -10375,6 +10391,8 @@ const KST = /ขึ้นใหม่|ไฟล์เดิม|ต่อสั�
   NOEND = /กำหนด|จนกว่า|ปลด|ไม่มี|^x{3,}$|^\*{3,}$/i;
 /* 5.5.32: ช่องสถานะเป็นวันที่ (Excel เก็บเป็นเลข เช่น 46341 = 15/11/2569) = แถวใน Playlist เลื่อนไป 1 ช่อง (เริ่ม / สิ้นสุด / สถานะ)
    ถ้า วันเริ่ม ≤ วันสิ้นสุด ≤ วันในช่องสถานะ → เริ่ม = วันสิ้นสุด • สิ้นสุด = วันในช่องสถานะ • สถานะว่าง แล้วบอกให้ตรวจ (ไม่หยุดการเติม) */
+/* 5.5.33: ชื่อหนังมีเลขเกินท้ายชื่อ (Playlist พิมพ์เกิน เช่น “…_9Nov26_15s 15” วันถัดไปแก้เป็น “…_9Nov26_15s”) → ตัดออก ทั้งใน Playlist และในใบเช็ค */
+const durTail = v => (typeof v === 'string' ? v.replace(/(_\d+s)\s+\d+\s*$/i, '$1') : v);
 const stDate = v => {
   const x = String(v == null ? '' : v).trim();
   if (/^\d{5}(\.\d+)?$/.test(x) && +x > 20000 && +x < 80000)
@@ -10385,9 +10403,17 @@ function plCheck(p, I) {
   const st = new Map(),
     bad = new Map(),
     all = new Set(),
-    shf = [];
+    shf = [],
+    tl = new Set();
   for (const s of p)
     for (const r of s.rows) {
+      {
+        const a = durTail(r.ad);
+        if (a !== r.ad) {
+          tl.add(String(r.ad).trim() + ' → ' + a);
+          r.ad = a;
+        }
+      }
       if (!r.ad || r.ad === s.c || JUNK.test(String(r.ad).trim())) continue;
       all.add(r.ad);
       {
@@ -10417,6 +10443,11 @@ function plCheck(p, I) {
         }
       }
     }
+  if (tl.size)
+    I.push({
+      lv: 'info',
+      t: `ชื่อหนังมีเลขเกินท้ายชื่อ ${tl.size} เรื่อง ระบบตัดออกให้: ${[...tl].slice(0, 2).join(' • ')}${tl.size > 2 ? ' …' : ''}`,
+    }); /* 5.5.33 */
   if (shf.length)
     I.push({
       lv: 'info',
@@ -10739,7 +10770,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.32 (10 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.33 (10 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
