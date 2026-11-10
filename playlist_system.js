@@ -139,6 +139,7 @@
  *   เวอร์ชัน 5.5.34: เตือนแถวหมายเหตุเฉพาะแถวที่จะถูกใส่จริง (ไม่นับ เวลารวม …)
  *   เวอร์ชัน 5.5.35: ปุ่มแจ้งปัญหาส่งแบบฟอร์มในแท็บใหม่ (ที่รับแบบทุกคนในบริษัท)
  *   เวอร์ชัน 5.5.36: ตั้งที่รับฟีดแบ็กของบริษัทในระบบแล้ว (ปุ่มแจ้งปัญหาพร้อมใช้)
+ *   เวอร์ชัน 5.5.37: ลิงก์ใช้เวอร์ชันก่อนหน้า (versions/) ท้ายหน้า + แถบบอกเมื่อเปิดเวอร์ชันเก่า
  * ======================================================================
  */
 
@@ -10770,7 +10771,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.36 (10 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.37 (10 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -14223,6 +14224,33 @@ function view() {
 /* 5.5.36: ที่รับของบริษัท (เปิดได้เฉพาะบัญชี Google ของบริษัท) */
 const FB_URL =
   'https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbyhGIBAGh4Bi2pFPtqiWYiPPPAZldjjnbH0kXZOl7TySZddGNmbP3Ga1sFMv3fkDu1F/exec';
+/* 5.5.37: เวอร์ชันก่อนหน้า — หน้านี้เปิดจาก versions/ (สำเนาเวอร์ชันเก่าที่เก็บไว้ใช้ตอนเวอร์ชันล่าสุดมีปัญหา) → แถบบอก + ลิงก์กลับเวอร์ชันล่าสุด */
+const SITE = 'https://playlist-system.github.io/playlist_system/',
+  OLDVER = /\/versions\/[^\/]*$/.test(location.pathname);
+if (OLDVER) {
+  const a = document.getElementById('prevv');
+  if (a) {
+    a.href = SITE + 'playlist_system.html';
+    a.textContent = 'กลับไปเวอร์ชันล่าสุด';
+  }
+  const b = document.createElement('div'),
+    t = document.createElement('b'),
+    v = (VERTXT.match(/เวอร์ชัน\s*([0-9.]+)/) || [])[1] || '';
+  b.className = 'oldv';
+  b.setAttribute('role', 'status');
+  t.textContent = 'กำลังใช้เวอร์ชันก่อนหน้า' + (v ? ' (' + v + ')' : '');
+  b.append(t, ' — ใช้ชั่วคราวระหว่างรอแก้เวอร์ชันล่าสุด ');
+  for (const [h, l] of [
+    [SITE + 'playlist_system.html', 'กลับไปเวอร์ชันล่าสุด'],
+    [SITE + 'versions/', 'เลือกเวอร์ชันอื่น'],
+  ]) {
+    const x = document.createElement('a');
+    x.href = h;
+    x.textContent = l;
+    b.append(x);
+  }
+  document.body.prepend(b);
+}
 IC.chat =
   '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></svg>';
 let FBK = false,

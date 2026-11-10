@@ -9,6 +9,7 @@
 | `playlist_system.html` | **ตัวระบบทั้งหมด** ไฟล์เดียว (ไลบรารี SheetJS / JSZip ฝังอยู่ข้างใน) — โค้ดของระบบอยู่ใน `<script>` ที่มี `function layoutChk(` |
 | `playlist_system.js` | สำเนาโค้ดที่จัดย่อหน้าให้อ่านง่าย **สร้างจาก HTML ด้วย `dev/build_js.py` ห้ามแก้ด้วยมือ** |
 | `index.html` | หน้าเปิด → ส่งต่อไป `playlist_system.html` |
+| `versions/` | สำเนา 5 เวอร์ชันก่อนหน้า + `index.html` หน้าเลือกเวอร์ชัน (ลิงก์ “ใช้เวอร์ชันก่อนหน้า” ท้ายหน้าระบบ) — `dev/set_version.py` เก็บให้อัตโนมัติ ห้ามแก้ด้วยมือ |
 | `README.md`, `คู่มือการใช้งาน_ระบบเติมใบเช็ครูป.txt` | เอกสารผู้ใช้ — อัปเดตทุกเวอร์ชัน (คู่มือ .txt เป็น CRLF + BOM) |
 | `apps_script/Code.gs` | Apps Script เก็บ Playlist จากอีเมลเข้า Google Drive + หน้าเว็บ "Playlist รายวัน" |
 | `apps_script/feedback.gs` | ที่รับปุ่ม "แจ้งปัญหา" (Web app ของบริษัท เปิดได้เฉพาะบัญชีบริษัท) — วิธีตั้งดู `apps_script/FEEDBACK.md` |
@@ -53,7 +54,7 @@ python3 dev/check_syntax.py playlist_system.html
 # 3) ทดสอบ (ดูหัวข้อ 5) — ต่างจาก expected ได้เฉพาะเรื่องที่ตั้งใจแก้
 python3 dev/tests/run_tests.py playlist_system.html /path/photo-check-tests
 
-# 4) เลขเวอร์ชัน + ประวัติ (html, README, คู่มือ)
+# 4) เลขเวอร์ชัน + ประวัติ (html, README, คู่มือ) — เก็บสำเนาเวอร์ชันบนเว็บตอนนี้ (git HEAD) ไว้ใน versions/ ให้ก่อน
 python3 dev/set_version.py 5.5.37 "11 พ.ย. 2569" --history "**หัวข้อ** • รายละเอียดสั้น ๆ"
 #    ถ้าต้องแก้เนื้อหาคู่มือ/README เพิ่ม ใช้ dev/docs_edit.py (ดู examples/docs_example.py)
 
@@ -71,6 +72,13 @@ gh pr create … && gh pr merge …   # หรือผ่าน gh api
 - ข้อความ commit / PR: บอกว่าแก้อะไร ทดสอบอะไร — **ไม่มีชื่อหนัง**
 - หลัง merge ตรวจว่า deploy เสร็จ (`gh api repos/playlist-system/playlist_system/deployments`) แล้วบอกผู้ใช้กด **Ctrl+F5**
 - เลขเวอร์ชัน: แก้เล็ก = ขยับเลขท้าย (5.5.36 → 5.5.37)
+- อย่าลืม `git add versions/` (set_version สร้างสำเนาเวอร์ชันเดิม + หน้าเลือกเวอร์ชันใหม่)
+
+### ถ้าเวอร์ชันใหม่มีปัญหา
+
+- ทีมกด “ใช้เวอร์ชันก่อนหน้า” ท้ายหน้าระบบ → `versions/` เลือกเวอร์ชันที่ใช้ได้ (ตั้งแต่ 5.5.37 หน้าเวอร์ชันเก่าขึ้นแถบเหลืองเอง เพราะโค้ดเช็ค `OLDVER` จาก path)
+- คนดูแลระบบ: แก้แล้วออกเวอร์ชันใหม่ตามปกติ — ถ้าต้องถอยทั้งเว็บ ใช้ `git revert` ของ merge นั้นแล้วออกเป็นเวอร์ชันใหม่
+- เก็บสำเนาเองได้: `python3 dev/snapshot.py --rev <commit>` (สร้างหน้าเลือกเวอร์ชันใหม่ให้)
 
 ## 5. ชุดทดสอบ (regression)
 
