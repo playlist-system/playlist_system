@@ -1,8 +1,16 @@
-__pycache__/
-*.pyc
-# ชุดทดสอบมี Playlist / ใบเช็คจริง — เก็บใน Google Drive ของบริษัทเท่านั้น
-photo-check-tests/
-photo-check-tests*.zip
+# ข้อมูลลูกค้า — ห้ามขึ้น repo
+*.xlsx
 *.xlsm
 *.xls
-*.xlsx
+*.csv
+*.txt
+*.zip
+# ไฟล์ระบบ
+.DS_Store
+Thumbs.db
+~$*
+# ชุดทดสอบมี Playlist / ใบเช็คจริง — เก็บใน Google Drive ของบริษัทเท่านั้น
+photo-check-tests/
+# แคช Python (dev/)
+__pycache__/
+*.pyc
