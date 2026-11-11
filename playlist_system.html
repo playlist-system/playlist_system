@@ -3885,7 +3885,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.43 (11 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.44 (11 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4603,7 +4603,7 @@ const vArr=()=>{const F=last.res.filter(r=>r.blob&&arrHas(r.arr));if(!F.length)r
 const vHelp=()=>`<div class="ov"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="hlt"><div class="dlgh"><h2 id="hlt">วิธีใช้ประจำวัน</h2><button class="ib" data-a="help" aria-label="ปิด" data-focus>${IC.x}</button></div>
 <ol class="hs">
 <li><b>เตรียมไฟล์</b><span>Playlist ของวันนี้ 11 แบบ (สรุปรายการหนังแยกจอ 40Blue, 40Red, 80Blue, 80Red, CITY, Spare และ Signature Max, Show DC, BKJ1, BKJ2, Metro LED) กับใบเช็ครูปที่เติมแล้วของวันก่อนหน้า • ถ้ามีใบเช็ค CCTV / MRT ใส่ Playlist เพิ่มเติม Rama9 Connect, Digital MRT, Gateway X, Air Traveller, The 20 ด้วย (ไม่นับใน 11 แบบ)</span></li>
-<li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง (ไฟล์ .zip เช่น จากหน้าเว็บ Playlist รายวัน หรือดาวน์โหลดทั้งโฟลเดอร์จาก Google Drive ลากลงได้เลย ไม่ต้องแตกไฟล์) ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
+<li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง (ไฟล์ .zip เช่น จากหน้า PLAYLIST INBOX หรือดาวน์โหลดทั้งโฟลเดอร์จาก Google Drive ลากลงได้เลย ไม่ต้องแตกไฟล์) ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
 <li><b>หยุดหลายวัน (เช่น เสาร์–อาทิตย์)</b><span>วันทำงานถัดไป ลากไฟล์ .zip (หรือ Playlist) ของทุกวันที่หยุดลงขั้นที่ 1 พร้อมกัน ระบบเรียงวันให้ในกล่อง “ใส่ Playlist ไว้ … วัน” ตอนกดเติม ระบบเติมต่อกันทีละวันเอง (ใบเช็คที่ได้ของวันหนึ่งเป็นไฟล์ตั้งต้นของวันถัดไป) กดเติมครั้งเดียว บันทึกครั้งเดียว ผลเหมือนเติมทีละวัน • ถ้าขาดวันไหน หรือใบเช็คเติมล่าสุดไม่ถึงวันก่อนหน้า ระบบเตือนก่อนเติม</span></li>
 <li><b>ใบเช็คจอในห้าง / อาคาร (ตั้งแต่ 4.4)</b><span>Siam Paragon (In Mall, Facade, Nextopia), Paragon Max, Parc Paragon / Interchange, Central Network (CTW 360), The District EM, The Panoramix, EMS 5M, UOB Live และ LIDO Connect — ใส่ Playlist ของสื่อเหล่านี้ในขั้นที่ 1 พร้อมไฟล์อื่น (ลาก .zip ได้) ระบบจับคู่ชีตในใบเช็คกับกลุ่มจอเอง ชื่อหนังตัดคำหน้าแบบที่ทีมเขียน (เช่น PRGFC_, EMS_5M_, UOB_LIVE_) • หนัง Content ของห้างใส่ # หรือไม่ใส่ตามแบบที่ทีมทำในแต่ละสื่อ • ไฟล์ที่ไม่ได้ส่งทุกวันใช้ฉบับล่าสุดที่มี • Playlist NTW (Nationwide) และ Customize Looker ระบบอ่านได้แล้ว แต่ยังไม่มีใบเช็คให้เติม</span></li>
 <li><b>ขั้นที่ 2 ตรวจ / แก้ไข (ไม่บังคับ)</b><span>ใช้เมื่อต้องปลด เพิ่ม หรือเปลี่ยนชื่อหนังก่อนเติม</span></li>
@@ -4771,7 +4771,7 @@ function view(){logTick();const ae=document.activeElement,fk=focusKey(ae);let se
 const FB_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbyhGIBAGh4Bi2pFPtqiWYiPPPAZldjjnbH0kXZOl7TySZddGNmbP3Ga1sFMv3fkDu1F/exec';
 /* 5.5.38: หน้า "Playlist รายวัน" (Apps Script ของบริษัท ดึง Playlist จากอีเมลลง Google Drive ทุกชั่วโมง) — ปุ่มในขั้นใส่ Playlist และหน้าหลัก */
 const PLW_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbzQ1xQ1-tZMflduU9R6xqntXhieDfzR0cJsBwb1ymsn0jVIF-kOtx2Fo0ELrAFeekDjlA/exec',PLW_TIP='ดาวน์โหลด Playlist ทุกไฟล์ของวันนี้จาก Google Drive ของบริษัทเป็น .zip ไฟล์เดียว แล้วลากมาวางที่นี่ (ต้องล็อกอินบัญชี Google ของบริษัท)',
- plwBtn=c=>PLW_URL?`<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิดหน้า Playlist รายวัน</a>`:'',
+ plwBtn=c=>PLW_URL?`<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิด PLAYLIST INBOX</a>`:'',
  /* 5.5.41: ดึง Playlist วันนี้เข้าระบบเอง — เปิดหน้า Playlist รายวันด้วย ?send=studio หน้านั้นรวมไฟล์เป็น .zip แล้วส่งกลับมาทาง postMessage (ไม่ต้องดาวน์โหลด / ลากวาง) */
  plpBtn=c=>PLW_URL?`<button class="btn ${c}" data-a="plpull" title="ดึง Playlist 11 แบบของวันนี้จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP?' disabled':''}>${IC.up}${PLP?'กำลังดึง Playlist …':'ดึง Playlist วันนี้'}</button>`:'';
 let PLP=null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
@@ -4982,8 +4982,8 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
  clri:()=>{for(const x of PLI)x.ack=1;note='ซ่อนรายการด่านตรวจแล้ว (ยังบันทึกไว้ในรายงาน)';FOCUSSEL='[data-dz="pl"]'},
  plpull:()=>{if(BUSY||FILLING||PLP||!PLW_URL)return;const w=window.open(PLW_URL+'?send=studio','psplp');if(!w){say('เบราว์เซอร์บล็อกหน้าต่างใหม่ — กดอนุญาตป๊อปอัปของหน้านี้ (ไอคอนที่ช่องที่อยู่เว็บ) แล้วกดอีกครั้ง');return}
   PLP={w,t:Date.now()};PLP.iv=setInterval(()=>{if(!PLP)return;const s=(Date.now()-PLP.t)/1000;
-   if(PLP.w.closed)plpEnd('หน้า Playlist รายวันปิด หรือเบราว์เซอร์ตัดการเชื่อมก่อนส่งไฟล์ — ถ้าหน้านั้นยังเปิดอยู่ กด “ดาวน์โหลด (.zip)” แล้วลากมาวางแทน');
-   else if(s>180)plpEnd('รอนานเกิน 3 นาที — ถ้าหน้า Playlist รายวันขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดอีกครั้ง หรือกด “ดาวน์โหลด (.zip)” ในหน้านั้นแล้วลากมาวาง')},1000);
+   if(PLP.w.closed)plpEnd('หน้า PLAYLIST INBOX ปิด หรือเบราว์เซอร์ตัดการเชื่อมก่อนส่งไฟล์ — ถ้าหน้านั้นยังเปิดอยู่ กด “ดาวน์โหลด” แล้วลากไฟล์ .zip มาวางแทน');
+   else if(s>180)plpEnd('รอนานเกิน 3 นาที — ถ้าหน้า PLAYLIST INBOX ขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดอีกครั้ง หรือกด “ดาวน์โหลด” ในหน้านั้นแล้วลากไฟล์ .zip มาวาง')},1000);
   say('กำลังดึง Playlist วันนี้จาก Google Drive … หน้าใหม่จะเปิดแล้วปิดเอง')},
  pick:k=>{if(!BUSY&&!FILLING)openPicker(k)},pickdir:k=>{if(BUSY||FILLING)return;const p=$('#pickdir');if(!p)return;p.dataset.k=k||'pl';p.value='';p.click()},
  adv:()=>{adv=!adv},rx:k=>{RO.has(+k)?RO.delete(+k):RO.add(+k)},tab:k=>{if(BUSY||FILLING)return;if(k==='res'&&!last)return;tab=k;cs=null;window.scrollTo(0,0)},media:k=>{fm=k},open:k=>{if(DB[+k])cs=+k},back:()=>{cs=null},

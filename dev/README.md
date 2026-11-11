@@ -11,7 +11,7 @@
 | `index.html` | หน้าเปิด → ส่งต่อไป `playlist_system.html` |
 | `versions/` | สำเนา 5 เวอร์ชันก่อนหน้า + `index.html` หน้าเลือกเวอร์ชัน (ลิงก์ “ใช้เวอร์ชันก่อนหน้า” ท้ายหน้าระบบ) — `dev/set_version.py` เก็บให้อัตโนมัติ ห้ามแก้ด้วยมือ |
 | `README.md`, `คู่มือการใช้งาน_ระบบเติมใบเช็ครูป.txt` | เอกสารผู้ใช้ — อัปเดตทุกเวอร์ชัน (คู่มือ .txt เป็น CRLF + BOM) |
-| `apps_script/Code.gs` | Apps Script เก็บ Playlist จากอีเมลเข้า Google Drive + หน้าเว็บ "Playlist รายวัน" |
+| `apps_script/Code.gs` | Apps Script เก็บ Playlist จากอีเมลเข้า Google Drive + หน้าเว็บ PLAYLIST INBOX (เดิม "Playlist รายวัน") |
 | `apps_script/feedback.gs` | ที่รับปุ่ม "แจ้งปัญหา" (Web app ของบริษัท เปิดได้เฉพาะบัญชีบริษัท) — วิธีตั้งดู `apps_script/FEEDBACK.md` |
 | `n8n/` | ทางเลือกเก็บ Playlist ด้วย n8n (ไม่มีค่าตั้งส่วนตัว) |
 | `dev/` | เครื่องมือของคนดูแลระบบ (ไฟล์นี้) |
