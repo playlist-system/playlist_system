@@ -484,6 +484,7 @@ svg{flex:none}
 main{max-width:1160px;margin:0 auto;padding:40px 24px 64px;display:flex;flex-direction:column;gap:24px;transition:opacity .15s}
 main.dim{opacity:.55}
 .banner{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:14px;background:var(--waitSoft);border:1.5px dashed var(--waitLine);color:var(--waitInk);font-size:14px}
+.banner.info{background:var(--infoSoft);border:1px solid var(--infoLine);color:var(--ink2)}
 .hero{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px 32px}
 .hero h1{margin:0;font:700 44px/1.15 var(--hd);letter-spacing:-.01em}
 .hero p{margin:10px 0 0;color:var(--ink2);font-size:16px;max-width:58ch}
@@ -581,7 +582,7 @@ label.tile .hint{color:var(--muted)}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 var D = null, SEL = {}, BUSY = '', TT = 0, PROG = 0;
-var SEND = ${send ? 'true' : 'false'}, STUDIO = ${JSON.stringify(CONFIG.studioOrigin || '')}, SENT = false, SENDMSG = '', SENDOK = false, SENTN = 0;
+var SEND = ${send ? 'true' : 'false'}, STUDIO = ${JSON.stringify(CONFIG.studioOrigin || '')}, SENT = false, SENDMSG = '', SENDOK = false, SENTN = 0, SENDINFO = false;
 var TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 var WD = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
 function sv(p, s, c, w) { return '<svg aria-hidden="true" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor"' + (c ? ' style="color:' + c + '"' : '') + ' stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>'; }
@@ -612,11 +613,11 @@ function load(day) { BUSY = 'load'; draw(); call('webDay', [day || ''], function
 function opener_() { try { return window.top.opener || null; } catch (e) { return null; } }
 function sendStudio() {
   var w = opener_();
-  if (!w || !STUDIO) { SENDMSG = 'ส่งเข้าระบบอัตโนมัติไม่ได้ (เบราว์เซอร์ไม่ให้หน้านี้ส่งกลับไปที่หน้าระบบ) — กด “ดาวน์โหลด” แล้วลากไฟล์ .zip ลงขั้นที่ 1 ของ PHOTO CHECK STUDIO แทน'; draw(); return; }
+  if (!w || !STUDIO) { SENDINFO = true; SENDMSG = 'หน้านี้ไม่ได้เปิดจากปุ่ม “ดึง Playlist วันนี้” ในระบบ (หรือเบราว์เซอร์ไม่ให้ส่งกลับ) จึงยังไม่ได้ส่งไฟล์เข้าระบบ — ถ้าจะส่ง กดปุ่มนั้นใน PHOTO CHECK STUDIO หรือกด “ดาวน์โหลด” แล้วลากไฟล์ .zip ลงขั้นที่ 1'; draw(); return; }
   var g = byKind(), main = mainKinds(), miss = main.filter(function (k) { return !g.by[k.name]; }).map(function (k) { return k.name; });
   if (!picked().length) { try { w.postMessage({ psPL: 1, ok: false, day: D.day, err: 'ยังไม่มี Playlist ของวันนี้ในโฟลเดอร์' }, STUDIO); } catch (e) {} SENDMSG = 'ยังไม่มี Playlist ของวันนี้ — รอระบบดึงจากอีเมล (ทุกชั่วโมง) หรือกด “ดึงตอนนี้”'; draw(); return; }
   zip(function (name, blob, n) {
-    try { w.postMessage({ psPL: 1, ok: true, day: D.day, name: name, blob: blob, n: n, have: main.length - miss.length, total: main.length, miss: miss }, STUDIO); }
+    try { w.postMessage({ psPL: 1, ok: true, day: D.day, name: name, blob: blob, n: n, have: main.length - miss.length, total: main.length, miss: miss, extra: picked().filter(isExtra).length }, STUDIO); }
     catch (e) { SENDMSG = 'ส่งเข้าระบบไม่ได้: ' + (e && e.message || e) + ' — กด “ดาวน์โหลด” แล้วลากไฟล์ .zip เองแทน'; draw(); return; }
     SENDOK = true; SENTN = n; SENDMSG = ''; draw();
     setTimeout(function () { try { window.top.close(); } catch (e) {} }, 800);
@@ -624,11 +625,13 @@ function sendStudio() {
 }
 function byKind() { var by = {}, oth = []; D.files.forEach(function (f) { if (f.kind) (by[f.kind] = by[f.kind] || []).push(f); else oth.push(f); }); return { by: by, oth: oth }; }
 function mainKinds() { return D.kinds.filter(function (k) { return !k.extra && !k.line; }); }
-/* ค่าเริ่มต้น: ติ๊ก Playlist ที่ระบบใช้ (แบบละ 1 ไฟล์ = ฉบับที่เข้าโฟลเดอร์ล่าสุด) • Playlist เพิ่มเติมและไฟล์อื่นไม่ติ๊ก */
+/* ค่าเริ่มต้น: ติ๊ก Playlist ที่ระบบใช้ ทั้งแบบหลักและ Playlist เพิ่มเติม (แบบละ 1 ไฟล์ = ฉบับที่เข้าโฟลเดอร์ล่าสุด)
+   ไม่ติ๊ก: แบบที่ระบบไม่ได้ใช้ (unused) • ฉบับเก่า • ไฟล์ที่ไม่อยู่ในรายการ — ปุ่ม “ดึง Playlist วันนี้” ในระบบจึงได้ Playlist เพิ่มเติมด้วยทุกครั้ง */
 function defaults() {
   SEL = {}; var g = byKind();
-  D.kinds.forEach(function (k) { var L = g.by[k.name]; if (!L || k.extra) return; SEL[L[L.length - 1].id] = true; });
+  D.kinds.forEach(function (k) { var L = g.by[k.name]; if (!L || k.unused) return; SEL[L[L.length - 1].id] = true; });
 }
+function isExtra(f) { return D.kinds.some(function (k) { return k.extra && k.name === f.kind; }); }
 function picked() { return D ? D.files.filter(function (f) { return SEL[f.id]; }) : []; }
 function extraFiles(g) { var L = []; D.kinds.forEach(function (k) { if (k.extra && !k.unused && g.by[k.name]) L = L.concat(g.by[k.name]); }); return L; }
 function selBtn(L, grp) { var all = L.length && L.every(function (f) { return SEL[f.id]; }); return '<button class="lk" data-a="sel" data-g="' + grp + '">' + (all ? 'ไม่เลือก' : 'เลือกทั้งหมด') + '</button>'; }
@@ -677,14 +680,14 @@ function actsHtml() {
 }
 function sendView() { return SEND && !(SENDMSG && !SENDOK); }
 function drawSend() {
-  var Pk = D ? picked() : [], n = Pk.length, sz = 0, g = D ? byKind() : null;
+  var Pk = D ? picked() : [], n = Pk.length, nx = D ? Pk.filter(isExtra).length : 0, sz = 0, g = D ? byKind() : null;
   Pk.forEach(function (f) { sz += f.size; });
   var miss = D ? mainKinds().filter(function (k) { return !g.by[k.name]; }).map(function (k) { return k.name; }) : [];
   var zipping = BUSY === 'zip', pct = !D ? 8 : SENDOK ? 100 : zipping ? 15 + Math.round(75 * PROG / Math.max(1, n)) : 12;
   var title = !D ? 'กำลังเตรียม Playlist ของวันนี้…' : SENDOK ? 'ส่ง ' + SENTN + ' ไฟล์เข้าระบบแล้ว' : 'กำลังส่ง ' + n + ' ไฟล์เข้าระบบ';
   var step = function (txt, s) { return '<li class="' + s + '"><span class="i">' + (s === 'done' ? sv(P.check, 13, 'var(--okInk)', 3.2) : '') + '</span>' + txt + '</li>'; };
   var h = '<div class="sendp"><div class="pp">' + brand('ส่ง Playlist เข้า PHOTO CHECK STUDIO') +
-    '<div><h1>' + esc(title) + '</h1><p class="when">Playlist ' + (D ? 'วัน' + esc(thLong(D.day)) : 'ของวันนี้') + '</p><div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><span style="width:' + pct + '%"></span></div></div>' +
+    '<div><h1>' + esc(title) + '</h1><p class="when">Playlist ' + (D ? 'วัน' + esc(thLong(D.day)) + (n ? ' — แบบหลัก ' + (n - nx) + ' ไฟล์' + (nx ? ' + เพิ่มเติม ' + nx + ' ไฟล์' : '') : '') : 'ของวันนี้') + '</p><div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><span style="width:' + pct + '%"></span></div></div>' +
     '<ol class="steps">' + step('หาไฟล์ของวันนี้ใน Drive', D ? 'done' : 'now') +
     step('รวมเป็นไฟล์ .zip' + (n ? ' (' + kb(sz) + ')' : '') + (zipping ? ' ' + PROG + '/' + n : ''), SENDOK ? 'done' : zipping ? 'now' : '') +
     step('ส่งเข้า PHOTO CHECK STUDIO', SENDOK ? 'done' : '') + '</ol>';
@@ -708,7 +711,7 @@ function draw() {
     (isToday ? '' : '<button class="pill" data-go="' + D.today + '">กลับไปวันนี้</button>') +
     '<a class="pill dark" href="' + esc(D.studio) + '" target="_blank" rel="noopener">เปิด PHOTO CHECK STUDIO' + sv(P.ext, 15, 0, 2.2) + '</a></div></div></header>';
   h += '<main' + (BUSY === 'load' ? ' class="dim"' : '') + '>';
-  if (SEND && SENDMSG) h += '<div class="banner" role="alert">' + sv(P.info, 18, 0, 2.4) + '<span>' + esc(SENDMSG) + '</span></div>';
+  if (SEND && SENDMSG) h += '<div class="banner' + (SENDINFO ? ' info' : '') + '" role="' + (SENDINFO ? 'status' : 'alert') + '">' + sv(P.info, 18, 0, 2.4) + '<span>' + esc(SENDMSG) + '</span></div>';
   // หัวข้อ + ปุ่ม
   var h1, sub;
   if (!D.files.length) { h1 = isToday ? 'ยังไม่มี Playlist ของวันนี้' : 'ไม่มี Playlist ของวันที่ ' + thShort(day); sub = isToday ? (D.auto === false ? 'ดึงอัตโนมัติปิดอยู่ กด “ดึงตอนนี้” หรือเปิดด้วย setup ในหน้าโค้ด' : 'ระบบดึงจากอีเมลให้เองทุกชั่วโมง ' + D.startHour + ':00–' + D.endHour + ':59 หรือกด “ดึงตอนนี้”') : 'ระบบไม่ได้เก็บ Playlist ของวันนั้นไว้ในโฟลเดอร์'; }
@@ -733,7 +736,7 @@ function draw() {
   if (extra.length || older.length || g.oth.length) {
     h += '<section class="card">';
     if (extra.length) {
-      h += '<div class="hd"><h2>Playlist เพิ่มเติม</h2><p>ติ๊กถ้าวันนี้เติมใบเช็คสื่ออื่น เช่น CCTV, MRT, NTW, Paragon ' + selBtn(extraFiles(g), 'extra') + '</p></div><div class="chips">';
+      h += '<div class="hd"><h2>Playlist เพิ่มเติม</h2><p>ใช้กับใบเช็คสื่ออื่น เช่น CCTV, MRT, NTW, Paragon — ติ๊กไว้ให้แล้ว ' + selBtn(extraFiles(g), 'extra') + '</p></div><div class="chips">';
       extra.forEach(function (k) { var L = g.by[k.name]; L.forEach(function (f, i) { h += chip(f, k.name, { dim: k.unused, note: [k.unused ? '(ระบบไม่ได้ใช้)' : '', L.length > 1 ? f.time : ''].filter(Boolean).join(' ') }); }); });
       h += '</div>';
     }
