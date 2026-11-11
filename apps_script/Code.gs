@@ -31,6 +31,8 @@ const CONFIG = {
   // เก็บ Playlist ทุกไฟล์ของวันนี้ แม้ไม่อยู่ในรายการ kinds ด้านล่าง (ชื่อไฟล์ต้องมีคำใน playlistWords)
   //   false = เก็บเฉพาะแบบที่อยู่ในรายการ • ไฟล์ Excel ที่ชื่อไม่มีคำเหล่านี้ (เช่น ใบแจ้งหนี้) ไม่เก็บ แค่แจ้งในอีเมลสรุป
   collectAll: true,
+  // หน้าระบบเติมใบเช็คที่ส่ง Playlist ให้ได้ (ปุ่ม “ดึง Playlist วันนี้” ในระบบ เปิดหน้านี้ด้วย ?send=studio) — ส่งให้เฉพาะเว็บนี้เท่านั้น
+  studioOrigin: 'https://playlist-system.github.io',
   playlistWords: 'รายการหนัง|playlist',
   // Playlist ที่ระบบเติมใบเช็ครูปใช้ (ลำดับมีผล: ไฟล์เข้าแบบแรกที่ชื่อตรง)
   //   pattern = คำในชื่อไฟล์ • latest = ถ้าวันนี้ไม่มีฉบับใหม่ ใช้ฉบับล่าสุด
@@ -345,12 +347,13 @@ function summary_(folder, today, added, others, trashed) {
 // หน้าเว็บอ่านเฉพาะโฟลเดอร์ "Playlist รายวัน" ของสคริปต์นี้ ไม่แก้ไข/ลบไฟล์
 
 /** เปิดหน้าเว็บ */
-function doGet() {
+function doGet(e) {
   try {
     const u = ScriptApp.getService().getUrl();
     if (/\/exec$/.test(u || '') && PropertiesService.getScriptProperties().getProperty(PROP_WEB) !== u) PropertiesService.getScriptProperties().setProperty(PROP_WEB, u);
   } catch (e) {}
-  return HtmlService.createHtmlOutput(page_()).setTitle('Playlist รายวัน').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  const send = !!(e && e.parameter && e.parameter.send === 'studio'); // เปิดจากปุ่ม “ดึง Playlist วันนี้” ในระบบ → ส่งไฟล์กลับให้ระบบเอง
+  return HtmlService.createHtmlOutput(page_(send)).setTitle(send ? 'ส่ง Playlist เข้า PHOTO CHECK STUDIO' : 'Playlist รายวัน').addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /** ลิงก์หน้าเว็บ (จำไว้ตอนเปิดหน้าเว็บครั้งแรก) — ใช้ใส่ในอีเมลสรุป */
@@ -437,7 +440,7 @@ function webCollect() {
   return { msg: r.text, added: r.added.length, data: webDay('') };
 }
 
-function page_() {
+function page_(send) {
   return `<!doctype html>
 <html lang="th"><head><base target="_top"><meta charset="utf-8">
 <style>
@@ -461,6 +464,7 @@ input[type=date].ib{padding:0 8px}
 .card h2{font-size:15px;margin:0 0 2px}
 .card .note{color:var(--sub);font-size:13.5px;margin:0}
 .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.sendc{border-color:var(--acc)}.sendc.ok{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}.sendc.bad{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
 .ib.sm{height:32px;font-size:13.5px;white-space:nowrap;flex:none}
 .st{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .big{font-size:38px;font-weight:bold;line-height:1}
@@ -507,6 +511,7 @@ label.row{cursor:pointer}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 var D = null, SEL = {}, BUSY = '', TT = 0, PROG = 0;
+var SEND = ${send ? 'true' : 'false'}, STUDIO = ${JSON.stringify(CONFIG.studioOrigin || '')}, SENT = false, SENDMSG = '', SENDOK = false;
 var TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 var WD = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
 function $(s) { return document.querySelector(s); }
@@ -524,7 +529,21 @@ function call(fn, args, ok) {
     toast(m, 1);
   })[fn].apply(null, args);
 }
-function load(day) { BUSY = 'load'; draw(); call('webDay', [day || ''], function (d) { D = d; BUSY = ''; defaults(); draw(); }); }
+function load(day) { BUSY = 'load'; draw(); call('webDay', [day || ''], function (d) { D = d; BUSY = ''; defaults(); draw(); if (SEND && !SENT) { SENT = true; sendStudio(); } }); }
+/* เปิดจากปุ่ม “ดึง Playlist วันนี้” ในระบบ: รวม Playlist ที่ติ๊กไว้ (แบบหลัก) เป็น .zip แล้วส่งกลับให้หน้าระบบ (ส่งให้เฉพาะ studioOrigin) */
+function opener_() { try { return window.top.opener || null; } catch (e) { return null; } }
+function sendStudio() {
+  var w = opener_();
+  if (!w || !STUDIO) { SENDMSG = 'ส่งเข้าระบบอัตโนมัติไม่ได้ (เบราว์เซอร์ไม่ให้หน้านี้ส่งกลับไปที่หน้าระบบ) — กด “ดาวน์โหลด (.zip)” ด้านล่าง แล้วลากไฟล์ลงขั้นที่ 1 ของ PHOTO CHECK STUDIO แทน'; draw(); return; }
+  var g = byKind(), main = D.kinds.filter(function (k) { return !k.extra && !k.line; }), miss = main.filter(function (k) { return !g.by[k.name]; }).map(function (k) { return k.name; });
+  if (!picked().length) { try { w.postMessage({ psPL: 1, ok: false, day: D.day, err: 'ยังไม่มี Playlist ของวันนี้ในโฟลเดอร์' }, STUDIO); } catch (e) {} SENDMSG = 'ยังไม่มี Playlist ของวันนี้ — รอระบบดึงจากอีเมล (ทุกชั่วโมง) หรือกด “ดึงตอนนี้”'; draw(); return; }
+  zip(function (name, blob, n) {
+    try { w.postMessage({ psPL: 1, ok: true, day: D.day, name: name, blob: blob, n: n, have: main.length - miss.length, total: main.length, miss: miss }, STUDIO); }
+    catch (e) { SENDMSG = 'ส่งเข้าระบบไม่ได้: ' + (e && e.message || e) + ' — กด “ดาวน์โหลด (.zip)” แล้วลากเองแทน'; draw(); return; }
+    SENDOK = true; SENDMSG = 'ส่ง ' + n + ' ไฟล์เข้า PHOTO CHECK STUDIO แล้ว — หน้านี้จะปิดเอง (ถ้าไม่ปิด ปิดเองได้เลย)'; draw();
+    setTimeout(function () { try { window.top.close(); } catch (e) {} }, 800);
+  });
+}
 function byKind() { var by = {}, oth = []; D.files.forEach(function (f) { if (f.kind) (by[f.kind] = by[f.kind] || []).push(f); else oth.push(f); }); return { by: by, oth: oth }; }
 /* ค่าเริ่มต้น: ติ๊ก Playlist ที่ระบบใช้ (แบบละ 1 ไฟล์ = ฉบับที่เข้าโฟลเดอร์ล่าสุด) • Playlist เพิ่มเติมและไฟล์อื่นไม่ติ๊ก */
 function defaults() {
@@ -552,7 +571,8 @@ function draw() {
   var miss = main.filter(function (k) { return !g.by[k.name]; });
   var multi = main.concat(line).filter(function (k) { return g.by[k.name] && g.by[k.name].length > 1; });
   var last = D.files.length ? D.files[D.files.length - 1] : null;
-  var h = '<div class="top"><h1>Playlist รายวัน</h1><a class="lnk" href="' + esc(D.studio) + '" target="_blank" rel="noopener">เปิด PHOTO CHECK STUDIO ↗</a></div>';
+  var h = SEND ? '<section class="card sendc' + (SENDOK ? ' ok' : SENDMSG ? ' bad' : '') + '"><b>' + esc(SENDMSG || (BUSY === 'zip' ? 'กำลังส่ง Playlist เข้า PHOTO CHECK STUDIO …' : 'กำลังเตรียม Playlist ของวันนี้ …')) + '</b></section>' : '';
+  h += '<div class="top"><h1>Playlist รายวัน</h1><a class="lnk" href="' + esc(D.studio) + '" target="_blank" rel="noopener">เปิด PHOTO CHECK STUDIO ↗</a></div>';
   h += '<div class="date"><span class="d">' + esc(thLong(day)) + (isToday ? ' (วันนี้)' : '') + '</span>' +
     '<button class="ib" data-go="' + shift(day, -1) + '" aria-label="วันก่อนหน้า" title="วันก่อนหน้า">‹</button>' +
     '<input class="ib" type="date" id="pick" value="' + day + '" max="' + D.today + '" aria-label="เลือกวันที่">' +
@@ -626,7 +646,7 @@ function zipBlob(list) {
 }
 function b64u8(s) { var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
 function join(L) { var n = 0, o = 0; L.forEach(function (u) { n += u.length; }); var r = new Uint8Array(n); L.forEach(function (u) { r.set(u, o); o += u.length; }); return r; }
-function zip() {
+function zip(cb) {
   var P = picked(), out = [], next = 0, done = 0, failed = false;
   if (!P.length || BUSY) return;
   BUSY = 'zip'; PROG = 0; draw();
@@ -648,7 +668,9 @@ function zip() {
       while (used[n.toLowerCase()]) n = b + ' (' + k++ + ')' + x;
       used[n.toLowerCase()] = 1; e.name = n;
     });
-    var name = 'Playlist_' + D.day + '.zip', url = URL.createObjectURL(zipBlob(out));
+    var name = 'Playlist_' + D.day + '.zip';
+    if (typeof cb === 'function') { BUSY = ''; draw(); return cb(name, zipBlob(out), out.length); } // ส่งเข้าระบบแทนดาวน์โหลด
+    var url = URL.createObjectURL(zipBlob(out));
     var a = document.createElement('a'); a.href = url; a.download = name; a.target = '_self';
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 60000);
