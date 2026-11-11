@@ -3885,7 +3885,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.44 (11 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.45 (11 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4773,13 +4773,13 @@ const FB_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbyhGIBA
 const PLW_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbzQ1xQ1-tZMflduU9R6xqntXhieDfzR0cJsBwb1ymsn0jVIF-kOtx2Fo0ELrAFeekDjlA/exec',PLW_TIP='ดาวน์โหลด Playlist ทุกไฟล์ของวันนี้จาก Google Drive ของบริษัทเป็น .zip ไฟล์เดียว แล้วลากมาวางที่นี่ (ต้องล็อกอินบัญชี Google ของบริษัท)',
  plwBtn=c=>PLW_URL?`<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิด PLAYLIST INBOX</a>`:'',
  /* 5.5.41: ดึง Playlist วันนี้เข้าระบบเอง — เปิดหน้า Playlist รายวันด้วย ?send=studio หน้านั้นรวมไฟล์เป็น .zip แล้วส่งกลับมาทาง postMessage (ไม่ต้องดาวน์โหลด / ลากวาง) */
- plpBtn=c=>PLW_URL?`<button class="btn ${c}" data-a="plpull" title="ดึง Playlist 11 แบบของวันนี้จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP?' disabled':''}>${IC.up}${PLP?'กำลังดึง Playlist …':'ดึง Playlist วันนี้'}</button>`:'';
+ plpBtn=c=>PLW_URL?`<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP?' disabled':''}>${IC.up}${PLP?'กำลังดึง Playlist …':'ดึง Playlist วันนี้'}</button>`:'';
 let PLP=null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
 function plpEnd(msg){if(!PLP)return;clearInterval(PLP.iv);try{PLP.w&&!PLP.w.closed&&PLP.w.close()}catch(_){}PLP=null;if(msg)say(msg);view()}
 addEventListener('message',async e=>{const d=e.data;if(!d||!d.psPL||!PLP||!/(^https:\/\/script\.google\.com$)|(\.googleusercontent\.com$)/.test(e.origin||''))return;
  if(!d.ok){plpEnd('ดึง Playlist ไม่ได้: '+(d.err||'ไม่ทราบสาเหตุ'));return}
  const f=new File([d.blob],d.name||'Playlist.zip',{type:'application/zip'});plpEnd('');if(tab!=='dat'&&tab!=='home'){tab='dat';cs=null}
- await addAny('pl',[f]);note=`ดึง Playlist วันที่ ${thd(new Date(d.day+'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (${d.have}/${d.total} แบบ${d.miss&&d.miss.length?' — ยังขาด '+d.miss.join(', '):' ครบ'})`;MQN='done';view()});
+ await addAny('pl',[f]);note=`ดึง Playlist วันที่ ${thd(new Date(d.day+'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (แบบหลัก ${d.have}/${d.total}${d.miss&&d.miss.length?' — ยังขาด '+d.miss.join(', '):' ครบ'}${d.extra?' • Playlist เพิ่มเติม '+d.extra+' ไฟล์':''})`;MQN='done';view()});
 /* 5.5.37: เวอร์ชันก่อนหน้า — หน้านี้เปิดจาก versions/ (สำเนาเวอร์ชันเก่าที่เก็บไว้ใช้ตอนเวอร์ชันล่าสุดมีปัญหา) → แถบบอก + ลิงก์กลับเวอร์ชันล่าสุด */
 const SITE='https://playlist-system.github.io/playlist_system/',OLDVER=/\/versions\/[^\/]*$/.test(location.pathname);
 if(OLDVER){const a=document.getElementById('prevv');if(a){a.href=SITE+'playlist_system.html';a.textContent='กลับไปเวอร์ชันล่าสุด'}

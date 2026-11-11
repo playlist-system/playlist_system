@@ -147,6 +147,7 @@
  *   เวอร์ชัน 5.5.42: ไอคอนแท็บ (icons/)
  *   เวอร์ชัน 5.5.43: อ่านวันที่ที่พิมพ์ตกเครื่องหมาย / (เช่น 30/112026) เมื่อได้วันที่จริงแบบเดียว
  *   เวอร์ชัน 5.5.44: ปุ่ม/ข้อความ “เปิด PLAYLIST INBOX” (หน้าดึง Playlist แบบใหม่ใน apps_script/Code.gs)
+ *   เวอร์ชัน 5.5.45: ดึง Playlist วันนี้ ได้ Playlist เพิ่มเติมด้วย (ข้อความบอกจำนวนแยก)
  * ======================================================================
  */
 
@@ -10826,7 +10827,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.44 (11 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.45 (11 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -14291,7 +14292,7 @@ const PLW_URL =
   /* 5.5.41: ดึง Playlist วันนี้เข้าระบบเอง — เปิดหน้า Playlist รายวันด้วย ?send=studio หน้านั้นรวมไฟล์เป็น .zip แล้วส่งกลับมาทาง postMessage (ไม่ต้องดาวน์โหลด / ลากวาง) */
   plpBtn = c =>
     PLW_URL
-      ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist 11 แบบของวันนี้จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP ? ' disabled' : ''}>${IC.up}${PLP ? 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</button>`
+      ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP ? ' disabled' : ''}>${IC.up}${PLP ? 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</button>`
       : '';
 let PLP = null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
 function plpEnd(msg) {
@@ -14324,7 +14325,7 @@ addEventListener('message', async e => {
     cs = null;
   }
   await addAny('pl', [f]);
-  note = `ดึง Playlist วันที่ ${thd(new Date(d.day + 'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (${d.have}/${d.total} แบบ${d.miss && d.miss.length ? ' — ยังขาด ' + d.miss.join(', ') : ' ครบ'})`;
+  note = `ดึง Playlist วันที่ ${thd(new Date(d.day + 'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (แบบหลัก ${d.have}/${d.total}${d.miss && d.miss.length ? ' — ยังขาด ' + d.miss.join(', ') : ' ครบ'}${d.extra ? ' • Playlist เพิ่มเติม ' + d.extra + ' ไฟล์' : ''})`;
   MQN = 'done';
   view();
 });
