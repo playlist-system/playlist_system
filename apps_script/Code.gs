@@ -33,6 +33,8 @@ const CONFIG = {
   collectAll: true,
   // หน้าระบบเติมใบเช็คที่ส่ง Playlist ให้ได้ (ปุ่ม “ดึง Playlist วันนี้” ในระบบ เปิดหน้านี้ด้วย ?send=studio) — ส่งให้เฉพาะเว็บนี้เท่านั้น
   studioOrigin: 'https://playlist-system.github.io',
+  // ไอคอนแท็บของหน้าเว็บนี้ (รูป .png บนเว็บของระบบ) — ว่าง = ไอคอนเดิมของ Apps Script
+  iconUrl: 'https://playlist-system.github.io/playlist_system/icons/playlist-64.png',
   playlistWords: 'รายการหนัง|playlist',
   // Playlist ที่ระบบเติมใบเช็ครูปใช้ (ลำดับมีผล: ไฟล์เข้าแบบแรกที่ชื่อตรง)
   //   pattern = คำในชื่อไฟล์ • latest = ถ้าวันนี้ไม่มีฉบับใหม่ ใช้ฉบับล่าสุด
@@ -353,7 +355,7 @@ function doGet(e) {
     if (/\/exec$/.test(u || '') && PropertiesService.getScriptProperties().getProperty(PROP_WEB) !== u) PropertiesService.getScriptProperties().setProperty(PROP_WEB, u);
   } catch (e) {}
   const send = !!(e && e.parameter && e.parameter.send === 'studio'); // เปิดจากปุ่ม “ดึง Playlist วันนี้” ในระบบ → ส่งไฟล์กลับให้ระบบเอง
-  return HtmlService.createHtmlOutput(page_(send)).setTitle(send ? 'ส่ง Playlist เข้า PHOTO CHECK STUDIO' : 'Playlist รายวัน').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  return HtmlService.createHtmlOutput(page_(send)).setTitle(send ? 'ส่ง Playlist เข้า PHOTO CHECK STUDIO' : 'Playlist รายวัน').setFaviconUrl(CONFIG.iconUrl || 'https://playlist-system.github.io/playlist_system/icons/playlist-64.png').addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /** ลิงก์หน้าเว็บ (จำไว้ตอนเปิดหน้าเว็บครั้งแรก) — ใช้ใส่ในอีเมลสรุป */

@@ -62,6 +62,7 @@ PAGE = '''<!doctype html>
 <meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>เวอร์ชันก่อนหน้า — PHOTO CHECK STUDIO</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%%3Csvg xmlns=%%22http://www.w3.org/2000/svg%%22 viewBox=%%220 0 64 64%%22%%3E%%3Cdefs%%3E%%3ClinearGradient id=%%22g%%22 x1=%%220%%22 y1=%%220%%22 x2=%%221%%22 y2=%%221%%22%%3E%%3Cstop offset=%%220%%22 stop-color=%%22%%236D4AFF%%22/%%3E%%3Cstop offset=%%221%%22 stop-color=%%22%%232563EB%%22/%%3E%%3C/linearGradient%%3E%%3C/defs%%3E%%3Crect width=%%2264%%22 height=%%2264%%22 rx=%%2215%%22 fill=%%22url(%%23g)%%22/%%3E%%3Cg transform=%%22translate(6.4 6.4) scale(2.133)%%22 fill=%%22none%%22 stroke=%%22%%23fff%%22 stroke-width=%%222.3%%22 stroke-linecap=%%22round%%22 stroke-linejoin=%%22round%%22%%3E%%3Crect x=%%223%%22 y=%%227%%22 width=%%2218%%22 height=%%2213%%22 rx=%%223.5%%22/%%3E%%3Cpath d=%%22M8 7l2-3h4l2 3%%22/%%3E%%3Cpath d=%%22M9.2 13.6l2 2 3.8-4%%22/%%3E%%3C/g%%3E%%3C/svg%%3E"><link rel="apple-touch-icon" href="https://playlist-system.github.io/playlist_system/icons/studio-180.png">
 <style>
 :root{--bg:#EEF3FB;--card:#FFFFFF;--tx:#0F1B33;--mu:#46526B;--ln:#D5DBE5;--ac:#1F5FE0;--acink:#FFFFFF;--wbg:#FFF4D6;--wtx:#5A3B00;--wln:#E9B949}
 @media (prefers-color-scheme:dark){:root{--bg:#0B1430;--card:#121D3F;--tx:#E9EEF8;--mu:#A9B6D3;--ln:#24365A;--ac:#7AA7FF;--acink:#0B1430;--wbg:#3A2C08;--wtx:#FBE3A6;--wln:#8A6A1C}}

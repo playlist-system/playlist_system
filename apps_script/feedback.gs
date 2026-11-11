@@ -65,7 +65,7 @@ function page_(o) {
     (o.ok ? '<h2 style="color:#1d7546">ส่งเรื่องแล้ว · เลขที่ ' + esc(o.no) + '</h2><p>ขอบคุณครับ คนดูแลระบบจะเห็นในตารางรวมคำแจ้ง<br>ปิดแท็บนี้ได้เลย</p>'
           : '<h2 style="color:#b3261e">ส่งไม่ได้</h2><p>' + esc(o.err) + '</p><p>กลับไปที่หน้าระบบ แล้วกดส่งอีกครั้ง</p>') +
     '</div><script>try{var w=window.top.opener;if(w)w.postMessage({psfb:1,ok:' + (o.ok ? 'true' : 'false') + ',no:' + JSON.stringify(o.no || '') + ',err:' + JSON.stringify(o.err || '') + '},"*")}catch(e){}</script>';
-  return HtmlService.createHtmlOutput(h).setTitle(o.ok ? 'ส่งเรื่องแล้ว' : 'ส่งไม่ได้');
+  return HtmlService.createHtmlOutput(h).setTitle(o.ok ? 'ส่งเรื่องแล้ว' : 'ส่งไม่ได้').setFaviconUrl('https://playlist-system.github.io/playlist_system/icons/studio-64.png');
 }
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 function clean_(s) { return String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80); }
