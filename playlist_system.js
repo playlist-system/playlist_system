@@ -10482,7 +10482,7 @@ function plCheck(p, I) {
         if (v && !parseD0(v) && !NOEND.test(v)) {
           const fx = dTypo(v);
           if (fx) {
-            if (!typo.has(v)) typo.set(v, thdS(fx) + ' ' + fx.getUTCFullYear());
+            if (!typo.has(v)) typo.set(v, thd(fx));
             continue;
           }
           if (!bad.has(r.ad)) bad.set(r.ad, (k === 's' ? 'วันเริ่ม' : 'วันหมด') + ' “' + v + '”');
