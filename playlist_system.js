@@ -145,6 +145,7 @@
  *   เวอร์ชัน 5.5.40: ข้อความวันที่ผิดใน Playlist บอกว่าใส่แล้ว / ยังไม่ใส่ ตามจริง
  *   เวอร์ชัน 5.5.41: ปุ่มดึง Playlist วันนี้ (รับไฟล์จากหน้า Playlist รายวันทาง postMessage)
  *   เวอร์ชัน 5.5.42: ไอคอนแท็บ (icons/)
+ *   เวอร์ชัน 5.5.43: อ่านวันที่ที่พิมพ์ตกเครื่องหมาย / (เช่น 30/112026) เมื่อได้วันที่จริงแบบเดียว
  * ======================================================================
  */
 
@@ -373,7 +374,32 @@ const jamList = (s, o) =>
 /* ---------- แบบใบเช็คที่ทำด้วยมือ: # ก่อน → A-Z, แยกตามวันเริ่ม, ออกวันที่ ---------- */
 const SCR = new Map(),
   MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+/* 5.5.43: วันที่ที่พิมพ์ตกเครื่องหมาย / (เช่น “30/112026” “02/92026” “2710/2026”) — อ่านได้ถ้าได้วันที่จริงแบบเดียว ปี 2020–2099 (หรือ พ.ศ.) • บอกใน “ข้อมูล” */
+function dTypo(t) {
+  const x = String(t == null ? '' : t).trim(),
+    ok = (d, m, y) => {
+      if (y > 2400) y -= 543;
+      if (y < 2020 || y > 2099 || m < 1 || m > 12 || d < 1) return null;
+      const D = new Date(Date.UTC(y, m - 1, d));
+      return D.getUTCDate() === d ? D : null;
+    };
+  let q = x.match(/^(\d{1,2})[-\/.](\d{1,2})(\d{4})$/);
+  if (q) return ok(+q[1], +q[2], +q[3]);
+  q = x.match(/^(\d{3,4})[-\/.](\d{4})$/);
+  if (q) {
+    const a = q[1],
+      L = [
+        ok(+a.slice(0, 2), +a.slice(2), +q[2]),
+        a.length === 3 ? ok(+a.slice(0, 1), +a.slice(1), +q[2]) : null,
+      ].filter(Boolean);
+    return L.length === 1 ? L[0] : null;
+  }
+  return null;
+}
 function parseD(t) {
+  return parseD0(t) || (t ? dTypo(t) : null);
+}
+function parseD0(t) {
   if (!t) return null;
   {
     const x = String(t).trim();
@@ -10419,7 +10445,8 @@ function plCheck(p, I) {
     bad = new Map(),
     all = new Set(),
     shf = [],
-    tl = new Set();
+    tl = new Set(),
+    typo = new Map();
   for (const s of p)
     for (const r of s.rows) {
       {
@@ -10452,12 +10479,25 @@ function plCheck(p, I) {
       }
       for (const k of ['s', 'e']) {
         const v = String(r[k] || '').trim();
-        if (v && !parseD(v) && !NOEND.test(v)) {
+        if (v && !parseD0(v) && !NOEND.test(v)) {
+          const fx = dTypo(v);
+          if (fx) {
+            if (!typo.has(v)) typo.set(v, thdS(fx) + ' ' + fx.getUTCFullYear());
+            continue;
+          }
           if (!bad.has(r.ad)) bad.set(r.ad, (k === 's' ? 'วันเริ่ม' : 'วันหมด') + ' “' + v + '”');
           break;
         }
       }
     }
+  if (typo.size)
+    I.push({
+      lv: 'info',
+      t: `วันที่ในไฟล์พิมพ์ตกเครื่องหมาย ${typo.size} แบบ ระบบอ่านให้แล้ว: ${[...typo]
+        .slice(0, 3)
+        .map(([v, d]) => '“' + v + '” = ' + d)
+        .join(', ')}${typo.size > 3 ? ' …' : ''}`,
+    }); /* 5.5.43 */
   if (tl.size)
     I.push({
       lv: 'info',
@@ -10785,7 +10825,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.42 (11 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.43 (11 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:

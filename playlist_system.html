@@ -1029,7 +1029,12 @@ function namedScreen(label,code,sn){if(/^BASE$/.test(nrm(sn||''))){const h=DB.fi
 const jamList=(s,o)=>listOf(s,o).filter(a=>!/^BJ\d*_\d+_/i.test(a)&&!/weather/i.test(a)&&!/^เวลารวม|^รวมทุกแพค/.test(a));
 /* ---------- แบบใบเช็คที่ทำด้วยมือ: # ก่อน → A-Z, แยกตามวันเริ่ม, ออกวันที่ ---------- */
 const SCR=new Map(),MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-function parseD(t){if(!t)return null;{const x=String(t).trim();let q=x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(q)return new Date(Date.UTC(+q[1],+q[2]-1,+q[3]));q=x.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);if(q){let y=+q[3];if(y<100)y+=2000;if(y>2400)y-=543;if(+q[2]>=1&&+q[2]<=12)return new Date(Date.UTC(y,+q[2]-1,+q[1]))}}const m=String(t).trim().match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ](\d{2,4})$/);if(!m||!(m[2].toLowerCase()in MON))return null;let y=+m[3];if(y<100)y+=2000;if(y>2400)y-=543;return new Date(Date.UTC(y,MON[m[2].toLowerCase()],+m[1]))}
+/* 5.5.43: วันที่ที่พิมพ์ตกเครื่องหมาย / (เช่น “30/112026” “02/92026” “2710/2026”) — อ่านได้ถ้าได้วันที่จริงแบบเดียว ปี 2020–2099 (หรือ พ.ศ.) • บอกใน “ข้อมูล” */
+function dTypo(t){const x=String(t==null?'':t).trim(),ok=(d,m,y)=>{if(y>2400)y-=543;if(y<2020||y>2099||m<1||m>12||d<1)return null;const D=new Date(Date.UTC(y,m-1,d));return D.getUTCDate()===d?D:null};
+ let q=x.match(/^(\d{1,2})[-\/.](\d{1,2})(\d{4})$/);if(q)return ok(+q[1],+q[2],+q[3]);
+ q=x.match(/^(\d{3,4})[-\/.](\d{4})$/);if(q){const a=q[1],L=[ok(+a.slice(0,2),+a.slice(2),+q[2]),a.length===3?ok(+a.slice(0,1),+a.slice(1),+q[2]):null].filter(Boolean);return L.length===1?L[0]:null}return null}
+function parseD(t){return parseD0(t)||(t?dTypo(t):null)}
+function parseD0(t){if(!t)return null;{const x=String(t).trim();let q=x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(q)return new Date(Date.UTC(+q[1],+q[2]-1,+q[3]));q=x.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);if(q){let y=+q[3];if(y<100)y+=2000;if(y>2400)y-=543;if(+q[2]>=1&&+q[2]<=12)return new Date(Date.UTC(y,+q[2]-1,+q[1]))}}const m=String(t).trim().match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ](\d{2,4})$/);if(!m||!(m[2].toLowerCase()in MON))return null;let y=+m[3];if(y<100)y+=2000;if(y>2400)y-=543;return new Date(Date.UTC(y,MON[m[2].toLowerCase()],+m[1]))}
 const serial=d=>Math.round((d-Date.UTC(1899,11,30))/864e5),addD=(d,n)=>new Date(d.getTime()+n*864e5);
 const JUNK=/^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s*[A-Za-z]{3}|^แจ้ง\s*HOLD|^HOLD$|^รอ\s*ไฟล์|^ออน(?:แอร์)?\s*เมื่อ/i,MTP=/^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i,
  FASTN=/(^|[^a-z])Fast[\s_-]*Ads?/i; /* FastAd4-3_V2, #FAST_ADS: ไม่ใช่หนังโฆษณา ไม่ลงใบเช็ค */
@@ -3822,11 +3827,12 @@ const KST=/ขึ้นใหม่|ไฟล์เดิม|ต่อสัญ�
 /* 5.5.33: ชื่อหนังมีเลขเกินท้ายชื่อ (Playlist พิมพ์เกิน เช่น “…_9Nov26_15s 15” วันถัดไปแก้เป็น “…_9Nov26_15s”) → ตัดออก ทั้งใน Playlist และในใบเช็ค */
 const durTail=v=>typeof v==='string'?v.replace(/(_\d+s)\s+\d+\s*$/i,'$1'):v;
 const stDate=v=>{const x=String(v==null?'':v).trim();if(/^\d{5}(\.\d+)?$/.test(x)&&+x>20000&&+x<80000)return new Date(Date.UTC(1899,11,30)+Math.round(+x)*864e5);return/^\d{1,2}[-\/.](\d{1,2}|[A-Za-z]{3})[-\/.]\d{2,4}$/.test(x)?parseD(x):null};
-function plCheck(p,I){const st=new Map(),bad=new Map(),all=new Set(),shf=[],tl=new Set();
+function plCheck(p,I){const st=new Map(),bad=new Map(),all=new Set(),shf=[],tl=new Set(),typo=new Map();
  for(const s of p)for(const r of s.rows){{const a=durTail(r.ad);if(a!==r.ad){tl.add(String(r.ad).trim()+' → '+a);r.ad=a}}if(!r.ad||r.ad===s.c||JUNK.test(String(r.ad).trim()))continue;all.add(r.ad);
   {const sd=stDate(r.st);if(sd){const a=parseD(r.s),b=parseD(r.e);if(a&&b&&+a<=+b&&+b<=+sd){r.shf={s:r.s,e:r.e,st:r.st};r.s=r.e;r.e=fdU(sd);r.st='';shf.push(`${s.c}: ${r.ad} → เริ่ม ${thdS(b)} สิ้นสุด ${thdS(sd)}`)}else r.st='วันที่ '+thdS(sd)+' '+sd.getUTCFullYear()}}
   const x=String(r.st||'').trim();if(x&&!KST.test(x)){if(!st.has(x))st.set(x,new Set());st.get(x).add(r.ad)}
-  for(const k of['s','e']){const v=String(r[k]||'').trim();if(v&&!parseD(v)&&!NOEND.test(v)){if(!bad.has(r.ad))bad.set(r.ad,(k==='s'?'วันเริ่ม':'วันหมด')+' “'+v+'”');break}}}
+  for(const k of['s','e']){const v=String(r[k]||'').trim();if(v&&!parseD0(v)&&!NOEND.test(v)){const fx=dTypo(v);if(fx){if(!typo.has(v))typo.set(v,thdS(fx)+' '+fx.getUTCFullYear());continue}if(!bad.has(r.ad))bad.set(r.ad,(k==='s'?'วันเริ่ม':'วันหมด')+' “'+v+'”');break}}}
+ if(typo.size)I.push({lv:'info',t:`วันที่ในไฟล์พิมพ์ตกเครื่องหมาย ${typo.size} แบบ ระบบอ่านให้แล้ว: ${[...typo].slice(0,3).map(([v,d])=>'“'+v+'” = '+d).join(', ')}${typo.size>3?' …':''}`}); /* 5.5.43 */
  if(tl.size)I.push({lv:'info',t:`ชื่อหนังมีเลขเกินท้ายชื่อ ${tl.size} เรื่อง ระบบตัดออกให้: ${[...tl].slice(0,2).join(' • ')}${tl.size>2?' …':''}`}); /* 5.5.33 */
  if(shf.length)I.push({lv:'info',t:`แถวที่ช่องเลื่อน ${shf.length} เรื่อง (ช่องสถานะเป็นวันที่): ระบบใช้วันสิ้นสุดเป็นวันเริ่ม และวันในช่องสถานะเป็นวันสิ้นสุด — ${shf.slice(0,3).join(' • ')}${shf.length>3?' …':''}`}); /* 5.5.32 */
  for(const[x,a]of st)I.push({lv:'stop',t:`สถานะ “${x}” ระบบไม่รู้จัก (${a.size} เรื่อง เช่น ${[...a].slice(0,2).join(', ')}) หนังเหล่านี้จะไม่ถูกนับว่า “ขึ้นใหม่” จึงไม่ลงใต้แถบของวันนี้`});
@@ -3879,7 +3885,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.42 (11 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.43 (11 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',

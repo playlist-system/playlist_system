@@ -18,6 +18,7 @@ cases.json
 - fill    : ใส่ Playlist + ใบเช็ค → กดเติม → เทียบไฟล์ .xlsm ที่ได้ (ค่า สี ตัวหนา ขนาดตัวอักษร) และรายงาน
 - folders : อ่านใบเช็คแบบหน้า "งานโฟลเดอร์และรูป" → แผน zip (ไม่มี / มีโฟลเดอร์เดิม) → แผนสร้างโฟลเดอร์
             บนโฟลเดอร์จำลองตาม dirs.json → สร้างจริงใน OPFS → เทียบผลทั้งหมดกับ expected/<name>.json
+- dates   : อ่านวันที่แบบต่าง ๆ ด้วย parseD (ไม่ใช้ชุดทดสอบ รันทุกครั้ง) — รวมวันที่ที่พิมพ์ตก / (ตั้งแต่ 5.5.43)
 - feedback: ปุ่มแจ้งปัญหาส่งแบบฟอร์มไปที่รับจำลอง (ที่อยู่เดียวกับที่ตั้งในระบบ) + จำลอง feedback.gs ด้วย node
             (ไม่ใช้ expected — ตรวจตามเงื่อนไข)
 
@@ -52,6 +53,25 @@ def open_page(pw, html):
 
 def b64files(paths):
     return [[os.path.basename(f), base64.b64encode(open(f, 'rb').read()).decode()] for f in paths]
+
+
+# ---------------------------------------------------------------- dates
+# [ข้อความ, วันที่ที่ควรได้ (YYYY-MM-DD) หรือ None = ต้องอ่านไม่ได้]
+DATES = [
+    ('10/11/2026', '2026-11-10'), ('10/11/2569', '2026-11-10'), ('10-Nov-26', '2026-11-10'), ('2026-11-10', '2026-11-10'),
+    # 5.5.43: พิมพ์ตกเครื่องหมาย / — อ่านได้เมื่อได้วันที่จริงแบบเดียว
+    ('30/112026', '2026-11-30'), ('02/92026', '2026-09-02'), ('2710/2026', '2026-10-27'), ('30/112569', '2026-11-30'),
+    ('1/12026', '2026-01-01'),
+    ('3112/2026', '2026-12-31'), ('213/2026', '2026-03-21'),
+    ('31/22026', None), ('111/2026', None), ('211/2026', None), ('30/111999', None), ('ไม่มีกำหนด', None), ('', None),   # 211/2026 = 21/1 หรือ 2/11 ไม่รู้ → ไม่เดา
+]
+
+
+def run_dates(pw, html):
+    br, ctx, p, errs = open_page(pw, html)
+    got = p.evaluate("L => L.map(t => { const d = parseD(t); return d ? d.toISOString().slice(0, 10) : null })", [t for t, _ in DATES])
+    br.close()
+    return ['“%s” ได้ %s (ควรได้ %s)' % (t, g, w) for (t, w), g in zip(DATES, got) if g != w], errs
 
 
 # ---------------------------------------------------------------- fill
@@ -291,6 +311,12 @@ def main():
     print('ทดสอบ', ver)
     fails = []
     with sync_playwright() as pw:
+        if want('dates'):
+            probs, errs = run_dates(pw, a.html)
+            probs += ['JS error: ' + x for x in errs]
+            print(('ผ่าน ' if not probs else 'ไม่ผ่าน ') + 'dates — อ่านวันที่แบบต่าง ๆ (%d แบบ)' % len(DATES))
+            for x in probs: print('    ' + x)
+            if probs: fails.append('dates')
         for c in cases.get('fill', []):
             if not want(c['name']): continue
             o = os.path.join(out, c['name'])
