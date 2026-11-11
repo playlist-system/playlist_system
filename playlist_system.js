@@ -143,6 +143,7 @@
  *   เวอร์ชัน 5.5.38: ปุ่มเปิดหน้า Playlist รายวัน (Apps Script ของบริษัท) ในขั้นใส่ Playlist และหน้าหลัก
  *   เวอร์ชัน 5.5.39: แพค CITY → โฟลเดอร์ “Pic @ City TV” (ชื่อใหม่ใน Gallary)
  *   เวอร์ชัน 5.5.40: ข้อความวันที่ผิดใน Playlist บอกว่าใส่แล้ว / ยังไม่ใส่ ตามจริง
+ *   เวอร์ชัน 5.5.41: ปุ่มดึง Playlist วันนี้ (รับไฟล์จากหน้า Playlist รายวันทาง postMessage)
  * ======================================================================
  */
 
@@ -10783,7 +10784,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.40 (11 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.41 (11 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -11049,7 +11050,7 @@ const KINDS = [
   { k: 'Show DC', c: 'p', latest: true, tip: 'ไม่ได้ส่งทุกวัน', has: s => s.m === 'Show DC / Prudential' },
   { k: 'BKJ1', c: 'j', has: s => s.m === 'Bangkok Jams' && s.c === 'BKJ1 ALL' },
   { k: 'BKJ2', c: 'j', has: s => s.m === 'Bangkok Jams' && /^BKJ2/.test(s.c) },
-  { k: 'Metro LED', c: 'm', tip: 'มาทาง LINE', has: s => s.m === 'MetroLED' },
+  { k: 'Metro LED', c: 'm', tip: 'มาทางอีเมล (ตั้งแต่ พ.ย. 2569)', has: s => s.m === 'MetroLED' },
   { k: 'Rama9 Connect', c: 'g', x: 1, has: s => s.m === 'Rama9 Connect' },
   { k: 'Digital MRT', c: 'b', x: 1, latest: true, tip: 'ไม่ได้ส่งทุกวัน', has: s => s.m === 'Digital MRT' },
   { k: 'Gateway X', c: 'p', x: 1, latest: true, tip: 'ไม่ได้ส่งทุกวัน', has: s => s.m === 'Gateway X' },
@@ -11630,7 +11631,7 @@ function vData() {
   ].sort((a, b) => a - b);
   return `${shead('ใส่ Playlist ของวันนี้', 'ลากไฟล์ Playlist ทุกไฟล์ของวันนี้มาวางพร้อมกัน ช่องในเช็กลิสต์จะสว่างเมื่อได้ไฟล์แบบนั้นแล้ว • หยุดหลายวัน ใส่ของทุกวันพร้อมกันได้ ระบบจะเติมต่อกันให้ทีละวัน')}
  <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม • ลากโฟลเดอร์ของแต่ละวันมาทั้งโฟลเดอร์ก็ได้', '.xlsx,.xls,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
- <div class="plrow"><button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>${plwBtn('quiet ckdir pldir')}</div>
+ <div class="plrow"><button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>${plpBtn('ckdir pldir')}${plwBtn('quiet ckdir pldir')}</div>
  ${vDays(MD)}${vWall(wd)}
  <div class="stack">${PLX.length ? alertHTML('er', `อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`, `<ul>${PLX.map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`) : ''}
  ${vPLI()}
@@ -13435,7 +13436,7 @@ function vHome() {
           )
           .join('') +
         `<p class="hint">${fl.length > 4 ? `และอีก ${fl.length - 4} ไฟล์ • ` : ''}ครบ ${nk} จาก 11 แบบ${PLX.length ? ` • อ่านไม่ได้ ${PLX.length} ไฟล์` : ''}</p>`
-      : `<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns"><button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button>${plwBtn('secondary')}</div>`
+      : `<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns">${plpBtn('secondary')}<button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button></div>`
   }</section>`;
   const resCard = `<section class="hcard" aria-labelledby="hrs"><h2 id="hrs">ผลการเติมล่าสุด</h2>${
     L
@@ -14244,7 +14245,47 @@ const PLW_URL =
   plwBtn = c =>
     PLW_URL
       ? `<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิดหน้า Playlist รายวัน</a>`
+      : '',
+  /* 5.5.41: ดึง Playlist วันนี้เข้าระบบเอง — เปิดหน้า Playlist รายวันด้วย ?send=studio หน้านั้นรวมไฟล์เป็น .zip แล้วส่งกลับมาทาง postMessage (ไม่ต้องดาวน์โหลด / ลากวาง) */
+  plpBtn = c =>
+    PLW_URL
+      ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist 11 แบบของวันนี้จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP ? ' disabled' : ''}>${IC.up}${PLP ? 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</button>`
       : '';
+let PLP = null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
+function plpEnd(msg) {
+  if (!PLP) return;
+  clearInterval(PLP.iv);
+  try {
+    PLP.w && !PLP.w.closed && PLP.w.close();
+  } catch (_) {}
+  PLP = null;
+  if (msg) say(msg);
+  view();
+}
+addEventListener('message', async e => {
+  const d = e.data;
+  if (
+    !d ||
+    !d.psPL ||
+    !PLP ||
+    !/(^https:\/\/script\.google\.com$)|(\.googleusercontent\.com$)/.test(e.origin || '')
+  )
+    return;
+  if (!d.ok) {
+    plpEnd('ดึง Playlist ไม่ได้: ' + (d.err || 'ไม่ทราบสาเหตุ'));
+    return;
+  }
+  const f = new File([d.blob], d.name || 'Playlist.zip', { type: 'application/zip' });
+  plpEnd('');
+  if (tab !== 'dat' && tab !== 'home') {
+    tab = 'dat';
+    cs = null;
+  }
+  await addAny('pl', [f]);
+  note = `ดึง Playlist วันที่ ${thd(new Date(d.day + 'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (${d.have}/${d.total} แบบ${d.miss && d.miss.length ? ' — ยังขาด ' + d.miss.join(', ') : ' ครบ'})`;
+  MQN = 'done';
+  view();
+});
 /* 5.5.37: เวอร์ชันก่อนหน้า — หน้านี้เปิดจาก versions/ (สำเนาเวอร์ชันเก่าที่เก็บไว้ใช้ตอนเวอร์ชันล่าสุดมีปัญหา) → แถบบอก + ลิงก์กลับเวอร์ชันล่าสุด */
 const SITE = 'https://playlist-system.github.io/playlist_system/',
   OLDVER = /\/versions\/[^\/]*$/.test(location.pathname);
@@ -15363,6 +15404,30 @@ const ACT = {
     for (const x of PLI) x.ack = 1;
     note = 'ซ่อนรายการด่านตรวจแล้ว (ยังบันทึกไว้ในรายงาน)';
     FOCUSSEL = '[data-dz="pl"]';
+  },
+  plpull: () => {
+    if (BUSY || FILLING || PLP || !PLW_URL) return;
+    const w = window.open(PLW_URL + '?send=studio', 'psplp');
+    if (!w) {
+      say(
+        'เบราว์เซอร์บล็อกหน้าต่างใหม่ — กดอนุญาตป๊อปอัปของหน้านี้ (ไอคอนที่ช่องที่อยู่เว็บ) แล้วกดอีกครั้ง',
+      );
+      return;
+    }
+    PLP = { w, t: Date.now() };
+    PLP.iv = setInterval(() => {
+      if (!PLP) return;
+      const s = (Date.now() - PLP.t) / 1000;
+      if (PLP.w.closed)
+        plpEnd(
+          'หน้า Playlist รายวันปิด หรือเบราว์เซอร์ตัดการเชื่อมก่อนส่งไฟล์ — ถ้าหน้านั้นยังเปิดอยู่ กด “ดาวน์โหลด (.zip)” แล้วลากมาวางแทน',
+        );
+      else if (s > 180)
+        plpEnd(
+          'รอนานเกิน 3 นาที — ถ้าหน้า Playlist รายวันขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดอีกครั้ง หรือกด “ดาวน์โหลด (.zip)” ในหน้านั้นแล้วลากมาวาง',
+        );
+    }, 1000);
+    say('กำลังดึง Playlist วันนี้จาก Google Drive … หน้าใหม่จะเปิดแล้วปิดเอง');
   },
   pick: k => {
     if (!BUSY && !FILLING) openPicker(k);
