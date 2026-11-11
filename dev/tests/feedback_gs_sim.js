@@ -15,7 +15,7 @@ const ctx = {
   SpreadsheetApp: { create: () => ({ getId: () => 'x', getSheets: () => [sheet] }), open: () => ({ getSheets: () => [sheet] }) },
   Session: { getActiveUser: () => ({ getEmail: () => 'tester@example.com' }) },
   Utilities: { formatDate: () => '2026-01-01 0900', newBlob: (b, t, n) => ({ name: n }), base64Decode: s => Buffer.from(s, 'base64') },
-  HtmlService: { createHtmlOutput: h => ({ h, setTitle(t) { this.t = t; return this } }) },
+  HtmlService: { createHtmlOutput: h => ({ h, setTitle(t) { this.t = t; return this }, setFaviconUrl(u) { this.icon = u; return this } }) },
   ContentService: { createTextOutput: t => ({ t, setMimeType() { return this } }), MimeType: { JSON: 'json' } },
   MimeType: { PLAIN_TEXT: 'text' },
 };
