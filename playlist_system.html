@@ -3885,7 +3885,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.45 (11 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.46 (12 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4892,6 +4892,9 @@ async function addAny(kind,files){files=[...files];if(!files.length)return;
   if(U.bad.length)say(`เปิดไฟล์ .zip ไม่ได้ หรือในไฟล์ไม่มีไฟล์ Excel: ${U.bad.join(', ')}`);
   if(!files.length)return}
  if(kind==='tc'){await tcAdd(files);return}
+ /* 5.5.46: ไฟล์ที่ไม่ใช่ Excel (เช่น PDF ที่อยู่ในโฟลเดอร์ Playlist เดียวกัน) ข้ามทันที ไม่ต้องอ่าน — เดิมอ่านทุกไฟล์แล้วลองเปิดเป็น Excel 2 รอบ ช้ามากเมื่อลากทั้งโฟลเดอร์จากไดรฟ์เครือข่าย */
+ {const ok=f=>/\.(xlsx|xlsm|xls|xlsb|json)$/i.test(f.name),non=files.filter(f=>!ok(f));if(non.length){files=files.filter(ok);const ex=[...new Set(non.map(f=>((f.name.match(/\.([A-Za-z0-9]{1,5})$/)||[])[1]||'ไม่มีนามสกุล').toUpperCase()))];
+  say(`ข้าม ${non.length} ไฟล์ที่ไม่ใช่ Excel (${ex.join(', ')}) — ระบบใช้แค่ไฟล์ Excel`);if(!files.length)return}}
  const js=files.filter(f=>/\.json$/i.test(f.name)),rest=files.filter(f=>!/\.json$/i.test(f.name));
  if(kind==='pj'||(js.length&&!rest.length)){if(js[0]||files[0])await loadProject(js[0]||files[0]);return}
  const ck=kind==='ck'?rest:rest.filter(f=>/\.xlsm$/i.test(f.name)),pl=kind==='ck'?[]:rest.filter(f=>!/\.xlsm$/i.test(f.name));
