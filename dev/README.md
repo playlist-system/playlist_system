@@ -99,6 +99,7 @@ python3 dev/tests/run_tests.py playlist_system.html photo-check-tests --update  
 | `dates` | อ่านวันที่แบบต่าง ๆ ด้วย `parseD` — รายการอยู่ใน `DATES` ใน run_tests.py (ไม่ใช้ชุดทดสอบ รันทุกครั้ง) |
 
 - นาฬิกาในเบราว์เซอร์ทดสอบถูกตั้งตายตัว (`now` ใน cases.json) ผลจึงเหมือนเดิมทุกครั้ง
+- เคส `fill/mall01` `fill/mall14` (ตั้งแต่ 5.5.49): ใบเช็คจอในห้าง 4 ไฟล์ (ใบเปล่า) — วันเดียวที่มีไฟล์วันถัดไปปน และหลายวันพร้อมไฟล์ระหว่างวัน
 - เพิ่มเคสใหม่: ใส่ไฟล์ในโฟลเดอร์ชุดทดสอบ เพิ่มใน `cases.json` รัน `--only <ชื่อ> --update` ด้วยเวอร์ชันที่ถูกต้อง แล้ว zip ขึ้น Drive ใหม่
 - เมื่อแก้แล้วผลเปลี่ยนตามที่ตั้งใจ: ตรวจความต่างที่รายงาน → `--update` → zip ชุดทดสอบใหม่ส่งให้เจ้าของระบบเก็บใน Drive
 - `dev/tests/feedback_gs_sim.js` รันเดี่ยวได้: `node dev/tests/feedback_gs_sim.js apps_script/feedback.gs`
@@ -107,7 +108,7 @@ python3 dev/tests/run_tests.py playlist_system.html photo-check-tests --update  
 
 | ส่วน | ฟังก์ชันหลัก |
 |---|---|
-| อ่าน Playlist | `parsePlaylist` (แยกตามแบบไฟล์: `parseSect` `parseSplit` `parseSig` `parseMetro` `parseMco` `parseVen`) • `plCheck` (ตรวจแถว วันที่ผิด แถวเลื่อนช่อง เลขเกิน `durTail`) • `plDays` `plSync` |
+| อ่าน Playlist | `plwRead` (5.5.49: `slimXlsx` + `XLSX.read` ใน Web Worker หลายตัว → ส่ง `wb` ให้ `parsePlaylist`; ไม่ได้ก็อ่านแบบเดิม) • `parsePlaylist` (แยกตามแบบไฟล์: `parseSect` `parseSplit` `parseSig` `parseMetro` `parseMco` `parseVen`) • `plCheck` (ตรวจแถว วันที่ผิด แถวเลื่อนช่อง เลขเกิน `durTail`) • `plDays` `plSync` |
 | อ่าน / วางแผนใบเช็ค | `layoutChk` (แผนต่อชีต: จอไหน แถวไหน เตือนอะไร) • `chkRows` (แถวที่จะใส่ต่อจอ, แถวหมายเหตุ `RMK`) • `sheetNeeds` • `namedScreen` `screen10` `picId` |
 | เติม | `fillRun` → `fillDays` (หลายวัน) → `fillWb` (เขียน .xlsm ผ่าน JSZip เก็บมาโคร) • `oldHdrFix` (หัวแบบเก่า) • `autoMv` `colWb` `xHist` (ย้าย / เพิ่มคอลัมน์ BKJ, Metro กลางเดือน) |
 | ใบเปล่า / ย้ายจอ | `sdbLoad` `sdbRun` `sdbApply` `sdbMoveApply` `sdbNewFile` (สร้างใบเปล่าให้คนใหม่) `blankWb` |
