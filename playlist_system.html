@@ -3622,6 +3622,11 @@ const HDB={p:null,db(){return this.p||(this.p=new Promise((ok,no)=>{const r=inde
  async get(k){const d=await this.db();return new Promise(ok=>{const q=d.transaction('h').objectStore('h').get(k);q.onsuccess=()=>ok(q.result||null);q.onerror=()=>ok(null)})},
  async set(k,v){const d=await this.db();return new Promise(ok=>{const t=d.transaction('h','readwrite');t.objectStore('h').put(v,k);t.oncomplete=()=>ok();t.onerror=()=>ok()})}}; /* จำโฟลเดอร์ใบเช็คไว้ในเครื่องนี้ */
 const isoD=d=>d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+/* 5.5.53: ไฟล์ที่เปิดค้างใน Excel (มีไฟล์ ~$ชื่อไฟล์ ในโฟลเดอร์) เขียนทับไม่ได้ — ถามก่อนบันทึก ไม่ให้บันทึกได้ครึ่ง ๆ • errN = ชื่อข้อผิดพลาดที่บอกในข้อความ */
+async function xlOpen(dir,names){const out=[];for(const n of names){for(const t of ['~$'+n,...(String(n).length>=10?['~$'+String(n).slice(2)]:[])]){try{await dir.getFileHandle(t);out.push(n);break}catch(_){}}}return out}
+async function xlAsk(dir,names){const L=await xlOpen(dir,names);return!L.length||confirm(`ไฟล์นี้เปิดอยู่ใน Excel (เจอไฟล์ ~$ ในโฟลเดอร์ “${dir.name}”):\n${L.join('\n')}\n\nไฟล์ที่เปิดอยู่ ระบบเขียนทับไม่ได้ — ปิดไฟล์ใน Excel ก่อน แล้วกด OK เพื่อบันทึก\n(กด Cancel = ยังไม่บันทึก ไม่มีไฟล์ไหนถูกแก้)`)}
+const errN=e=>{const n=e&&e.name;return n&&n!=='Error'?n:String((e&&e.message)||e||'')};
+const xlWhy=W=>W.length?' — '+W.map(([n,e])=>n+(e?' ('+e+')':'')).join(', '):'';
 const saveBlob=(n,d)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([d]));a.download=n;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500)};
 /* วันที่จาก Excel: แปลงแบบ UTC กันวันเลื่อน 1 วันในเขตเวลาไทย */
 const fdU=d=>String(d.getUTCDate()).padStart(2,'0')+'-'+'JanFebMarAprMayJunJulAugSepOctNovDec'.substr(d.getUTCMonth()*3,3)+'-'+String(d.getUTCFullYear()).slice(2);
@@ -3922,7 +3927,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.52 (12 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.53 (12 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -5082,17 +5087,18 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   saveBlob('ใบเช็ครูป_ใส่วันที่ถ่าย.zip',await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
  shotsave:async k=>{const D=SHOT&&SHOT.done;if(!D||!FSA)return;let d=k==='pick'?null:CKDIR;
   try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;
-   if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}catch(e){if(e&&e.name==='AbortError')return;note='เลือกโฟลเดอร์ไม่ได้';return}
+   if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}catch(e){if(e&&e.name==='AbortError'){note='ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ (หรือไม่ได้กดอนุญาตให้แก้ไฟล์)';return}MQN='err';note=`เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;return}
+  if(!(await xlAsk(d,D.files.map(x=>x.name)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
   const has0=async(dir,n)=>{try{return await (await dir.getFileHandle(n)).getFile()}catch(_){return null}},same=async(f,b)=>{if(!f||!b||f.size!==b.byteLength)return false;const u=new Uint8Array(await f.arrayBuffer()),v=new Uint8Array(b);for(let i=0;i<u.length;i++)if(u[i]!==v[i])return false;return true};
-  const dif=[];for(const x of D.files){const old=await has0(d,x.name);if(old&&!(await same(old,D.orig&&D.orig.get(x.name)))&&!(await same(old,x.blob.buffer.slice(x.blob.byteOffset,x.blob.byteOffset+x.blob.byteLength))))dif.push(x.name)}
+  const dif=[];for(const x of D.files){try{const old=await has0(d,x.name);if(old&&!(await same(old,D.orig&&D.orig.get(x.name)))&&!(await same(old,x.blob.buffer.slice(x.blob.byteOffset,x.blob.byteOffset+x.blob.byteLength))))dif.push(x.name)}catch(e){MQN='err';note=`อ่านไฟล์ ${x.name} ในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ถ้าไฟล์เปิดอยู่ใน Excel ให้ปิดก่อน แล้วกดบันทึกอีกครั้ง (ยังไม่ได้บันทึก)`;return}}
   if(dif.length&&!confirm(`ไฟล์ในโฟลเดอร์ “${d.name}” ไม่ใช่ฉบับเดียวกับที่ใส่วันที่ถ่าย (อาจถูกแก้ทีหลัง หรือเป็นคนละไฟล์):\n${dif.join('\n')}\n\nบันทึกทับไหม? ไฟล์เดิมจะเก็บไว้ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย`)){note='ยังไม่ได้บันทึก — ถ้าจะใส่วันที่ลงไฟล์ในโฟลเดอร์นั้น กด “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์นั้น แล้วตรวจและใส่อีกครั้ง';return}
   CKDIR=d;HDB.set('ck',d).catch(()=>{});const day=isoD(new Date(Date.now()+7*36e5));
-  const bk=await (await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย',{create:true})).getDirectoryHandle(day,{create:true});
-  const has=has0;const bad=[];let neu=0;
+  let bk;try{bk=await (await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย',{create:true})).getDirectoryHandle(day,{create:true})}catch(e){MQN='err';note=`สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;return}
+  const has=has0;const bad=[],W=[];let neu=0;
   for(const x of D.files){try{const old=await has(d,x.name);if(!old)neu++;if(old&&!(await has(bk,x.name))){const w=await (await bk.getFileHandle(x.name,{create:true})).createWritable();await w.write(await old.arrayBuffer());await w.close()}
-    const w=await (await d.getFileHandle(x.name,{create:true})).createWritable();await w.write(x.blob);await w.close()}catch(_){bad.push(x.name)}}
+    const w=await (await d.getFileHandle(x.name,{create:true})).createWritable();await w.write(x.blob);await w.close()}catch(e){bad.push(x.name);W.push([x.name,errN(e)])}}
   try{const w=await (await bk.getFileHandle('รายงานวันที่ถ่าย.txt',{create:true})).createWritable();await w.write(D.txt);await w.close()}catch(_){}
-  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
+  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
   D.saved=true;D.sv={dir:d.name,ok:D.files.length,neu,day};MQN='done';note=`บันทึกลงโฟลเดอร์ “${d.name}” แล้ว ${D.files.length} ไฟล์`},
  picck:async()=>{if(!TC.length)return;await tcRead()},
  blkmake:async()=>{if(!TC.length||BUSY||FILLING)return;const res=[];let i=0;
@@ -5154,11 +5160,12 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
  sdbdl:async()=>{const A=SDA;if(!A||!sdaL(A).length)return;const z=new JSZip();for(const n of sdaL(A)){const f=TC.find(x=>x.name===n);if(f)z.file(n,f.buf,{createFolders:false})}saveBlob('ใบเช็ค_'+sdaKs(A).map(k=>SDAK[k]).join('_')+'.zip',await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
  sdbsave:async k=>{const A=SDA;if(!A||!sdaL(A).length||!FSA)return;let d=k==='pick'?null:CKDIR;
   try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}catch(e){if(!(e&&e.name==='AbortError'))note='เลือกโฟลเดอร์ไม่ได้';return}
+  if(!(await xlAsk(d,sdaL(A)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
   const day=isoD(new Date(Date.now()+7*36e5));let bk;try{bk=await(await d.getDirectoryHandle(sdaBk(A),{create:true})).getDirectoryHandle(day,{create:true})}catch(_){MQN='err';note='สร้างโฟลเดอร์สำรองไม่ได้ ยังไม่ได้บันทึก';return}
   const bad=[];for(const n of sdaL(A)){const f=TC.find(x=>x.name===n);if(!f)continue;try{let old=null;try{old=await(await d.getFileHandle(n)).getFile()}catch(_){}
    if(old){let has=false;try{await bk.getFileHandle(n);has=true}catch(_){}if(!has){const w0=await(await bk.getFileHandle(n,{create:true})).createWritable();await w0.write(await old.arrayBuffer());await w0.close()}}
-   const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(f.buf);await w.close()}catch(_){bad.push(n)}}
-  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์ (${bad.join(', ')}) — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
+   const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(f.buf);await w.close()}catch(e){bad.push([n,errN(e)])}}
+  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
   A.sv={dir:d.name,day,bk:sdaBk(A)};MQN='party';note=`บันทึกใบเช็คที่${sdaWhat(A)}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${d.name}”`},
  sdbclear:()=>{if(!confirm('ลบฐานข้อมูลจอออกจากเครื่องนี้? (ใส่ใหม่ได้ตลอด)'))return;SDB=null;SDQ=null;if(BLK){BLK.plan=null;BLK.mplan=null}store.set('ps_sdb','');note='ลบฐานข้อมูลจอแล้ว'},
  toolv:k=>{if(!['pic','shot','cmp','blank','sdb'].includes(k))return;TOOLV=k;if(k==='sdb')(sdb()?sdbRun():anaRun()).then(()=>view(),()=>view());setTimeout(()=>{const d=$('#tdetail');if(d)d.scrollIntoView({behavior:'smooth',block:'start'})},60)},
@@ -5206,17 +5213,18 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   try{if(!d&&k!=='pick'){const x=await HDB.get('ck').catch(()=>null);if(x)d=x}
    if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;
    if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite'});
-  }catch(e){if(e&&e.name==='AbortError')return;note='เลือกโฟลเดอร์ไม่ได้';return}
+  }catch(e){if(e&&e.name==='AbortError'){note='ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ (หรือไม่ได้กดอนุญาตให้แก้ไฟล์)';return}MQN='err';note=`เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;return}
+  if(!(await xlAsk(d,last.res.filter(r=>r.blob).map(r=>r.name)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
   CKDIR=d;HDB.set('ck',d).catch(()=>{});const day=last.W0?isoD(new Date(last.W0))+' ถึง '+isoD(new Date(last.W)):isoD(new Date(last.W)); /* 4.3: หลายวัน = ก่อนเติมวันแรก */
-  const bk=await (await d.getDirectoryHandle('สำรองก่อนเติม',{create:true})).getDirectoryHandle(day,{create:true});
+  let bk;try{bk=await (await d.getDirectoryHandle('สำรองก่อนเติม',{create:true})).getDirectoryHandle(day,{create:true})}catch(e){MQN='err';note=`สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;return}
   const has=async(dir,n)=>{try{return await (await dir.getFileHandle(n)).getFile()}catch(_){return null}};
-  let ok=0,neu=0;const bad=[];
+  let ok=0,neu=0;const bad=[],W=[];
   for(const r of last.res){if(!r.blob)continue;
    try{const old=await has(d,r.name);if(old){if(!(await has(bk,r.name))){const w=await (await bk.getFileHandle(r.name,{create:true})).createWritable();await w.write(await old.arrayBuffer());await w.close()}}else neu++;
-    const w=await (await d.getFileHandle(r.name,{create:true})).createWritable();await w.write(r.blob);await w.close();ok++}catch(e){bad.push(r.name)}}
+    const w=await (await d.getFileHandle(r.name,{create:true})).createWritable();await w.write(r.blob);await w.close();ok++}catch(e){bad.push(r.name);W.push([r.name,errN(e)])}}
   try{const w=await (await bk.getFileHandle('รายงาน.txt',{create:true})).createWritable();await w.write(last.txt||'');await w.close()}catch(_){}
   last.sv={dir:d.name,ok,neu,bad,day};if(!bad.length)last.saved=true;thruSet(last.res.filter(r=>!bad.includes(r.name)),last.W);
-  MQN=bad.length?'err':'party';note=bad.length?`บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`:`บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`},
+  MQN=bad.length?'err':'party';note=bad.length?`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`:`บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`},
  next:()=>{if(!last)return;if(!last.saved&&!confirm('ผลการเติมนี้ยังไม่ได้บันทึกหรือดาวน์โหลด ใช้เป็นใบเช็คตั้งต้นของวันถัดไปเลยไหม? (ยังดาวน์โหลดผลนี้ได้จนกว่าจะเติมครั้งถัดไป)'))return;
   const old=new Map(C.map(f=>[f.name,f]));C=last.res.filter(r=>r.blob).map(r=>{const o=old.get(r.name)||{};const x={...o,name:r.name,buf:r.blob.buffer.slice(r.blob.byteOffset,r.blob.byteOffset+r.blob.byteLength),thru:+(r.thru||last.W)};delete x.nd;return x});
   DB=[];PFS=[];PLD=null;PLM={};PLX=[];PLI=[];OP.base='';BASEERR='';LIT=new Set();RO.clear();cs=null;fm='ทั้งหมด';q='';TQ='';dirty=0;tab='dat';window.scrollTo(0,0);

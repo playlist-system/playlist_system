@@ -155,6 +155,7 @@
  *   เวอร์ชัน จัดจอเข้าชีตตามแพค อ่านชีตแบบรหัสจอแถว 10 และใบเปล่า
  *   เวอร์ชัน ชีต CITY ใหม่ชื่อ City TV
  *   เวอร์ชัน ย้ายจอ / เพิ่มจอ / แก้สูตร แล้วบันทึกครั้งเดียว
+ *   เวอร์ชัน บันทึกไม่ได้ → บอกสาเหตุ เตือนไฟล์ที่เปิดอยู่ใน Excel
  * ======================================================================
  */
 
@@ -9485,6 +9486,34 @@ const isoD = d =>
   String(d.getUTCMonth() + 1).padStart(2, '0') +
   '-' +
   String(d.getUTCDate()).padStart(2, '0');
+/* 5.5.53: ไฟล์ที่เปิดค้างใน Excel (มีไฟล์ ~$ชื่อไฟล์ ในโฟลเดอร์) เขียนทับไม่ได้ — ถามก่อนบันทึก ไม่ให้บันทึกได้ครึ่ง ๆ • errN = ชื่อข้อผิดพลาดที่บอกในข้อความ */
+async function xlOpen(dir, names) {
+  const out = [];
+  for (const n of names) {
+    for (const t of ['~$' + n, ...(String(n).length >= 10 ? ['~$' + String(n).slice(2)] : [])]) {
+      try {
+        await dir.getFileHandle(t);
+        out.push(n);
+        break;
+      } catch (_) {}
+    }
+  }
+  return out;
+}
+async function xlAsk(dir, names) {
+  const L = await xlOpen(dir, names);
+  return (
+    !L.length ||
+    confirm(
+      `ไฟล์นี้เปิดอยู่ใน Excel (เจอไฟล์ ~$ ในโฟลเดอร์ “${dir.name}”):\n${L.join('\n')}\n\nไฟล์ที่เปิดอยู่ ระบบเขียนทับไม่ได้ — ปิดไฟล์ใน Excel ก่อน แล้วกด OK เพื่อบันทึก\n(กด Cancel = ยังไม่บันทึก ไม่มีไฟล์ไหนถูกแก้)`,
+    )
+  );
+}
+const errN = e => {
+  const n = e && e.name;
+  return n && n !== 'Error' ? n : String((e && e.message) || e || '');
+};
+const xlWhy = W => (W.length ? ' — ' + W.map(([n, e]) => n + (e ? ' (' + e + ')' : '')).join(', ') : '');
 const saveBlob = (n, d) => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([d]));
@@ -11112,7 +11141,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.52 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.53 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -16183,10 +16212,23 @@ const ACT = {
         d = null;
       if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
     } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      note = 'เลือกโฟลเดอร์ไม่ได้';
+      if (e && e.name === 'AbortError') {
+        note = 'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ (หรือไม่ได้กดอนุญาตให้แก้ไฟล์)';
+        return;
+      }
+      MQN = 'err';
+      note = `เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;
       return;
     }
+    if (
+      !(await xlAsk(
+        d,
+        D.files.map(x => x.name),
+      ))
+    ) {
+      note = 'ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';
+      return;
+    } /* 5.5.53 */
     const has0 = async (dir, n) => {
         try {
           return await (await dir.getFileHandle(n)).getFile();
@@ -16203,13 +16245,19 @@ const ACT = {
       };
     const dif = [];
     for (const x of D.files) {
-      const old = await has0(d, x.name);
-      if (
-        old &&
-        !(await same(old, D.orig && D.orig.get(x.name))) &&
-        !(await same(old, x.blob.buffer.slice(x.blob.byteOffset, x.blob.byteOffset + x.blob.byteLength)))
-      )
-        dif.push(x.name);
+      try {
+        const old = await has0(d, x.name);
+        if (
+          old &&
+          !(await same(old, D.orig && D.orig.get(x.name))) &&
+          !(await same(old, x.blob.buffer.slice(x.blob.byteOffset, x.blob.byteOffset + x.blob.byteLength)))
+        )
+          dif.push(x.name);
+      } catch (e) {
+        MQN = 'err';
+        note = `อ่านไฟล์ ${x.name} ในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ถ้าไฟล์เปิดอยู่ใน Excel ให้ปิดก่อน แล้วกดบันทึกอีกครั้ง (ยังไม่ได้บันทึก)`;
+        return;
+      }
     }
     if (
       dif.length &&
@@ -16224,11 +16272,19 @@ const ACT = {
     CKDIR = d;
     HDB.set('ck', d).catch(() => {});
     const day = isoD(new Date(Date.now() + 7 * 36e5));
-    const bk = await (
-      await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย', { create: true })
-    ).getDirectoryHandle(day, { create: true });
+    let bk;
+    try {
+      bk = await (
+        await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย', { create: true })
+      ).getDirectoryHandle(day, { create: true });
+    } catch (e) {
+      MQN = 'err';
+      note = `สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;
+      return;
+    }
     const has = has0;
-    const bad = [];
+    const bad = [],
+      W = [];
     let neu = 0;
     for (const x of D.files) {
       try {
@@ -16242,8 +16298,9 @@ const ACT = {
         const w = await (await d.getFileHandle(x.name, { create: true })).createWritable();
         await w.write(x.blob);
         await w.close();
-      } catch (_) {
+      } catch (e) {
         bad.push(x.name);
+        W.push([x.name, errN(e)]);
       }
     }
     try {
@@ -16253,7 +16310,7 @@ const ACT = {
     } catch (_) {}
     if (bad.length) {
       MQN = 'err';
-      note = `บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
+      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
       return;
     }
     D.saved = true;
@@ -16717,6 +16774,10 @@ const ACT = {
       if (!(e && e.name === 'AbortError')) note = 'เลือกโฟลเดอร์ไม่ได้';
       return;
     }
+    if (!(await xlAsk(d, sdaL(A)))) {
+      note = 'ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';
+      return;
+    } /* 5.5.53 */
     const day = isoD(new Date(Date.now() + 7 * 36e5));
     let bk;
     try {
@@ -16752,13 +16813,13 @@ const ACT = {
         const w = await (await d.getFileHandle(n, { create: true })).createWritable();
         await w.write(f.buf);
         await w.close();
-      } catch (_) {
-        bad.push(n);
+      } catch (e) {
+        bad.push([n, errN(e)]);
       }
     }
     if (bad.length) {
       MQN = 'err';
-      note = `บันทึกไม่ได้ ${bad.length} ไฟล์ (${bad.join(', ')}) — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
+      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
       return;
     }
     A.sv = { dir: d.name, day, bk: sdaBk(A) };
@@ -17057,18 +17118,38 @@ const ACT = {
         d = null;
       if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
     } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      note = 'เลือกโฟลเดอร์ไม่ได้';
+      if (e && e.name === 'AbortError') {
+        note = 'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ (หรือไม่ได้กดอนุญาตให้แก้ไฟล์)';
+        return;
+      }
+      MQN = 'err';
+      note = `เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;
       return;
     }
+    if (
+      !(await xlAsk(
+        d,
+        last.res.filter(r => r.blob).map(r => r.name),
+      ))
+    ) {
+      note = 'ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';
+      return;
+    } /* 5.5.53 */
     CKDIR = d;
     HDB.set('ck', d).catch(() => {});
     const day = last.W0
       ? isoD(new Date(last.W0)) + ' ถึง ' + isoD(new Date(last.W))
       : isoD(new Date(last.W)); /* 4.3: หลายวัน = ก่อนเติมวันแรก */
-    const bk = await (
-      await d.getDirectoryHandle('สำรองก่อนเติม', { create: true })
-    ).getDirectoryHandle(day, { create: true });
+    let bk;
+    try {
+      bk = await (
+        await d.getDirectoryHandle('สำรองก่อนเติม', { create: true })
+      ).getDirectoryHandle(day, { create: true });
+    } catch (e) {
+      MQN = 'err';
+      note = `สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;
+      return;
+    }
     const has = async (dir, n) => {
       try {
         return await (await dir.getFileHandle(n)).getFile();
@@ -17078,7 +17159,8 @@ const ACT = {
     };
     let ok = 0,
       neu = 0;
-    const bad = [];
+    const bad = [],
+      W = [];
     for (const r of last.res) {
       if (!r.blob) continue;
       try {
@@ -17096,6 +17178,7 @@ const ACT = {
         ok++;
       } catch (e) {
         bad.push(r.name);
+        W.push([r.name, errN(e)]);
       }
     }
     try {
@@ -17111,7 +17194,7 @@ const ACT = {
     );
     MQN = bad.length ? 'err' : 'party';
     note = bad.length
-      ? `บันทึกไม่ได้ ${bad.length} ไฟล์ — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`
+      ? `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`
       : `บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`;
   },
   next: () => {
