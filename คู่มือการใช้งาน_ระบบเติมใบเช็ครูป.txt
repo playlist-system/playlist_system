@@ -1,6 +1,6 @@
 ﻿======================================================================
           คู่มือการใช้งาน  PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูปอัตโนมัติ)
-          เวอร์ชัน 5.5.47  •  ปรับปรุงล่าสุด 12 พ.ย. 2569
+          เวอร์ชัน 5.5.48  •  ปรับปรุงล่าสุด 12 พ.ย. 2569
 ======================================================================
 
 เปิดระบบ:  https://playlist-system.github.io/playlist_system/
@@ -801,7 +801,7 @@
        แล้วจับคู่กลุ่มจอ เช่น PTS = Poster LED, SPD = Directory70_30,
        ParagonMax / Luxury Parking = กลุ่มจอของแต่ละคอลัมน์,
        CTW 360 = CTW360 + W98, EMP_EMQ = Emporium / Emquartier,
-       Emsphere = Emsphere / Pylon PlanB, PI9 = Parc Paragon,
+       Emsphere = Emsphere / Pylon PlanB + Pylon Em (ตั้งแต่ 5.5.48), PI9 = Parc Paragon,
        INTERCHANGE = Interchange21, Zen = Zen,
        GlassLift_Jewel = Glass_Lift_GM, GlassLift_Stardome = Glass Lift,
        M3M5 = Lift,33x3 (คอลัมน์ M5 = 55x5) (ตั้งแต่ 4.4.2 ตามตารางรหัสจอ)
