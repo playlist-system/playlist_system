@@ -152,6 +152,7 @@
  *   เวอร์ชัน 5.5.47: Exchange Tower, ไฟล์วันถัดไป, ไฟล์ระหว่างวัน, CTW 360 W98 + NONE
  *   เวอร์ชัน 5.5.48: Emsphere Pylon = Pylon PlanB + Pylon Em
  *   เวอร์ชัน 5.5.49: อ่าน Playlist หลายไฟล์พร้อมกัน
+ *   เวอร์ชัน จัดจอเข้าชีตตามแพค อ่านชีตแบบรหัสจอแถว 10 และใบเปล่า
  * ======================================================================
  */
 
@@ -4599,6 +4600,7 @@ const arrangeWb = (() => {
       rows.set(+r.getAttribute('r'), { el: r, cells: m });
     }
     const blocks = [];
+    let crow = 11; /* 5.5.50: แถวที่มีรหัสจอ (10 หรือ 11) */
     for (const rw of r10 ? [11, 10] : [11]) {
       if (blocks.length) break;
       const rr = rows.get(rw);
@@ -4606,11 +4608,11 @@ const arrangeWb = (() => {
         for (const [cn] of rr.cells) {
           const x = wsv[n2col(cn) + rw],
             code = x ? codeOf(x.v) : '';
-          if (code) blocks.push({ code, cc: cn, s: cn - 2 });
+          if (code) (blocks.push({ code, cc: cn, s: cn - 2 }), (crow = rw));
         }
     }
     blocks.sort((a, b) => a.s - b.s);
-    return { rows, blocks };
+    return { rows, blocks, crow };
   }
   const hasVal = c =>
     !!c && (c.getElementsByTagNameNS(NS, 'v').length > 0 || c.getElementsByTagNameNS(NS, 'is').length > 0);
@@ -4674,11 +4676,11 @@ const arrangeWb = (() => {
           }
           return false;
         }); /* 5.5.2: ใบเปล่าที่แถบแรกมีวันที่ 1 แล้ว (ยังไม่มีหนัง) ยังนับเป็นใบเปล่า */
-      if (!hr && ((opt.adds && opt.adds.length) || (opt.dels && opt.dels.length)))
+      if (!hr && (opt.blank || (opt.adds && opt.adds.length) || (opt.dels && opt.dels.length)))
         hr =
           blankHr(
             wsv,
-          ); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย */
+          ); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย • 5.5.50: opt.blank = ตอนเติมครั้งแรก ใบเปล่าก็จัดจอเข้าชีตตามแพค */
       if (!ok || !hr) {
         notes.push([sn, 'ไม่ได้จัด (รูปแบบชีตไม่ตรงแบบบล็อก 3 คอลัมน์)']);
         continue;
@@ -4731,6 +4733,23 @@ const arrangeWb = (() => {
         let to = bySheetMedia(m);
         if (to && !info[to]) {
           notes.push([sn, b.code + ' → ' + m + ': ชีต ' + to + ' ไม่ใช่แบบบล็อกจอ ไม่ได้ย้าย']);
+          continue;
+        }
+        if (to && info[to].crow !== info[sn].crow) {
+          /* 5.5.50: ชีตต้นทาง / ปลายทางเขียนรหัสจอคนละแถว — ย้ายแล้วระบบจะอ่านจอนั้นไม่เจอ */
+          notes.push([
+            sn,
+            b.code +
+              ' → ' +
+              m +
+              ': ชีต ' +
+              to +
+              ' เขียนรหัสจอแถว ' +
+              info[to].crow +
+              ' แต่ชีตนี้แถว ' +
+              info[sn].crow +
+              ' ไม่ได้ย้าย — ย้ายเองในใบเช็ค',
+          ]);
           continue;
         }
         if (!to) {
@@ -11064,7 +11083,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.49 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.50 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -15242,11 +15261,11 @@ async function fillRun(list, o, L, out, bt) {
         g = f;
       if (arrOn(o))
         try {
-          A = await arrangeWb(f.buf, on, { mk: o.arrMk, sort: o.arrSort });
+          A = await arrangeWb(f.buf, on, { mk: o.arrMk, sort: o.arrSort, r10: true, blank: true });
           if (A.buf !== f.buf) g = { ...f, buf: A.buf };
         } catch (e) {
           A = { err: 1, moves: [], notes: [], relabeled: [], sorted: [], ana: 0 };
-        } /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม */
+        } /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม • 5.5.50: r10 = ชีตที่รหัสจออยู่แถว 10 ก็จัดด้วย (เดิมข้ามเงียบ ๆ จอ Spare ที่ Playlist ย้ายไป CITY / 40 Red จึงค้างชีต Spare) */
       try {
         r = await fillWb(g, on, metro, fo);
       } catch (e) {
