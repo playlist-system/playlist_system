@@ -1937,10 +1937,10 @@ const arrangeWb = (() => {
     '40Red': 'PBTV 40 RED',
     '80Blue': 'PBTV 80 BLUE',
     '80Red': 'PBTV 80 RED',
-    CITY: 'CITY TV 25',
+    CITY: 'City TV', /* 5.5.51: แพคเปลี่ยนชื่อจาก CITY TV 25 เป็น City TV */
     Spare: 'SPARE',
   };
-  const SHEETNAME = { CITY: 'CITY TV 25', Spare: 'Spare' };
+  const SHEETNAME = { CITY: 'City TV', Spare: 'Spare' };
   const nk = c => String(c).replace(/-/g, '').toUpperCase();
   const qn = n => (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(n) ? n : "'" + n.replace(/'/g, "''") + "'");
   const unq = s => (s.startsWith("'") ? s.slice(1, -1).replace(/''/g, "'") : s);
@@ -2018,6 +2018,7 @@ const arrangeWb = (() => {
       rows.set(+r.getAttribute('r'), { el: r, cells: m });
     }
     const blocks = [];
+    let crow = 11; /* 5.5.50: แถวที่มีรหัสจอ (10 หรือ 11) */
     for (const rw of r10 ? [11, 10] : [11]) {
       if (blocks.length) break;
       const rr = rows.get(rw);
@@ -2025,11 +2026,11 @@ const arrangeWb = (() => {
         for (const [cn] of rr.cells) {
           const x = wsv[n2col(cn) + rw],
             code = x ? codeOf(x.v) : '';
-          if (code) blocks.push({ code, cc: cn, s: cn - 2 });
+          if (code) blocks.push({ code, cc: cn, s: cn - 2 }), (crow = rw);
         }
     }
     blocks.sort((a, b) => a.s - b.s);
-    return { rows, blocks };
+    return { rows, blocks, crow };
   }
   const hasVal = c => !!c && (c.getElementsByTagNameNS(NS, 'v').length > 0 || c.getElementsByTagNameNS(NS, 'is').length > 0);
   const numV = (wsv, col, r) => {
@@ -2079,7 +2080,7 @@ const arrangeWb = (() => {
       let hr = 0;
       for (let r = 14; r <= 40 && !hr; r++) if (numV(wsv, nc0, r)) hr = r;
       const filled = !!hr && R.blocks.some(b => { for (let r = hr + 1; r <= hr + 600; r++) { const t = strV(wsv, b.s + 1, r); if (t && !FIXR.test(t)) return true } return false }); /* 5.5.2: ใบเปล่าที่แถบแรกมีวันที่ 1 แล้ว (ยังไม่มีหนัง) ยังนับเป็นใบเปล่า */
-      if (!hr && ((opt.adds && opt.adds.length) || (opt.dels && opt.dels.length))) hr = blankHr(wsv); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย */
+      if (!hr && (opt.blank || (opt.adds && opt.adds.length) || (opt.dels && opt.dels.length))) hr = blankHr(wsv); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย • 5.5.50: opt.blank = ตอนเติมครั้งแรก ใบเปล่าก็จัดจอเข้าชีตตามแพค */
       if (!ok || !hr) {
         notes.push([sn, 'ไม่ได้จัด (รูปแบบชีตไม่ตรงแบบบล็อก 3 คอลัมน์)']);
         continue;
@@ -2119,6 +2120,10 @@ const arrangeWb = (() => {
         let to = bySheetMedia(m);
         if (to && !info[to]) {
           notes.push([sn, b.code + ' → ' + m + ': ชีต ' + to + ' ไม่ใช่แบบบล็อกจอ ไม่ได้ย้าย']);
+          continue;
+        }
+        if (to && info[to].crow !== info[sn].crow) { /* 5.5.50: ชีตต้นทาง / ปลายทางเขียนรหัสจอคนละแถว — ย้ายแล้วระบบจะอ่านจอนั้นไม่เจอ */
+          notes.push([sn, b.code + ' → ' + m + ': ชีต ' + to + ' เขียนรหัสจอแถว ' + info[to].crow + ' แต่ชีตนี้แถว ' + info[sn].crow + ' ไม่ได้ย้าย — ย้ายเองในใบเช็ค']);
           continue;
         }
         if (!to) {
@@ -3485,7 +3490,7 @@ const PKGS=new Set(['40Blue','40Red','80Blue','80Red','CITY','Spare']);
 const shUniq=(want,names)=>{const ex=new Set((names||[]).map(n=>String(n).toLowerCase()));let nm=want,i=2;while(ex.has(nm.toLowerCase()))nm=want+' ('+(i++)+')';return nm};
 /* ชื่อชีตแพคใหม่ตามแบบชื่อในไฟล์นั้น (PBTV 80 Blue → PBTV 40 Red • PBTV80 BLUE → PBTV40 RED) */
 const blkNameFor=(m,names)=>{const N=names||[],sib=N.find(n=>/40|80/.test(n)&&mediaOf(n)),st=N.some(n=>/_/.test(n))?'u':N.some(n=>/^PBTV ?\d\d ?[A-Z][a-z]/.test(n))?'t':'c';
- if(m==='CITY')return st==='u'?'CITY_TV_25':st==='t'?'The City 25':'CITY TV 25';
+ if(m==='CITY')return st==='u'?'City_TV':'City TV'; /* 5.5.51: ชื่อแพคใหม่ (เดิม CITY TV 25 / The City 25) */
  if(m==='Spare')return st==='t'?'PBTV BKK Spare':'Spare';
  if(sib)return sib.replace(/40|80/,m.slice(0,2)).replace(/blue|red/i,w=>{const t=m.slice(2);return w===w.toUpperCase()?t.toUpperCase():w[0]===w[0].toUpperCase()?t[0].toUpperCase()+t.slice(1).toLowerCase():t.toLowerCase()});
  return'PBTV '+m.slice(0,2)+' '+m.slice(2)};
@@ -3574,6 +3579,13 @@ const sdbP=x=>String(x==null?'':x).replace(/\.(xlsx|xlsm|xls)$/i,'').replace(/^\
 const sdbW=w=>'คุณ'+String(w||'').replace(/hello|in\s*mall/gi,'').trim().replace(/^คุณ\s*/,''); /* 5.5.28: ชื่อในฐานข้อมูลมีคำว่า คุณ อยู่แล้ว ไม่ใส่ซ้ำ */
 const ndCodes=nd=>((nd&&nd.S)||[]).flatMap(x=>(x.codes||[]).map(c=>[x.sn,c]));
 let SDB,SDQ=null,SDA=null,SDX={no:new Set(),rm:new Set()}; /* 5.5.8: SDX.no = จอที่เลือกไม่เพิ่ม / ไม่ย้าย • SDX.rm = จอที่ไม่มีในฐานข้อมูลแต่เลือกเอาออก (คีย์ ไฟล์|รหัส) */
+/* 5.5.52: ย้ายจอ → เพิ่มจอที่ขาด → แก้สูตร หลายขั้นแล้วกดบันทึกครั้งเดียว — SDA.pend = ทุกไฟล์ที่แก้แต่ยังไม่ได้บันทึก • SDA.kinds = ขั้นที่ทำ */
+const SDAK={move:'ย้ายจอ',add:'เพิ่มจอ',fix:'แก้สูตร'},sdaL=A=>A.pend||A.names,sdaKs=A=>A.kinds||[A.kind||'add'],sdaWhat=A=>sdaKs(A).map(k=>SDAK[k]).join(' + ');
+const sdaPrev=()=>SDA&&SDA.sig===ckSig()&&!SDA.sv&&sdaL(SDA).length?SDA:null; /* เรียกก่อนแก้ไฟล์ (ckSig เปลี่ยนเมื่อไฟล์เปลี่ยน) */
+const sdaJoin=(P0,kind,names)=>({pend:[...new Set([...(P0?sdaL(P0):[]),...names])],kinds:[...new Set([...(P0?sdaKs(P0):[]),kind])]});
+const sdaBk=A=>{const k=sdaKs(A);return k.includes('move')?'สำรองก่อนย้ายจอ':k.includes('add')?'สำรองก่อนเพิ่มจอ':'สำรองก่อนแก้สูตร'};
+function sdaBtns(A){const L=sdaL(A);if(A.sv||!L.length)return'';const more=L.length>A.names.length||sdaKs(A).length>1;
+ return`${more?`<p class="hint">ยังไม่ได้บันทึก ${L.length} ไฟล์ (${esc(sdaWhat(A))}) — กดบันทึกครั้งเดียวได้ครบทุกขั้น: ${esc(L.join(', '))}</p>`:''}<div class="picb">${FSA?`<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR?` (${esc(CKDIR.name)})`:''}</button>`:''}<button class="btn ${FSA?'secondary':'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA?'<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>':''}</div>`}
 const sdbKy=(n,c)=>n+'|'+sdbK(c); /* 4.8.1: SDA = ผลเพิ่มจอในใบเช็คของหน้านี้ {done,names,sv} */
 const sdb=()=>{if(SDB===undefined){try{SDB=JSON.parse(store.get('ps_sdb')||'null')}catch(_){SDB=null}if(SDB&&!Array.isArray(SDB.rows))SDB=null}return SDB};
 function sdbRead(buf,name){const wb=XLSX.read(buf,{type:'array'}),ord=[...wb.SheetNames].sort((a,b)=>(/data\s*base/i.test(b)?1:0)-(/data\s*base/i.test(a)?1:0));
@@ -3675,7 +3687,7 @@ const VMAP={
  'Paragon Max':{col:1,m:[[/PYLON/,'Pylon @ Parking Entrance'],[/PARKINGENTRANCE/,'Paragon Parking Entrance'],[/ENTRANCEBANNER/,'Paragon Entrance Banner'],[/SKYWALK/,'Siam Kempinski sky walk'],[/KEMPINSKI/,'Siam Kempinski Entrance Wall'],[/ENTRANCEWALL/,'Paragon Entrance Wall'],[/POLES|WALKWAY/,'Walkway'],[/SIAMCENTER/,'G Siam Center'],[/LUXURY/,'Parking Luxury']]},
  'The Panoramix':{m:[[/ZEN/,'Zen'],[/./,'Panoramix & Pylon']]},
  'Central Network':{col:1,none:1,m:[[/W98/,'W98'],[/./,'CTW360']]},
- 'The District EM':{m:[[/PYLON/,'Pylon PlanB'],[/EMPORIUM/,'Emporium'],[/EMQUARTIER/,'Emquartier'],[/EMSPHERE/,'Emsphere']]},
+ 'The District EM':{m:[[/PYLON/,{all:['Pylon PlanB','Pylon Em']}],[/EMPORIUM/,'Emporium'],[/EMQUARTIER/,'Emquartier'],[/EMSPHERE/,'Emsphere']]},
  'Parc Paragon / Interchange':{m:[[/INTERCHANGE/,'Interchange21'],[/./,'Parc Paragon']]}};
 const VKS=new Set(VEN.filter(v=>!v.ntw).map(v=>v.k));
 /* 4.4.1: ใบเช็ค Central Network ชีตละห้าง — ชื่อชีต / ชื่อห้าง → ชื่อห้างใน Playlist (M1-Rama3, M4-Nakhonratchasima …) • หัวคอลัมน์ M1 / M4 / VDO Wall (= M4(3x1)) บอกกลุ่มจอ */
@@ -3685,9 +3697,9 @@ function venScreen(ws,sn,cn,k){const L=DB.filter(s=>s.m===k);if(!L.length)return
  const g=a=>cl((ws[a]||{}).v),T=c=>nrm([11,12,13,14].map(r=>g(n2col(c)+r)).join(' ')),head=nrm(sn)+T(cn-1),R=VMAP[k],by=nm=>L.find(s=>nrm(s.c)===nrm(nm)),P=[];
  let cnx=false;if(k==='Central Network'){const ml=CNM.find(x=>x[0].test(head));if(ml)for(const c of cols){const t=T(c),ty=/3X1|VDOWALL/.test(t)?'M4(3x1)':/M4/.test(t)?'M4':/M1/.test(t)?'M1':'',s=ty&&by(ty+'-'+ml[1]);if(s&&!P.includes(s))P.push(s)}cnx=P.length>0}
  if(k==='Siam Paragon In Mall'&&/M3M5|LIFTLOBBY/.test(head)&&cols.length>1)for(const c of cols){const s=/M5/.test(T(c))&&by('55x5')||by('Lift,33x3');if(s&&!P.includes(s))P.push(s)} /* 4.4.2: ชีต M3M5 — คอลัมน์ M5 = กลุ่มจอ 55x5 ที่เหลือ = Lift,33x3 */
- const CS={};if(R&&!P.length)for(const c of R.col?cols:[cn]){const t=R.col?T(c)+head:head;for(const[re,nm]of R.m)if(re.test(t)){const s=[].concat(nm).map(by).find(Boolean);if(s&&R.col)CS[n2col(c)]=s;if(s&&!P.includes(s))P.push(s);break}} /* 4.4.2: ชื่อกลุ่มจอสำรอง (ไม่มีกลุ่มแรกใช้กลุ่มถัดไป) */
+ const CS={};if(R&&!P.length)for(const c of R.col?cols:[cn]){const t=R.col?T(c)+head:head;for(const[re,nm]of R.m)if(re.test(t)){for(const s of nm&&nm.all?nm.all.map(by).filter(Boolean):[[].concat(nm).map(by).find(Boolean)]){if(s&&R.col)CS[n2col(c)]=s;if(s&&!P.includes(s))P.push(s)}break}} /* 4.4.2: ชื่อกลุ่มจอสำรอง (ไม่มีกลุ่มแรกใช้กลุ่มถัดไป) • 5.5.48: {all:[…]} = ใช้ทุกกลุ่มรวมกัน */
  if(!P.length)return L.length===1?L[0]:null;if(P.length===1)return cnx?{...P[0],noExit:1}:P[0];
- const seen=new Set(),rows=[];for(const s of P)for(const r of s.rows)if(!seen.has(r.ad)){seen.add(r.ad);rows.push(r)} /* คอลัมน์ของหลายกลุ่มจอใช้รายชื่อร่วมกัน → รวมรายชื่อของทุกกลุ่ม */
+ const seen=new Map(),rows=[],sc=r=>(r.off?0:2)+(r.cnt===0?0:1);for(const s of P)for(const r of s.rows){const i=seen.get(r.ad);if(i==null){seen.set(r.ad,rows.length);rows.push(r)}else if(sc(r)>sc(rows[i]))rows[i]=r} /* คอลัมน์ของหลายกลุ่มจอใช้รายชื่อร่วมกัน → รวมรายชื่อของทุกกลุ่ม • 5.5.48: เรื่องเดียวกันหลายกลุ่ม ใช้แถวที่ยังออน / จำนวนครั้งไม่เป็น 0 */
  const cov=R&&R.none&&!cnx&&Object.keys(CS).length?Object.fromEntries(Object.entries(CS).map(([L,s])=>[L,new Set(s.rows.map(r=>r.ad))])):null; /* 5.5.47: คอลัมน์ไหนเป็นจอไหน (ใส่ NONE) */
  return{m:k,c:P.map(s=>s.c).join(' + '),n:P.map(s=>s.n).join(' + '),f:'',ed:0,pd:Math.max(0,...P.map(s=>s.pd||0)),rows:stable(rows),...(cnx?{noExit:1}:{}),...(cov?{cov}:{})}}
 function parseSig(wb,media,map,opt){media=media||'Signature Max';const out=[],ven=!!(opt&&opt.ven);
@@ -3815,7 +3827,7 @@ const isLaWb=wb=>wb.SheetNames.some(n=>LAT.test(cl(((wb.Sheets[n]||{}).A1||{}).v
 function laDate(wb){for(const n of wb.SheetNames){const ws=wb.Sheets[n];if(!ws||!LAT.test(cl((ws.A1||{}).v)))continue;const v=(ws.A2||{}).v;if(v instanceof Date)return new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate()));if(typeof v==='number'&&v>40000&&v<80000)return s2d(v);const m=cl(ws.A1.v).match(/(\d{1,2})\s*([\u0E01-\u0E4E]+)\s*(\d{4})/),i=m?THMF.indexOf(m[2]):-1;if(i>=0)return new Date(Date.UTC(yy(m[3]),i,+m[1]))}return null}
 function parsePlaylist(f){const I=[],ret=x=>{if(x&&x.length){x.iss=I;return x}return null};
  if(/Metro.*LED/i.test(f.name))return ret(parseMetro(XLSX.read(f.buf,{type:'array',cellDates:true,cellStyles:true}),I));
- if(!/แยกจอ/.test(f.name)){const wb=XLSX.read(f.buf,{type:'array'});{const V=venOf(f.name);if(V)return ret(parseVen(f,wb,V,I))} /* 4.4 */
+ if(!/แยกจอ/.test(f.name)){const wb=f.wb||XLSX.read(f.buf,{type:'array'});{const V=venOf(f.name);if(V)return ret(parseVen(f,wb,V,I))} /* 4.4 */
   if(wb.SheetNames.some(n=>bkjCode(n)))return ret(parseSig(wb,'Bangkok Jams',bkjCode));
   if(isLaWb(wb)){const p=parseSig(wb,'LA PlanB',()=>'LA PlanB');if(p.length){p.dt=laDate(wb);return ret(p)}}
   if(isSectWb(wb))return ret(parseSect(XLSX.read(f.buf,{type:'array',cellStyles:true}),f.name,I));
@@ -3825,7 +3837,7 @@ function parsePlaylist(f){const I=[],ret=x=>{if(x&&x.length){x.iss=I;return x}re
   return ret(parseSig(wb,/show\s*_*\s*dc|prudential/i.test(f.name)?'Show DC / Prudential':'Signature Max'))}
  /* สรุปรายการหนังแยกจอ: สื่ออยู่ในชื่อไฟล์ เช่น …แยกจอ_01_40Blue, …แยกจอ_2026_10_02_80Red ถ้าชื่อไฟล์ไม่บอก ใช้ชื่อชีต (40Blue, 80Red_1 …) */
  const bn=f.name.replace(/\.xlsx$/i,'').replace(/\s*\(\d+\)$/,''),rest=bn.replace(/^.*แยกจอ/,'').replace(/\d{4}[-_.]\d{1,2}[-_.]\d{1,2}/g,'').replace(/\d{1,2}[-_.]\d{1,2}[-_.]\d{2,4}/g,'').replace(/^[_\s]+|[_\s]+$/g,'').replace(/^\d{1,2}[_\s]+(?=\D)/,'');
- const wb=XLSX.read(f.buf,{type:'array'}),sm=splitMedia(wb);let media=mediaOf(rest);
+ const wb=f.wb||XLSX.read(f.buf,{type:'array'}),sm=splitMedia(wb);let media=mediaOf(rest);
  if(media&&sm&&sm!==media)I.push({lv:'stop',t:`ชื่อไฟล์บอกสื่อ ${media} แต่ชีตในไฟล์เป็น ${sm} ระบบใช้ตามชื่อไฟล์ ตรวจว่าใส่ไฟล์ถูก`});
  if(!media&&sm){media=sm;I.push({lv:'info',t:`ชื่อไฟล์ไม่บอกสื่อ ระบบใช้ชื่อชีตในไฟล์ (${sm}) แทน`})}
  if(!media){if(!rest)return null;media=rest.replace(/^\d{4}[-_. ]\d{1,2}[-_. ]\d{1,2}[_\s]*/,'')||rest;I.push({lv:'stop',t:`สื่อ “${media}” ระบบยังไม่รู้จัก หนังในไฟล์นี้จึงยังไม่ได้ใช้เติม ส่งไฟล์ให้ผู้ดูแลระบบ`})}
@@ -3875,12 +3887,25 @@ function listOf(s,o){let L=s.rows.filter(r=>o.off||!r.off);if(o.newOnly)L=L.filt
 /* 5.5.13: ชื่อจอในใบเช็ค → คีย์ media|code (ตรงรหัส หรือชื่อในใบเช็คอยู่ในชื่อจอของ Playlist เช่น The Prime 9 ↔ EkamaiExpressway_ThePrime9) */
 const nameHit=(keys,raw)=>{const q=nrm(raw).toUpperCase();let h=keys.filter(k=>nrm(k.split('|')[1]).toUpperCase()===q);if(!h.length&&q.length>=5)h=keys.filter(k=>{const s=DB.find(z=>z.m+'|'+z.c===k);return!!s&&nrm(s.n||'').toUpperCase().includes(q)});return h};
 function buildOn(o){const on=new Map();for(const s of DB){if(s.m==='MetroLED'||!/^(40|80|CITY|Spare)/.test(s.m))continue;if(o.media!=='ทั้งหมด'&&s.m!==o.media)continue;on.set(s.m+'|'+s.c,listOf(s,o))}return on}
+/* 5.5.49: อ่าน Playlist หลายไฟล์พร้อมกัน — ตัดช่องว่าง (slimXlsx) + SheetJS อ่านไฟล์ในเบื้องหลัง (Web Worker) หลายตัวพร้อมกัน แล้วหน้าหลักอ่านรายการหนังต่อทีละไฟล์ตามลำดับเดิม
+   ผลเหมือนอ่านทีละไฟล์ทุกช่อง • ไฟล์น้อยกว่า 3 ไฟล์ / Metro LED / เบราว์เซอร์ที่ใช้ Worker ไม่ได้ / Worker มีปัญหา → อ่านแบบเดิม */
+const PLW={src:null};
+function plwSrc(){if(PLW.src!==null)return PLW.src;let u='';try{const sc=[...document.scripts].map(x=>x.textContent||''),xs=sc.find(t=>/^\/\*! xlsx\.js/.test(t)),jz=sc.find(t=>/JSZip v\d/.test(t.slice(0,200)));
+  if(xs&&jz&&typeof Worker==='function'&&typeof Blob==='function'&&typeof DecompressionStream==='function')u=URL.createObjectURL(new Blob([xs,'\n;',jz,'\n;const EMPTYC=',String(EMPTYC),',WSX=',String(WSX),',FORMC=',String(FORMC),',ROWC=',String(ROWC),',HELPSH=',String(HELPSH),';\n',String(slimXlsx),
+   '\nonmessage=async e=>{const{id,buf}=e.data;try{const s=await slimXlsx(buf),wb=XLSX.read(s,{type:"array"});postMessage({id,buf:s,wb},[s])}catch(err){postMessage({id,err:String(err&&err.message||err)})}};'],{type:'text/javascript'}))}catch(_){u=''}return PLW.src=u}
+function plwRead(arr){const M=new Map(),todo=arr.filter(f=>!/Metro.*LED/i.test(f.name)),src=todo.length>=3?plwSrc():'';if(!src)return M;
+ const n=Math.min(4,todo.length,Math.max(2,(navigator.hardwareConcurrency||2)-1)),ws=[];try{for(let i=0;i<n;i++)ws.push(new Worker(src))}catch(_){ws.forEach(w=>w.terminate());return M}
+ const res=[],q=todo.map((f,i)=>i);let left=todo.length,dead=false;todo.forEach((f,i)=>M.set(f,new Promise(r=>res[i]=r)));
+ const stop=()=>{if(dead)return;dead=true;ws.forEach(w=>w.terminate());res.forEach(r=>r(null))}; /* พัง → ไฟล์ที่ยังไม่เสร็จอ่านแบบเดิม */
+ const next=w=>{if(dead)return;const i=q.shift();if(i==null)return;let c;try{c=todo[i].buf.slice(0)}catch(_){res[i](null);left--;return next(w)}w.postMessage({id:i,buf:c},[c])};
+ for(const w of ws){w.onmessage=e=>{const d=e.data;res[d.id](d.err?null:{name:todo[d.id].name,buf:d.buf,wb:d.wb});if(--left<=0){dead=true;ws.forEach(x=>x.terminate())}else next(w)};w.onerror=ev=>{try{ev.preventDefault()}catch(_){}stop()};next(w)}
+ return M}
 async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try{arr.push({name:f.name,buf:await f.arrayBuffer()})}catch(_){rb.push(f.name)}} /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
  if(rb.length){say(`เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')} — ถ้าลากจากในไฟล์ .zip ที่เปิดดูใน Windows ให้ลากไฟล์ .zip มาทั้งไฟล์ หรือแตกไฟล์ก่อน`);if(!arr.length)return view()}
  if(kind==='ck'){C.push(...arr);MQN='catchck';note=`เพิ่มใบเช็ครูป ${arr.length} ไฟล์`;return view()}
  if(kind==='pj'){PLI=[];try{const o=JSON.parse(new TextDecoder().decode(arr[0].buf));PFS=[];if(Array.isArray(o)){DB=o;PLD=null;PLM={}}else{DB=o.DB||[];PLD=plDate()||(o.PLD?new Date(o.PLD):null)}note='เปิดโปรเจกต์แล้ว';}catch(e){note='ไฟล์โปรเจกต์ไม่ถูกต้อง'}return view()}
  note='กำลังอ่าน Playlist …';view();await new Promise(r=>setTimeout(r,30));let n=0,skip=[];
- const ok=[],emp=[],got=[];let _i=0;for(const f of arr){_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name);let p;try{p=parsePlaylist(/Metro.*LED/i.test(f.name)?f:{name:f.name,buf:await slimXlsx(f.buf)})}catch(e){p=null}PLX=PLX.filter(x=>x.f!==f.name);PLI=PLI.filter(x=>x.f!==f.name);if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
+ const ok=[],emp=[],got=[],PW=plwRead(arr);let _i=0;for(const f of arr){_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name);let p;try{const g=PW.has(f)?await PW.get(f):null;p=parsePlaylist(/Metro.*LED/i.test(f.name)?f:g||{name:f.name,buf:await slimXlsx(f.buf)})}catch(e){p=null}PLX=PLX.filter(x=>x.f!==f.name);PLI=PLI.filter(x=>x.f!==f.name);if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
   if(!p.some(s=>s.rows.some(r=>!r.off))){emp.push(f.name);PLX.push({f:f.name,why:'อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) — ใช้ข้อมูลเดิมไว้ก่อน'});continue} /* อ่านได้แต่ไม่มีรายการหนังเลย → ไม่ลบข้อมูลเดิม */
   const fd0=p.dt||fullNameDate(f.name)||dataDate(p)||nameDate(f.name,autoBase());for(const x of p){x.pf=f.name;x.pd=fd0?+fd0:0}let I2=[];{const I=p.iss||[];plCheck(p,I);I2=I.map(x=>({f:f.name,...x}));PLI.push(...I2)}got.push({f,p,d:fd0?+fd0:0,I:I2})}
  got.sort((a,b)=>a.d-b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
@@ -3897,7 +3922,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.47 (12 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.52 (12 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4407,7 +4432,7 @@ function vBlankAdd0(B){if(!sdb())return B.ok?'<p class="hint">ใส่ไฟล
  return alertHTML('wr',`ใบเปล่ายังขาดจอ ${n+sk.length} จอ ตามฐานข้อมูลจอ`,`${li}<ul>${P.flatMap(x=>x.adds.map(a=>`<li><b>${esc(x.name)}</b> ขาด <b>${esc(a.code)}</b> ${esc(a.loc)} → เพิ่มต่อท้ายชีต ${esc(a.sn)}</li>`)).join('')}${sk.map(([nm,s])=>`<li><b>${esc(nm)}</b> ขาด <b>${esc(s.code)}</b> — ${esc(s.why)} ใส่เองในใบเช็ค</li>`).join('')}</ul><p>ระบบเพิ่มจอต่อท้ายชีตแพค ใช้หัวตารางแบบเดียวกับจอสุดท้ายในชีต แล้วใส่รหัส Format และสถานที่ของจอใหม่ (ชีตแบบบล็อกจอ 3 คอลัมน์ รหัสจอแถว 10 หรือ 11) • จอที่อยู่ในใบของคนอื่น ย้ายได้ที่กล่องด้านบน</p>${n?`<div class="picb"><button class="btn primary" data-a="blkadd">เพิ่มจอที่ขาดลงใบเปล่า (${n} จอ)</button></div>`:''}`)}
 /* 5.5.11: สูตรคะแนนในชีต Analysis */
 function vAnaFix(){const A=SDA&&SDA.sig===ckSig()&&SDA.kind==='fix'?SDA:null,Q=ANQ&&ANQ.sig===ckSig()?ANQ.r:null;let h='';
- if(A)h+=alertHTML(A.sv?'ok':'wr',A.sv?`บันทึกใบเช็คที่แก้สูตรแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`:`แก้สูตรคะแนนแล้ว ${A.n} แถว (${A.names.length} ไฟล์) — ยังไม่ได้บันทึก`,`<p>${A.fx.map(x=>`<b>${esc(x.name)}</b> ${esc(x.fixes.map(z=>z.code).join(', '))}`).join('<br>')||'–'}${A.sv?` • ไฟล์ก่อนแก้เก็บไว้ในโฟลเดอร์ สำรองก่อนแก้สูตร/${esc(A.sv.day)}`:''}</p>${A.sv||!A.names.length?'':`<div class="picb">${FSA?`<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR?` (${esc(CKDIR.name)})`:''}</button>`:''}<button class="btn ${FSA?'secondary':'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA?'<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>':''}</div>`}`);
+ if(A)h+=alertHTML(A.sv?'ok':'wr',A.sv?`บันทึกใบเช็คที่${esc(sdaWhat(A))}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`:`แก้สูตรคะแนนแล้ว ${A.n} แถว (${A.names.length} ไฟล์) — ยังไม่ได้บันทึก`,`<p>${A.fx.map(x=>`<b>${esc(x.name)}</b> ${esc(x.fixes.map(z=>z.code).join(', '))}`).join('<br>')||'–'}${A.sv?` • ไฟล์เดิมเก็บไว้ในโฟลเดอร์ ${esc(A.sv.bk||sdaBk(A))}/${esc(A.sv.day)}`:''}</p>${sdaBtns(A)}`);
  if(!Q)return h+(ANQ&&ANQ.run?'<p class="hint">กำลังตรวจสูตรคะแนนในชีต Analysis …</p>':'');
  const fx=Q.filter(x=>x.fixes.length),nb=Q.flatMap(x=>x.bad.map(b=>[x.name,b])),n=fx.reduce((t,x)=>t+x.fixes.length,0);
  if(!n&&!nb.length)return h+(A?'':'<p class="hint">ชีต Analysis: สูตรคะแนน (Score) ชี้ช่อง % ของจอถูกช่องทุกไฟล์</p>');
@@ -4418,8 +4443,8 @@ async function anaRun(){if(!TC.length){ANQ=null;return}const sig=ckSig();if(ANQ&
   if(P&&((P.fixes||[]).length||(P.anaBad||[]).length))r.push({name:f.name,fixes:P.fixes||[],bad:P.anaBad||[]})}
  ANQ={sig,r}}
 function vSdbAdd(){const A=SDA&&SDA.sig===ckSig()&&SDA.kind!=='fix'?SDA:null;let h='';
- if(A&&A.kind==='move')h+=alertHTML(A.sv?'ok':'wr',A.sv?`บันทึกใบเช็คที่ย้ายจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`:A.newf?`สร้าง ${esc(A.newf.name)} แล้ว — ยังไม่ได้บันทึก`:`ย้ายจอแล้ว ${A.go.length} จอ — ยังไม่ได้บันทึก`,`<p>${A.newf?`<b>${esc(A.newf.name)}</b> ใบเปล่าใหม่ แบบจากใบ ${esc(A.newf.from)} • จอ ${A.newf.n} จาก ${A.newf.want} จอในฐานข้อมูล${A.newf.bad.length?' • ใส่ไม่ได้: '+esc(A.newf.bad.join(' / '))+' (ใส่เองในใบเช็ค)':''}<br>`:''}${A.go.map(mvLine).join('<br>')||'–'}${A.no.length?`<br>ย้ายไม่ได้: ${A.no.map(m=>`<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}`:''}${postTxt(A.post)}${A.sv?` • ไฟล์ก่อนย้ายเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ/${esc(A.sv.day)}`:''}</p>${A.sv||!A.names.length?'':`<div class="picb">${FSA?`<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR?` (${esc(CKDIR.name)})`:''}</button>`:''}<button class="btn ${FSA?'secondary':'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA?'<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>':''}</div>`}`);
- else if(A)h+=alertHTML(A.sv?'ok':'wr',A.sv?`บันทึกใบเช็คที่เพิ่มจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`:`เพิ่มจอแล้ว ${A.done.reduce((t,d)=>t+d.ok.length,0)} จอ — ยังไม่ได้บันทึก`,`<p>${A.done.map(d=>`<b>${esc(d.name)}</b> ${esc(d.ok.map(a=>a.code+' (ชีต '+a.sheet+')').join(', ')||'–')}${(d.made||[]).length?' • สร้างชีตใหม่: '+esc(d.made.join(', ')):''}${d.fix?' • แก้สูตรคะแนนในชีต Analysis '+d.fix+' แถว':''}${d.bad.length?' • เพิ่มไม่ได้: '+esc(d.bad.map(z=>z[1]).join(' / ')):''}`).join('<br>')}${A.sv?` • ไฟล์ก่อนเพิ่มเก็บไว้ในโฟลเดอร์ สำรองก่อนเพิ่มจอ/${esc(A.sv.day)}`:''}</p>${A.sv||!A.names.length?'':`<div class="picb">${FSA?`<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR?` (${esc(CKDIR.name)})`:''}</button>`:''}<button class="btn ${FSA?'secondary':'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA?'<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>':''}</div>`}`);
+ if(A&&A.kind==='move')h+=alertHTML(A.sv?'ok':'wr',A.sv?`บันทึกใบเช็คที่${esc(sdaWhat(A))}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`:A.newf?`สร้าง ${esc(A.newf.name)} แล้ว — ยังไม่ได้บันทึก`:`ย้ายจอแล้ว ${A.go.length} จอ — ยังไม่ได้บันทึก`,`<p>${A.newf?`<b>${esc(A.newf.name)}</b> ใบเปล่าใหม่ แบบจากใบ ${esc(A.newf.from)} • จอ ${A.newf.n} จาก ${A.newf.want} จอในฐานข้อมูล${A.newf.bad.length?' • ใส่ไม่ได้: '+esc(A.newf.bad.join(' / '))+' (ใส่เองในใบเช็ค)':''}<br>`:''}${A.go.map(mvLine).join('<br>')||'–'}${A.no.length?`<br>ย้ายไม่ได้: ${A.no.map(m=>`<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}`:''}${postTxt(A.post)}${A.sv?` • ไฟล์เดิมเก็บไว้ในโฟลเดอร์ ${esc(A.sv.bk||sdaBk(A))}/${esc(A.sv.day)}`:''}</p>${sdaBtns(A)}`);
+ else if(A)h+=alertHTML(A.sv?'ok':'wr',A.sv?`บันทึกใบเช็คที่${esc(sdaWhat(A))}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`:`เพิ่มจอแล้ว ${A.done.reduce((t,d)=>t+d.ok.length,0)} จอ — ยังไม่ได้บันทึก`,`<p>${A.done.map(d=>`<b>${esc(d.name)}</b> ${esc(d.ok.map(a=>a.code+' (ชีต '+a.sheet+')').join(', ')||'–')}${(d.made||[]).length?' • สร้างชีตใหม่: '+esc(d.made.join(', ')):''}${d.fix?' • แก้สูตรคะแนนในชีต Analysis '+d.fix+' แถว':''}${d.bad.length?' • เพิ่มไม่ได้: '+esc(d.bad.map(z=>z[1]).join(' / ')):''}`).join('<br>')}${A.sv?` • ไฟล์เดิมเก็บไว้ในโฟลเดอร์ ${esc(A.sv.bk||sdaBk(A))}/${esc(A.sv.day)}`:''}</p>${sdaBtns(A)}`);
  const PX=PICX&&PICX.sig===ckSig()?PICX:null,blank=!!PX&&PX.res.filter(r=>!r.blank).length<TC.length,FN=PX?PX.res.filter(r=>!r.blank).map(r=>r.name):[]; /* 5.5.5: ใบที่เติมแล้วระบบไม่แก้อยู่แล้ว (ทีละชีต) */
  if(!blank)return h+(A?'':'<p class="hint">ย้ายจอตามฐานข้อมูล และเพิ่มจอที่ขาด ทำให้อัตโนมัติได้เฉพาะใบเปล่า (ตอนทำใบเปล่าเดือนใหม่ หรือเปิดโฟลเดอร์ใบเปล่าของเดือนใหม่ไว้ในกล่อง “ใบเช็คที่ใช้”) • ใบที่เติมแล้ว ให้เพิ่มจอเองในใบเช็ค</p>');
  if(FN.length)h+=`<p class="hint">ใบที่เติมแล้ว ${FN.length} ไฟล์ ระบบไม่ย้าย / ไม่เพิ่มจอในใบเหล่านี้: ${esc(FN.join(', '))}</p>`;
@@ -4931,7 +4956,7 @@ async function fillRun(list,o,L,out,bt){const on=buildOn(o),ms=DB.find(s=>s.m===
     const rd=f.nd?readyOf(f):null;
     if(rd&&(rd.bad||rd.empty))r={rep:[['ทั้งไฟล์','ไม่ได้เติม','ตรวจ: '+(rd.bad||'ไม่พบชีตของใบเช็ครูปในไฟล์นี้')+' จึงไม่ได้เติม',0]],blob:null};
     else{const fo={...o,col1:effCol(1,f),col2:effCol(2,f),k16:!!fcol(f.name).k16,padc:effPad(f),padh:padHist()};let A=null,g=f;
-     if(arrOn(o))try{A=await arrangeWb(f.buf,on,{mk:o.arrMk,sort:o.arrSort});if(A.buf!==f.buf)g={...f,buf:A.buf}}catch(e){A={err:1,moves:[],notes:[],relabeled:[],sorted:[],ana:0}} /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม */
+     if(arrOn(o))try{A=await arrangeWb(f.buf,on,{mk:o.arrMk,sort:o.arrSort,r10:true,blank:true});if(A.buf!==f.buf)g={...f,buf:A.buf}}catch(e){A={err:1,moves:[],notes:[],relabeled:[],sorted:[],ana:0}} /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม • 5.5.50: r10 = ชีตที่รหัสจออยู่แถว 10 ก็จัดด้วย (เดิมข้ามเงียบ ๆ จอ Spare ที่ Playlist ย้ายไป CITY / 40 Red จึงค้างชีต Spare) */
      try{r=await fillWb(g,on,metro,fo)}catch(e){r=null}
      if(r&&g!==f&&A.moves.length&&![...new Set(A.moves.map(m=>m.to))].every(sn=>r.rep.some(x=>x[0]===sn&&x[1]==='รูปแบบ'&&!/^ตรวจ/.test(x[2]))))r=null; /* ชีตที่รับจอต้องจัดแถวได้ตอนเติม ไม่อย่างนั้นไม่ย้าย */
      if(!r&&g!==f){A={err:1,moves:[],notes:[],relabeled:[],sorted:[],ana:0};try{r=await fillWb(f,on,metro,fo)}catch(e){r=null}} /* จัดจอแล้วเติมไม่ได้ → เติมไฟล์เดิมแบบไม่ย้ายจอ */
@@ -5108,33 +5133,33 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   B.sv={dir:d.name,ok:B.ok,ow:ex.length};MQN='party';note=`บันทึกใบเปล่า ${B.ok} ไฟล์ลงโฟลเดอร์ “${d.name}” แล้ว`},
  sdbrun:async()=>{SDQ=null;await sdbRun()},
  sdbx:k=>{const p=String(k).split('|'),v=p[0]==='1',kind=p[1],key=p.slice(2).join('|');if(kind==='u'){if(v)SDX.rm.add(key);else SDX.rm.delete(key)}else{if(v)SDX.no.delete(key);else SDX.no.add(key)}}, /* 5.5.8: เลือกเพิ่ม / ย้าย / เอาออก ทีละจอ */
- sdbadd:async()=>{if(!sdb()||!TC.length||BUSY||FILLING)return;const O=sdbOps(),fs=O.fs,P=O.P2;if(!P.some(x=>x.adds.length))return;const done=await sdbApply(fs,P),names=[];
+ sdbadd:async()=>{if(!sdb()||!TC.length||BUSY||FILLING)return;const P0=sdaPrev(),O=sdbOps(),fs=O.fs,P=O.P2;if(!P.some(x=>x.adds.length))return;const done=await sdbApply(fs,P),names=[];
   for(const d of done){const f=TC.find(z=>z.name===d.name),g=fs.find(z=>z.name===d.name);if(f&&d.ok.length){f.buf=g.buf;f.nd=g.nd;names.push(f.name)}}
-  const pv=PICX;if(pv)pv.sig=ckSig();SDA={done,names,sv:null,sig:ckSig()};SDQ=null;await sdbRun();const n=done.reduce((t,d)=>t+d.ok.length,0);MQN=n?'done':'warn';note=n?`เพิ่มจอแล้ว ${n} จอ — บันทึก หรือดาวน์โหลด`:'เพิ่มจอไม่ได้ — ดูรายละเอียดในกล่อง'},
- sdbnew:async k=>{if(!sdb()||!TC.length||BUSY||FILLING||!k)return;const PX=PICX&&PICX.sig===ckSig()?PICX:null,bl=TC.filter(f=>!PX||!PX.res.some(r=>r.name===f.name&&!r.blank)).map(f=>f.name); /* 5.5.28 */
+  const pv=PICX;if(pv)pv.sig=ckSig();SDA={done,names,...sdaJoin(P0,'add',names),sv:null,sig:ckSig()};SDQ=null;await sdbRun();const n=done.reduce((t,d)=>t+d.ok.length,0);MQN=n?'done':'warn';note=n?`เพิ่มจอแล้ว ${n} จอ — บันทึก หรือดาวน์โหลด`:'เพิ่มจอไม่ได้ — ดูรายละเอียดในกล่อง'},
+ sdbnew:async k=>{if(!sdb()||!TC.length||BUSY||FILLING||!k)return;const P0=sdaPrev(),PX=PICX&&PICX.sig===ckSig()?PICX:null,bl=TC.filter(f=>!PX||!PX.res.some(r=>r.name===f.name&&!r.blank)).map(f=>f.name); /* 5.5.28 */
   note='กำลังสร้างใบเปล่าให้'+k+' …';view();await new Promise(r=>setTimeout(r,30));for(const f of TC)if(!f.nd){try{f.nd=sheetNeeds(f.buf,f.name)}catch(_){f.nd={S:[]}}}
   let R=null;try{R=await sdbNewFile(k,TC.map(f=>({name:f.name,buf:f.buf,nd:f.nd})),bl)}catch(e){R={err:String(e&&e.message||e)}}
   if(!R||R.err){MQN='err';note='สร้างใบเปล่าไม่ได้ — '+((R&&R.err)||'');return}
   for(const n of R.names){const g=R.fs.find(z=>z.name===n),f=TC.find(z=>z.name===n);if(!g)continue;if(f){f.buf=g.buf;f.nd=g.nd}else TC.push({name:g.name,buf:g.buf,nd:g.nd})}
-  const pv=PICX;if(pv)pv.sig=ckSig();SDA={kind:'move',newf:{name:R.nf.name,from:R.from,n:R.n,want:R.want,bad:R.bad},go:R.go,no:R.no,names:R.names,post:R.post,sv:null,sig:ckSig()};SDQ=null;await sdbRun();MQN='done';note=`สร้าง ${R.nf.name} แล้ว (${R.n} จอ) — บันทึก หรือดาวน์โหลด`},
- sdbmove:async()=>{if(!sdb()||!TC.length||BUSY||FILLING)return;const O=sdbOps(),fs=O.fs;if(!O.mv.length)return; /* 5.4 • 5.5.8: ตามที่เลือก */
+  const pv=PICX;if(pv)pv.sig=ckSig();SDA={kind:'move',newf:{name:R.nf.name,from:R.from,n:R.n,want:R.want,bad:R.bad},go:R.go,no:R.no,names:R.names,post:R.post,...sdaJoin(P0,'move',R.names),sv:null,sig:ckSig()};SDQ=null;await sdbRun();MQN='done';note=`สร้าง ${R.nf.name} แล้ว (${R.n} จอ) — บันทึก หรือดาวน์โหลด`},
+ sdbmove:async()=>{if(!sdb()||!TC.length||BUSY||FILLING)return;const P0=sdaPrev(),O=sdbOps(),fs=O.fs;if(!O.mv.length)return; /* 5.4 • 5.5.8: ตามที่เลือก */
   note='กำลังย้ายจอ …';view();await new Promise(r=>setTimeout(r,30));const R=await sdbMoveApply(fs,O.mv,k=>!SDX.no.has(k));
   if(R.err){MQN='err';note=`ย้ายจอไม่ได้ (${R.err}) — ยังไม่ได้แก้ใบเช็คใบไหนเลย`;return}
   for(const n of R.names){const f=TC.find(z=>z.name===n),g=fs.find(z=>z.name===n);if(f&&g){f.buf=g.buf;f.nd=g.nd}}
-  const pv=PICX;if(pv)pv.sig=ckSig();SDA={kind:'move',go:R.go,no:R.no,names:R.names,post:R.post,sv:null,sig:ckSig()};SDQ=null;await sdbRun();MQN=R.go.length?'done':'warn';note=R.go.length?`ย้ายจอแล้ว ${R.go.length} จอ (${R.names.length} ไฟล์) — บันทึก หรือดาวน์โหลด`:'ย้ายจอไม่ได้ — ดูรายละเอียดในกล่อง'},
- anafix:async()=>{if(!TC.length||BUSY||FILLING)return;const Q=ANQ&&ANQ.sig===ckSig()?ANQ.r:null;if(!Q)return;const fx=[],names=[];let n=0; /* 5.5.11 */
+  const pv=PICX;if(pv)pv.sig=ckSig();SDA={kind:'move',go:R.go,no:R.no,names:R.names,post:R.post,...sdaJoin(P0,'move',R.names),sv:null,sig:ckSig()};SDQ=null;await sdbRun();MQN=R.go.length?'done':'warn';note=R.go.length?`ย้ายจอแล้ว ${R.go.length} จอ (${R.names.length} ไฟล์) — บันทึก หรือดาวน์โหลด`:'ย้ายจอไม่ได้ — ดูรายละเอียดในกล่อง'},
+ anafix:async()=>{if(!TC.length||BUSY||FILLING)return;const P0=sdaPrev(),Q=ANQ&&ANQ.sig===ckSig()?ANQ.r:null;if(!Q)return;const fx=[],names=[];let n=0; /* 5.5.11 */
   for(const x of Q){if(!x.fixes.length)continue;const f=TC.find(z=>z.name===x.name);if(!f)continue;note=`กำลังแก้สูตรในใบ ${f.name} …`;view();await new Promise(r=>setTimeout(r,30));
    let P=null;try{P=await wbPost(f.buf,{sm:f.nd&&f.nd.SM})}catch(_){P=null}if(!P||!P.fix)continue;f.buf=P.buf;f.nd=null;try{f.nd=sheetNeeds(f.buf,f.name)}catch(_){f.nd={S:[]}}names.push(f.name);fx.push({name:f.name,fixes:P.fixes||[]});n+=P.fix}
-  const pv=PICX;if(pv)pv.sig=ckSig();SDA={kind:'fix',names,fx,n,sv:null,sig:ckSig()};SDQ=null;await sdbRun();MQN=n?'done':'warn';note=n?`แก้สูตรคะแนนแล้ว ${n} แถว (${names.length} ไฟล์) — บันทึก หรือดาวน์โหลด`:'แก้สูตรไม่ได้ — ดูรายละเอียดในกล่อง'},
- sdbdl:async()=>{const A=SDA;if(!A||!A.names.length)return;const z=new JSZip();for(const n of A.names){const f=TC.find(x=>x.name===n);if(f)z.file(n,f.buf,{createFolders:false})}saveBlob(A.kind==='move'?'ใบเช็ค_ย้ายจอ.zip':A.kind==='fix'?'ใบเช็ค_แก้สูตร.zip':'ใบเช็ค_เพิ่มจอ.zip',await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
- sdbsave:async k=>{const A=SDA;if(!A||!A.names.length||!FSA)return;let d=k==='pick'?null:CKDIR;
+  const pv=PICX;if(pv)pv.sig=ckSig();SDA={kind:'fix',names,fx,n,...sdaJoin(P0,'fix',names),sv:null,sig:ckSig()};SDQ=null;await sdbRun();MQN=n?'done':'warn';note=n?`แก้สูตรคะแนนแล้ว ${n} แถว (${names.length} ไฟล์) — บันทึก หรือดาวน์โหลด`:'แก้สูตรไม่ได้ — ดูรายละเอียดในกล่อง'},
+ sdbdl:async()=>{const A=SDA;if(!A||!sdaL(A).length)return;const z=new JSZip();for(const n of sdaL(A)){const f=TC.find(x=>x.name===n);if(f)z.file(n,f.buf,{createFolders:false})}saveBlob('ใบเช็ค_'+sdaKs(A).map(k=>SDAK[k]).join('_')+'.zip',await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
+ sdbsave:async k=>{const A=SDA;if(!A||!sdaL(A).length||!FSA)return;let d=k==='pick'?null:CKDIR;
   try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}catch(e){if(!(e&&e.name==='AbortError'))note='เลือกโฟลเดอร์ไม่ได้';return}
-  const day=isoD(new Date(Date.now()+7*36e5));let bk;try{bk=await(await d.getDirectoryHandle(A.kind==='move'?'สำรองก่อนย้ายจอ':A.kind==='fix'?'สำรองก่อนแก้สูตร':'สำรองก่อนเพิ่มจอ',{create:true})).getDirectoryHandle(day,{create:true})}catch(_){MQN='err';note='สร้างโฟลเดอร์สำรองไม่ได้ ยังไม่ได้บันทึก';return}
-  const bad=[];for(const n of A.names){const f=TC.find(x=>x.name===n);if(!f)continue;try{let old=null;try{old=await(await d.getFileHandle(n)).getFile()}catch(_){}
+  const day=isoD(new Date(Date.now()+7*36e5));let bk;try{bk=await(await d.getDirectoryHandle(sdaBk(A),{create:true})).getDirectoryHandle(day,{create:true})}catch(_){MQN='err';note='สร้างโฟลเดอร์สำรองไม่ได้ ยังไม่ได้บันทึก';return}
+  const bad=[];for(const n of sdaL(A)){const f=TC.find(x=>x.name===n);if(!f)continue;try{let old=null;try{old=await(await d.getFileHandle(n)).getFile()}catch(_){}
    if(old){let has=false;try{await bk.getFileHandle(n);has=true}catch(_){}if(!has){const w0=await(await bk.getFileHandle(n,{create:true})).createWritable();await w0.write(await old.arrayBuffer());await w0.close()}}
    const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(f.buf);await w.close()}catch(_){bad.push(n)}}
   if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์ (${bad.join(', ')}) — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
-  A.sv={dir:d.name,day};MQN='party';note=`บันทึกใบเช็คที่${A.kind==='fix'?'แก้สูตร':A.kind==='move'?'ย้ายจอ':'เพิ่มจอ'}แล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${d.name}”`},
+  A.sv={dir:d.name,day,bk:sdaBk(A)};MQN='party';note=`บันทึกใบเช็คที่${sdaWhat(A)}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${d.name}”`},
  sdbclear:()=>{if(!confirm('ลบฐานข้อมูลจอออกจากเครื่องนี้? (ใส่ใหม่ได้ตลอด)'))return;SDB=null;SDQ=null;if(BLK){BLK.plan=null;BLK.mplan=null}store.set('ps_sdb','');note='ลบฐานข้อมูลจอแล้ว'},
  toolv:k=>{if(!['pic','shot','cmp','blank','sdb'].includes(k))return;TOOLV=k;if(k==='sdb')(sdb()?sdbRun():anaRun()).then(()=>view(),()=>view());setTimeout(()=>{const d=$('#tdetail');if(d)d.scrollIntoView({behavior:'smooth',block:'start'})},60)},
  mqx:()=>{clearTimeout(MQT);const d=$('#mq');if(d)d.innerHTML=''},
