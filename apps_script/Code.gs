@@ -409,6 +409,7 @@ function webDay(day) {
         at: at.getTime(),
         time: (atDay !== day ? thDay(atDay) + ' ' : '') + Utilities.formatDate(at, TZ, 'H:mm'),
         old: fd && fd < day ? thDay(fd) : '',
+        pd: fd || '', // วันที่ของ Playlist ตามชื่อไฟล์ (ปปปป-ดด-วว)
       });
     }
   }
@@ -514,6 +515,10 @@ main.dim{opacity:.55}
 .tile .nm{font:600 16px/1.3 var(--hd);padding-right:28px;overflow-wrap:anywhere}
 .tile .st{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
 .tile .hint{font-size:12px;line-height:1.45}
+.tile .fn{margin-top:4px;font-size:12px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile .mm,.mini .mm{font-size:12px;line-height:1.45;color:var(--ink2)}
+.mm .d{font-weight:600}
+.mm .d.other{color:var(--info)}
 label.tile{background:var(--surface);border:1px solid var(--line);cursor:pointer}
 label.tile:has(input:checked){border-color:var(--line3)}
 label.tile .st{color:var(--ok)}
@@ -542,6 +547,14 @@ label.tile .hint{color:var(--muted)}
 .chip input{width:16px;height:16px;margin:0;accent-color:var(--ink);flex:none;cursor:pointer}
 .chip.dim{color:var(--muted)}
 .chip small{color:var(--muted);font-size:12px}
+.minis{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.mini{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip);cursor:pointer;min-width:0}
+.mini input{width:16px;height:16px;margin:3px 0 0;accent-color:var(--ink);flex:none;cursor:pointer}
+.mini .mt{display:flex;flex-direction:column;min-width:0}
+.mini b{font-weight:600;font-size:14px;line-height:1.4}
+.mini b small{font-weight:400;color:var(--muted);font-size:12px}
+.mini .fn{font-size:12px;line-height:1.4;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini.dim b{color:var(--muted)}
 .lk{border:0;background:none;padding:6px 2px;color:var(--ink);font-weight:600;font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;font-size:13px;color:var(--muted)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:99px;background:#1FA463;margin-right:8px;vertical-align:1px}
@@ -666,6 +679,10 @@ function groups(kinds) {
     return g;
   });
 }
+function meta(f) {
+  var d = f.pd ? '<span class="d' + (f.pd !== D.day ? ' other' : '') + '">วันที่ ' + esc(thShort(f.pd)) + '</span> · ' : '';
+  return '<span class="mm">' + d + esc(kb(f.size)) + '</span>';
+}
 function tile(k, L, isToday, wide) {
   var w = wide ? ' wide' : '';
   if (L) {
@@ -673,14 +690,17 @@ function tile(k, L, isToday, wide) {
     var st = f.old ? '<span class="st info">' + sv(P.info, 15, 0, 2.4) + 'ฉบับ ' + esc(f.old) + '</span>' : '<span class="st">' + sv(P.check, 15, 0, 3) + esc(f.time) + '</span>';
     var hint = f.old ? 'วันนี้ยังไม่มีฉบับใหม่ ใช้ฉบับล่าสุดไปก่อน' : L.length > 1 ? 'มี ' + L.length + ' ฉบับ ติ๊กไว้ให้ฉบับล่าสุด' : '';
     return '<label class="tile' + w + '" title="' + esc(f.name + ' · ' + kb(f.size)) + '"><input type="checkbox" data-id="' + esc(f.id) + '"' + (SEL[f.id] ? ' checked' : '') + ' aria-label="' + esc(k.name) + '">' +
-      '<span class="box" aria-hidden="true">' + sv(P.check, 13, 'var(--surface)', 3.2) + '</span><span class="nm">' + esc(k.short) + '</span>' + st + (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</label>';
+      '<span class="box" aria-hidden="true">' + sv(P.check, 13, 'var(--surface)', 3.2) + '</span><span class="nm">' + esc(k.short) + '</span>' + st + (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') +
+      '<span class="fn">' + esc(wide || f.name.length <= 26 ? f.name : '…' + f.name.slice(-24)) + '</span>' + meta(f) + '</label>'; // ช่องเล็ก: แสดงท้ายชื่อไฟล์ (ส่วนที่ต่างกัน) ชื่อเต็มอยู่ใน title
   }
   if (k.line) return '<div class="tile line' + w + '"><span class="nm">' + esc(k.short) + '</span><span class="st">' + sv(P.info, 15, 0, 2.4) + 'มาทาง LINE</span><span class="hint">ดาวน์โหลดจาก LINE แล้วลากลงระบบพร้อมไฟล์ .zip</span></div>';
   var h = !isToday ? 'ไม่มีไฟล์ของวันนั้นในโฟลเดอร์' : k.tip ? k.tip : k.latest ? 'ไม่ได้ส่งทุกวัน ยังไม่มีฉบับไหนในอีเมล' : 'ยังไม่มีอีเมลวันนี้';
   return '<div class="tile wait' + w + '"><span class="nm">' + esc(k.short) + '</span><span class="st">' + sv(P.clock, 15, 0, 2.4) + (isToday ? 'รออยู่' : 'ไม่มี') + '</span><span class="hint">' + esc(h) + '</span></div>';
 }
 function chip(f, label, extra) {
-  return '<label class="chip' + (extra && extra.dim ? ' dim' : '') + '" title="' + esc(f.name + ' · ' + kb(f.size)) + '"><input type="checkbox" data-id="' + esc(f.id) + '"' + (SEL[f.id] ? ' checked' : '') + '><span>' + esc(label) + (extra && extra.note ? ' <small>' + esc(extra.note) + '</small>' : '') + '</span></label>';
+  return '<label class="mini' + (extra && extra.dim ? ' dim' : '') + '" title="' + esc(f.name) + '"><input type="checkbox" data-id="' + esc(f.id) + '"' + (SEL[f.id] ? ' checked' : '') + ' aria-label="' + esc(label) + '">' +
+    '<span class="mt"><b>' + esc(label) + (extra && extra.note ? ' <small>' + esc(extra.note) + '</small>' : '') + '</b>' + (label !== noext(f.name) ? '<span class="fn">' + esc(f.name) + '</span>' : '') +
+    '<span class="mm">' + (f.pd ? '<span class="d' + (f.pd !== D.day ? ' other' : '') + '">วันที่ ' + esc(thShort(f.pd)) + '</span> · ' : '') + 'เข้า ' + esc(f.time) + ' · ' + esc(kb(f.size)) + '</span></span></label>';
 }
 function brand(sub) { return '<div class="brand"><div class="logo">' + sv(P.list, 23, '#fff', 2.2) + '</div><div><b>PLAYLIST INBOX</b><small>' + esc(sub) + '</small></div></div>'; }
 function actsHtml() {
@@ -749,19 +769,19 @@ function draw() {
   if (extra.length || older.length || g.oth.length) {
     h += '<section class="card">';
     if (extra.length) {
-      h += '<div class="hd"><h2>Playlist เพิ่มเติม</h2><p>ใช้กับใบเช็คสื่ออื่น เช่น CCTV, MRT, NTW, Paragon — ติ๊กไว้ให้แล้ว ' + selBtn(extraFiles(g), 'extra') + '</p></div><div class="chips">';
-      extra.forEach(function (k) { var L = g.by[k.name]; L.forEach(function (f, i) { h += chip(f, k.name, { dim: k.unused, note: [k.unused ? '(ระบบไม่ได้ใช้)' : '', L.length > 1 ? f.time : ''].filter(Boolean).join(' ') }); }); });
+      h += '<div class="hd"><h2>Playlist เพิ่มเติม</h2><p>ใช้กับใบเช็คสื่ออื่น เช่น CCTV, MRT, NTW, Paragon — ติ๊กไว้ให้แล้ว ' + selBtn(extraFiles(g), 'extra') + '</p></div><div class="minis">';
+      extra.forEach(function (k) { var L = g.by[k.name]; L.forEach(function (f, i) { h += chip(f, k.name, { dim: k.unused, note: [k.unused ? '(ระบบไม่ได้ใช้)' : '', L.length > 1 && i < L.length - 1 ? '(ฉบับเก่า)' : ''].filter(Boolean).join(' ') }); }); });
       h += '</div>';
     }
     if (older.length) {
       if (extra.length) h += '<div class="sep"></div>';
-      h += '<div class="sub"><span>ฉบับเก่าของวันนี้ (มีฉบับใหม่กว่าแล้ว)</span></div><div class="chips">';
-      older.forEach(function (o) { h += chip(o.f, o.k.name, { note: o.f.time }); });
+      h += '<div class="sub"><span>ฉบับเก่าของวันนี้ (มีฉบับใหม่กว่าแล้ว)</span></div><div class="minis">';
+      older.forEach(function (o) { h += chip(o.f, o.k.name); });
       h += '</div>';
     }
     if (g.oth.length) {
       if (extra.length || older.length) h += '<div class="sep"></div>';
-      h += '<div class="sub"><span>ไม่อยู่ในรายการ แต่ระบบเก็บไว้ให้</span>' + selBtn(g.oth, 'oth') + '</div><div class="chips">';
+      h += '<div class="sub"><span>ไม่อยู่ในรายการ แต่ระบบเก็บไว้ให้</span>' + selBtn(g.oth, 'oth') + '</div><div class="minis">';
       g.oth.forEach(function (f) { h += chip(f, noext(f.name)); });
       h += '</div>';
     }
