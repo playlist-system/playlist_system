@@ -156,6 +156,7 @@
  *   เวอร์ชัน ชีต CITY ใหม่ชื่อ City TV
  *   เวอร์ชัน ย้ายจอ / เพิ่มจอ / แก้สูตร แล้วบันทึกครั้งเดียว
  *   เวอร์ชัน บันทึกไม่ได้ → บอกสาเหตุ เตือนไฟล์ที่เปิดอยู่ใน Excel
+ *   เวอร์ชัน ใส่วันที่ถ่าย: ตามวันที่ของไฟล์รูป
  * ======================================================================
  */
 
@@ -3880,24 +3881,27 @@ async function shotScan(root, files, prog) {
             const n = A.P.n + (B ? B.P.n : 0),
               days = [...A.P.days, ...(B ? B.P.days : [])],
               fdays = [...A.P.fdays, ...(B ? B.P.fdays : [])];
-            const row = {
-              f: f.name,
-              sn: x.sn,
-              scr: C.id,
-              nm,
-              r,
-              c: C.c,
-              rnd: rn,
-              v: val,
-              day,
-              n,
-              ld,
-              fd: fdays.length,
-              nofold: !A.fh && !(B && B.fh),
-              nornd: !A.rd && !(B && B.rd),
-              st: C.st,
-              src,
-            };
+            const fok = fdays.filter(d => d >= g && d < m1 && (!ed || d <= ed)),
+              row = {
+                f: f.name,
+                sn: x.sn,
+                scr: C.id,
+                nm,
+                r,
+                c: C.c,
+                rnd: rn,
+                v: val,
+                day,
+                n,
+                ld,
+                fd: fdays.length,
+                fday: fok.length ? new Date(Math.max(...fok)).getUTCDate() : 0,
+                /* 5.5.54: วันที่ของไฟล์รูป (รูปไม่มีวันที่ถ่ายในไฟล์) — ใช้เมื่อผู้ใช้เลือก “ตามวันที่ของไฟล์” */ nofold:
+                  !A.fh && !(B && B.fh),
+                nornd: !A.rd && !(B && B.rd),
+                st: C.st,
+                src,
+              };
             if (val != null) {
               if (!n) R.has.push(row);
               else if (day && /^\d{1,2}$/.test(String(val).trim()) && +val !== day) R.diff.push(row);
@@ -4051,7 +4055,13 @@ const shotTxt = R => {
       x.rnd +
       ' = ' +
       x.day +
-      (x.man ? ' (เลือกวันที่เอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''),
+      (x.man === 2
+        ? ' (วันที่ของไฟล์รูป — เลือกเอง)'
+        : x.man
+          ? ' (เลือกวันที่เอง)'
+          : x.src
+            ? ' (รูปในโฟลเดอร์ ' + x.src + ')'
+            : ''),
   );
   ln(
     'มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์',
@@ -11141,7 +11151,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.53 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.54 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -12598,8 +12608,14 @@ const shotFill = () => {
   return [
     ...SHOT.R.fill,
     ...SHOT.R.bad
-      .filter(x => M[x.scr + '|' + x.f + '|' + x.rnd])
-      .map(x => ({ ...x, day: M[x.scr + '|' + x.f + '|' + x.rnd], man: 1 })),
+      .filter(x => {
+        const v = M[x.scr + '|' + x.f + '|' + x.rnd];
+        return v === 'f' ? x.fday > 0 : v;
+      })
+      .map(x => {
+        const v = M[x.scr + '|' + x.f + '|' + x.rnd];
+        return { ...x, day: v === 'f' ? x.fday : v, man: v === 'f' ? 2 : 1 };
+      }),
   ];
 };
 const vShot = () => {
@@ -12644,7 +12660,7 @@ const vShot = () => {
       bg.get(k).push(x);
     }
     const badH = R.bad.length
-      ? `<details class="picd" ${Object.keys(M).length ? 'open' : ''}><summary><b>มีรูป แต่ใส่วันที่ให้ไม่ได้</b> ${R.bad.length} ช่อง — เลือกวันที่ถ่ายเองได้</summary><p class="shm">เช่น รูปที่ส่งต่อทาง LINE (วันที่ถ่ายหายไป) หรือวันที่ในกล้องผิด เลือกวันที่ถ่ายของจอนั้น แล้วระบบใส่ให้ทุกเรื่องในรายการของจอนั้น</p><ul>${[
+      ? `<details class="picd" ${Object.keys(M).length ? 'open' : ''}><summary><b>มีรูป แต่ใส่วันที่ให้ไม่ได้</b> ${R.bad.length} ช่อง — เลือกวันที่ถ่ายเองได้</summary><p class="shm">เช่น รูปที่ส่งต่อทาง LINE (วันที่ถ่ายหายไป) หรือวันที่ในกล้องผิด เลือกวันที่ถ่ายของจอนั้น แล้วระบบใส่ให้ทุกเรื่องในรายการของจอนั้น • ถ่ายหลายวัน (เช่น บางเรื่องรูปวันที่ 3 บางเรื่องวันที่ 11) เลือก “ตามวันที่ของไฟล์รูป” ระบบใส่วันที่ของไฟล์รูปของแต่ละเรื่อง (เรื่องที่มีรูปหลายวัน ใช้วันล่าสุด)</p><ul>${[
           ...bg,
         ]
           .slice(0, 150)
@@ -12652,10 +12668,12 @@ const vShot = () => {
             const q = L[0],
               a = q.rnd === '1-15' ? 1 : 16,
               z = q.rnd === '1-15' ? q.ld || 31 : +q.rnd.split('-')[1];
-            return `<li><b>${esc(q.scr)}</b> <span class="shm">${esc(q.f)} • รอบ ${esc(q.rnd)}</span> — ${L.length} ช่อง <label class="picr" style="display:inline-flex;margin-left:6px"><span>วันที่ถ่าย</span><select data-shotman="${esc(k)}" aria-label="วันที่ถ่ายของ ${esc(q.scr)} รอบ ${esc(q.rnd)}"><option value="">— เลือก —</option>${Array.from(
-              { length: z - a + 1 },
-              (_, i) => a + i,
-            )
+            return `<li><b>${esc(q.scr)}</b> <span class="shm">${esc(q.f)} • รอบ ${esc(q.rnd)}</span> — ${L.length} ช่อง <label class="picr" style="display:inline-flex;margin-left:6px"><span>วันที่ถ่าย</span><select data-shotman="${esc(k)}" aria-label="วันที่ถ่ายของ ${esc(q.scr)} รอบ ${esc(q.rnd)}"><option value="">— เลือก —</option>${(() => {
+              const fd = [...new Set(L.map(x => x.fday).filter(Boolean))].sort((p, q) => p - q);
+              return fd.length
+                ? `<option value="f" ${M[k] === 'f' ? 'selected' : ''}>ตามวันที่ของไฟล์รูป (${fd.join(' / ')})</option>`
+                : '';
+            })()}${Array.from({ length: z - a + 1 }, (_, i) => a + i)
               .map(d => `<option value="${d}" ${M[k] === d ? 'selected' : ''}>${d}</option>`)
               .join('')}</select></label><small>${esc(
               L.slice(0, 6)
@@ -12667,7 +12685,7 @@ const vShot = () => {
       : '';
     b = `${D ? (D.bad ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`) : alertHTML('ok', `${D.n && D.ns ? `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง • แก้สี ${D.ns.toLocaleString()} ช่อง` : D.n || !D.ns ? `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง` : `แก้สีช่องวันที่ถ่ายแล้ว ${D.ns.toLocaleString()} ช่อง`} ใน ${D.files.length} ไฟล์`, `<p>${TCS === 'c' ? 'ใบเช็คในขั้นที่ 3 เป็นฉบับที่ใส่แล้วด้วย (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้)' : TCS === 'last' ? 'ผลการเติมในขั้นที่ 4 เป็นฉบับที่ใส่แล้วด้วย' : 'ใบเช็คชุดนี้เป็นฉบับที่ใส่แล้ว'} ${D.saved && D.sv ? `<b>บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว</b> (ทับ ${D.sv.ok - D.sv.neu} ไฟล์${D.sv.neu ? ` • ไฟล์ใหม่ ${D.sv.neu} ไฟล์ เพราะโฟลเดอร์นี้ไม่มีไฟล์ชื่อเดียวกัน` : ''}) — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย/${esc(D.sv.day)}` : 'ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็คด้านล่าง'}</p>`)) : ''}
  <p class="hint">โฟลเดอร์ “${esc(R.dir)}” • ตรวจ ${R.cells.toLocaleString()} ช่อง${R.read.length ? ` • เปิดไม่ได้: ${esc(R.read.join(', '))}` : ''}</p>
- ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man ? ' (เลือกเอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}${D || !NS ? '' : `<p class="hint">ช่องวันที่ถ่ายที่ใส่ไว้แล้ว <b>${NS.toLocaleString()} ช่อง</b> ยังไม่ใช่พื้นดำตัวเลขขาว — กดปุ่มด้านล่าง ระบบแก้สีให้ (เลขเหมือนเดิม)</p>`}
+ ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man === 2 ? ' (วันที่ของไฟล์รูป)' : x.man ? ' (เลือกเอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}${D || !NS ? '' : `<p class="hint">ช่องวันที่ถ่ายที่ใส่ไว้แล้ว <b>${NS.toLocaleString()} ช่อง</b> ยังไม่ใช่พื้นดำตัวเลขขาว — กดปุ่มด้านล่าง ระบบแก้สีให้ (เลขเหมือนเดิม)</p>`}
  <div class="shg">${grp('มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์', R.has, 'อาจลืมคัดลอกรูป หรือชื่อโฟลเดอร์ไม่ตรงกับชื่อหนัง', x => x.nm + ' (' + x.v + ')')}
  ${grp('เลขในใบเช็คไม่ตรงกับวันที่ในรูป', R.diff, 'ระบบไม่ได้แก้ ตรวจว่าเลขไหนถูก', x => x.nm + ': ใบเช็ค ' + x.v + ' / รูป ' + x.day)}
  ${badH}
@@ -17550,7 +17568,7 @@ document.addEventListener('change', e => {
   if (t.dataset.shotman != null) {
     if (SHOT && SHOT.R && !SHOT.done) {
       SHOT.man = SHOT.man || {};
-      const v = parseInt(t.value, 10) || 0;
+      const v = t.value === 'f' ? 'f' : parseInt(t.value, 10) || 0;
       if (v) SHOT.man[t.dataset.shotman] = v;
       else delete SHOT.man[t.dataset.shotman];
     }
