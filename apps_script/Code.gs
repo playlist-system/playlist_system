@@ -31,6 +31,9 @@ const CONFIG = {
   // เก็บ Playlist ทุกไฟล์ของวันนี้ แม้ไม่อยู่ในรายการ kinds ด้านล่าง (ชื่อไฟล์ต้องมีคำใน playlistWords)
   //   false = เก็บเฉพาะแบบที่อยู่ในรายการ • ไฟล์ Excel ที่ชื่อไม่มีคำเหล่านี้ (เช่น ใบแจ้งหนี้) ไม่เก็บ แค่แจ้งในอีเมลสรุป
   collectAll: true,
+  // ไม่ดึงไฟล์ที่ชื่อตรงกับแบบนี้เลย (ไม่เก็บลง Drive ไม่แสดงในหน้าเว็บและอีเมลสรุป) — ว่าง = ดึงทุกไฟล์ตามด้านบน
+  //   ตอนนี้: "Metro LED_… _Playlist" = ไฟล์ลำดับฉายของ Metro LED ที่ระบบเติมใบเช็คไม่ได้ใช้ (ตั้งแต่ 5.5.46)
+  skipPattern: '^Metro[\\s_]*LED',
   // หน้าระบบเติมใบเช็คที่ส่ง Playlist ให้ได้ (ปุ่ม “ดึง Playlist วันนี้” ในระบบ เปิดหน้านี้ด้วย ?send=studio) — ส่งให้เฉพาะเว็บนี้เท่านั้น
   studioOrigin: 'https://playlist-system.github.io',
   // ไอคอนแท็บของหน้าเว็บนี้ (รูป .png บนเว็บของระบบ) — ว่าง = ไอคอนเดิมของ Apps Script
@@ -53,7 +56,7 @@ const CONFIG = {
     { name: 'BKJ1', pattern: 'BKJ\\s*1' },
     { name: 'BKJ2', pattern: 'BKJ\\s*2' },
     // Metro LED มาทางอีเมลแล้ว (ตั้งแต่ พ.ย. 2569 จาก Media Scheduling Center มาก่อนวันออกอากาศ 1 วัน) — อีเมลแนบ 2 ไฟล์ Excel:
-    //   "รายการหนังโฆษณา 7-Eleven Metro LED …" = ไฟล์ที่ระบบเติมใบเช็คใช้ • "Metro LED_… _Playlist" = ไฟล์ลำดับฉาย (Playlist เพิ่มเติม)
+    //   "รายการหนังโฆษณา 7-Eleven Metro LED …" = ไฟล์ที่ระบบเติมใบเช็คใช้ • "Metro LED_… _Playlist" = ไฟล์ลำดับฉาย (ไม่ดึง — ดู skipPattern ด้านบน)
     { name: 'Metro LED', pattern: 'รายการหนัง.*Metro', tip: 'ปกติมาทางอีเมลก่อนวันฉาย 1 วัน' },
     { name: 'Rama9 Connect', pattern: 'Rama\\s*9[\\s_]*connect', extra: true },
     { name: 'Digital MRT', pattern: 'Digital[\\s_]*MRT', extra: true },
@@ -61,7 +64,6 @@ const CONFIG = {
     { name: 'Air Traveller', pattern: 'Air[\\s_]*Travell?er', extra: true },
     { name: 'The 20', pattern: 'The[\\s_]*20(?!\\d)', extra: true },
     { name: 'LA PlanB', pattern: 'LA[\\s_]*Plan[\\s_]*B', latest: true, extra: true },
-    { name: 'Metro LED ลำดับฉาย', pattern: '^Metro[\\s_]*LED', extra: true, unused: true }, // ระบบเติมใบเช็คไม่ได้ใช้ — ไม่รวมในปุ่ม "เลือกทั้งหมด"
 
     { name: 'NTW 57Blue_1', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*1(?!\\d)', extra: true },
     { name: 'NTW 57Blue_2', pattern: 'NTW[\\s_]*57[\\s_]*Blue[\\s_]*2(?!\\d)', extra: true },
@@ -172,9 +174,15 @@ function nameDate_(n, thisYear) {
   return null;
 }
 
+/** แบบชื่อไฟล์ที่ไม่ดึง (CONFIG.skipPattern) */
+function skipRe_() {
+  return CONFIG.skipPattern ? new RegExp(CONFIG.skipPattern, 'i') : null;
+}
+
 /** คัดไฟล์ของวันนี้จากรายการไฟล์แนบ [{name, size, day(อีเมล), when, blob}] → {chosen, others} */
 function pick_(atts, today) {
   const kinds = CONFIG.kinds.map(k => Object.assign({}, k, { re: new RegExp(k.pattern, 'i') }));
+  const skip = skipRe_();
   const thisYear = +today.slice(0, 4);
   const word = CONFIG.collectAll && CONFIG.playlistWords ? new RegExp(CONFIG.playlistWords, 'i') : null;
   const byKind = {};
@@ -183,6 +191,7 @@ function pick_(atts, today) {
   for (const a of atts) {
     const name = String(a.name || '').normalize('NFC');
     if (!/\.xlsx?$/i.test(name)) continue;
+    if (skip && skip.test(name)) continue; // ไม่ดึงไฟล์ที่ตั้งไว้ใน skipPattern
     const day = nameDate_(name, thisYear) || a.day;
     if (!day || day > today) continue; // ไฟล์ของวันข้างหน้า รอวันนั้น
     const kind = kinds.find(k => k.re.test(name));
@@ -300,6 +309,7 @@ function summary_(folder, today, added, others, trashed) {
   const thDay = s => +s.slice(8, 10) + ' ' + TH[+s.slice(5, 7) - 1];
   const day = thDay(today) + ' ' + (+today.slice(0, 4) + 543);
   const kinds = CONFIG.kinds.map(k => Object.assign({}, k, { re: new RegExp(k.pattern, 'i') }));
+  const skip = skipRe_();
   const counts = {};
   const files = [];
   const more = [];
@@ -307,6 +317,7 @@ function summary_(folder, today, added, others, trashed) {
     const it = folder.getFiles();
     while (it.hasNext()) {
       const n = it.next().getName().normalize('NFC');
+      if (skip && skip.test(n)) continue; // ไฟล์ที่ดึงไว้ก่อนตั้ง skipPattern
       files.push(n);
       const k = kinds.find(x => x.re.test(n));
       if (k) counts[k.name] = (counts[k.name] || 0) + 1;
@@ -377,6 +388,7 @@ function webDay(day) {
   const TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const thDay = s => +s.slice(8, 10) + ' ' + TH[+s.slice(5, 7) - 1];
   const kinds = CONFIG.kinds.map(k => Object.assign({}, k, { re: new RegExp(k.pattern, 'i') }));
+  const skip = skipRe_();
   const thisYear = +day.slice(0, 4);
   const files = [];
   if (folder) {
@@ -384,6 +396,7 @@ function webDay(day) {
     while (it.hasNext()) {
       const f = it.next();
       const n = f.getName().normalize('NFC');
+      if (skip && skip.test(n)) continue; // ไฟล์ที่ดึงไว้ก่อนตั้ง skipPattern
       const k = kinds.find(x => x.re.test(n));
       const fd = nameDate_(n, thisYear);
       const at = f.getDateCreated();
