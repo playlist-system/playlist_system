@@ -151,6 +151,7 @@
  *   เวอร์ชัน 5.5.46: ข้ามไฟล์ที่ไม่ใช่ Excel (PDF ฯลฯ) ตอนลากไฟล์/โฟลเดอร์ ไม่ต้องอ่าน
  *   เวอร์ชัน 5.5.47: Exchange Tower, ไฟล์วันถัดไป, ไฟล์ระหว่างวัน, CTW 360 W98 + NONE
  *   เวอร์ชัน 5.5.48: Emsphere Pylon = Pylon PlanB + Pylon Em
+ *   เวอร์ชัน 5.5.49: อ่าน Playlist หลายไฟล์พร้อมกัน
  * ======================================================================
  */
 
@@ -10471,7 +10472,7 @@ function parsePlaylist(f) {
   if (/Metro.*LED/i.test(f.name))
     return ret(parseMetro(XLSX.read(f.buf, { type: 'array', cellDates: true, cellStyles: true }), I));
   if (!/แยกจอ/.test(f.name)) {
-    const wb = XLSX.read(f.buf, { type: 'array' });
+    const wb = f.wb || XLSX.read(f.buf, { type: 'array' });
     {
       const V = venOf(f.name);
       if (V) return ret(parseVen(f, wb, V, I));
@@ -10510,7 +10511,7 @@ function parsePlaylist(f) {
       .replace(/\d{1,2}[-_.]\d{1,2}[-_.]\d{2,4}/g, '')
       .replace(/^[_\s]+|[_\s]+$/g, '')
       .replace(/^\d{1,2}[_\s]+(?=\D)/, '');
-  const wb = XLSX.read(f.buf, { type: 'array' }),
+  const wb = f.wb || XLSX.read(f.buf, { type: 'array' }),
     sm = splitMedia(wb);
   let media = mediaOf(rest);
   if (media && sm && sm !== media)
@@ -10782,6 +10783,108 @@ function buildOn(o) {
   }
   return on;
 }
+/* 5.5.49: อ่าน Playlist หลายไฟล์พร้อมกัน — ตัดช่องว่าง (slimXlsx) + SheetJS อ่านไฟล์ในเบื้องหลัง (Web Worker) หลายตัวพร้อมกัน แล้วหน้าหลักอ่านรายการหนังต่อทีละไฟล์ตามลำดับเดิม
+   ผลเหมือนอ่านทีละไฟล์ทุกช่อง • ไฟล์น้อยกว่า 3 ไฟล์ / Metro LED / เบราว์เซอร์ที่ใช้ Worker ไม่ได้ / Worker มีปัญหา → อ่านแบบเดิม */
+const PLW = { src: null };
+function plwSrc() {
+  if (PLW.src !== null) return PLW.src;
+  let u = '';
+  try {
+    const sc = [...document.scripts].map(x => x.textContent || ''),
+      xs = sc.find(t => /^\/\*! xlsx\.js/.test(t)),
+      jz = sc.find(t => /JSZip v\d/.test(t.slice(0, 200)));
+    if (
+      xs &&
+      jz &&
+      typeof Worker === 'function' &&
+      typeof Blob === 'function' &&
+      typeof DecompressionStream === 'function'
+    )
+      u = URL.createObjectURL(
+        new Blob(
+          [
+            xs,
+            '\n;',
+            jz,
+            '\n;const EMPTYC=',
+            String(EMPTYC),
+            ',WSX=',
+            String(WSX),
+            ',FORMC=',
+            String(FORMC),
+            ',ROWC=',
+            String(ROWC),
+            ',HELPSH=',
+            String(HELPSH),
+            ';\n',
+            String(slimXlsx),
+            '\nonmessage=async e=>{const{id,buf}=e.data;try{const s=await slimXlsx(buf),wb=XLSX.read(s,{type:"array"});postMessage({id,buf:s,wb},[s])}catch(err){postMessage({id,err:String(err&&err.message||err)})}};',
+          ],
+          { type: 'text/javascript' },
+        ),
+      );
+  } catch (_) {
+    u = '';
+  }
+  return (PLW.src = u);
+}
+function plwRead(arr) {
+  const M = new Map(),
+    todo = arr.filter(f => !/Metro.*LED/i.test(f.name)),
+    src = todo.length >= 3 ? plwSrc() : '';
+  if (!src) return M;
+  const n = Math.min(4, todo.length, Math.max(2, (navigator.hardwareConcurrency || 2) - 1)),
+    ws = [];
+  try {
+    for (let i = 0; i < n; i++) ws.push(new Worker(src));
+  } catch (_) {
+    ws.forEach(w => w.terminate());
+    return M;
+  }
+  const res = [],
+    q = todo.map((f, i) => i);
+  let left = todo.length,
+    dead = false;
+  todo.forEach((f, i) => M.set(f, new Promise(r => (res[i] = r))));
+  const stop = () => {
+    if (dead) return;
+    dead = true;
+    ws.forEach(w => w.terminate());
+    res.forEach(r => r(null));
+  }; /* พัง → ไฟล์ที่ยังไม่เสร็จอ่านแบบเดิม */
+  const next = w => {
+    if (dead) return;
+    const i = q.shift();
+    if (i == null) return;
+    let c;
+    try {
+      c = todo[i].buf.slice(0);
+    } catch (_) {
+      res[i](null);
+      left--;
+      return next(w);
+    }
+    w.postMessage({ id: i, buf: c }, [c]);
+  };
+  for (const w of ws) {
+    w.onmessage = e => {
+      const d = e.data;
+      res[d.id](d.err ? null : { name: todo[d.id].name, buf: d.buf, wb: d.wb });
+      if (--left <= 0) {
+        dead = true;
+        ws.forEach(x => x.terminate());
+      } else next(w);
+    };
+    w.onerror = ev => {
+      try {
+        ev.preventDefault();
+      } catch (_) {}
+      stop();
+    };
+    next(w);
+  }
+  return M;
+}
 async function addFiles(kind, files) {
   const arr = [],
     rb = [];
@@ -10830,14 +10933,16 @@ async function addFiles(kind, files) {
     skip = [];
   const ok = [],
     emp = [],
-    got = [];
+    got = [],
+    PW = plwRead(arr);
   let _i = 0;
   for (const f of arr) {
     _i++;
     if (typeof busyStep === 'function') await busyStep('กำลังอ่าน Playlist', _i, arr.length, f.name);
     let p;
     try {
-      p = parsePlaylist(/Metro.*LED/i.test(f.name) ? f : { name: f.name, buf: await slimXlsx(f.buf) });
+      const g = PW.has(f) ? await PW.get(f) : null;
+      p = parsePlaylist(/Metro.*LED/i.test(f.name) ? f : g || { name: f.name, buf: await slimXlsx(f.buf) });
     } catch (e) {
       p = null;
     }
@@ -10959,7 +11064,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.48 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.49 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:

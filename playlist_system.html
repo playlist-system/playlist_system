@@ -3815,7 +3815,7 @@ const isLaWb=wb=>wb.SheetNames.some(n=>LAT.test(cl(((wb.Sheets[n]||{}).A1||{}).v
 function laDate(wb){for(const n of wb.SheetNames){const ws=wb.Sheets[n];if(!ws||!LAT.test(cl((ws.A1||{}).v)))continue;const v=(ws.A2||{}).v;if(v instanceof Date)return new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate()));if(typeof v==='number'&&v>40000&&v<80000)return s2d(v);const m=cl(ws.A1.v).match(/(\d{1,2})\s*([\u0E01-\u0E4E]+)\s*(\d{4})/),i=m?THMF.indexOf(m[2]):-1;if(i>=0)return new Date(Date.UTC(yy(m[3]),i,+m[1]))}return null}
 function parsePlaylist(f){const I=[],ret=x=>{if(x&&x.length){x.iss=I;return x}return null};
  if(/Metro.*LED/i.test(f.name))return ret(parseMetro(XLSX.read(f.buf,{type:'array',cellDates:true,cellStyles:true}),I));
- if(!/แยกจอ/.test(f.name)){const wb=XLSX.read(f.buf,{type:'array'});{const V=venOf(f.name);if(V)return ret(parseVen(f,wb,V,I))} /* 4.4 */
+ if(!/แยกจอ/.test(f.name)){const wb=f.wb||XLSX.read(f.buf,{type:'array'});{const V=venOf(f.name);if(V)return ret(parseVen(f,wb,V,I))} /* 4.4 */
   if(wb.SheetNames.some(n=>bkjCode(n)))return ret(parseSig(wb,'Bangkok Jams',bkjCode));
   if(isLaWb(wb)){const p=parseSig(wb,'LA PlanB',()=>'LA PlanB');if(p.length){p.dt=laDate(wb);return ret(p)}}
   if(isSectWb(wb))return ret(parseSect(XLSX.read(f.buf,{type:'array',cellStyles:true}),f.name,I));
@@ -3825,7 +3825,7 @@ function parsePlaylist(f){const I=[],ret=x=>{if(x&&x.length){x.iss=I;return x}re
   return ret(parseSig(wb,/show\s*_*\s*dc|prudential/i.test(f.name)?'Show DC / Prudential':'Signature Max'))}
  /* สรุปรายการหนังแยกจอ: สื่ออยู่ในชื่อไฟล์ เช่น …แยกจอ_01_40Blue, …แยกจอ_2026_10_02_80Red ถ้าชื่อไฟล์ไม่บอก ใช้ชื่อชีต (40Blue, 80Red_1 …) */
  const bn=f.name.replace(/\.xlsx$/i,'').replace(/\s*\(\d+\)$/,''),rest=bn.replace(/^.*แยกจอ/,'').replace(/\d{4}[-_.]\d{1,2}[-_.]\d{1,2}/g,'').replace(/\d{1,2}[-_.]\d{1,2}[-_.]\d{2,4}/g,'').replace(/^[_\s]+|[_\s]+$/g,'').replace(/^\d{1,2}[_\s]+(?=\D)/,'');
- const wb=XLSX.read(f.buf,{type:'array'}),sm=splitMedia(wb);let media=mediaOf(rest);
+ const wb=f.wb||XLSX.read(f.buf,{type:'array'}),sm=splitMedia(wb);let media=mediaOf(rest);
  if(media&&sm&&sm!==media)I.push({lv:'stop',t:`ชื่อไฟล์บอกสื่อ ${media} แต่ชีตในไฟล์เป็น ${sm} ระบบใช้ตามชื่อไฟล์ ตรวจว่าใส่ไฟล์ถูก`});
  if(!media&&sm){media=sm;I.push({lv:'info',t:`ชื่อไฟล์ไม่บอกสื่อ ระบบใช้ชื่อชีตในไฟล์ (${sm}) แทน`})}
  if(!media){if(!rest)return null;media=rest.replace(/^\d{4}[-_. ]\d{1,2}[-_. ]\d{1,2}[_\s]*/,'')||rest;I.push({lv:'stop',t:`สื่อ “${media}” ระบบยังไม่รู้จัก หนังในไฟล์นี้จึงยังไม่ได้ใช้เติม ส่งไฟล์ให้ผู้ดูแลระบบ`})}
@@ -3875,12 +3875,25 @@ function listOf(s,o){let L=s.rows.filter(r=>o.off||!r.off);if(o.newOnly)L=L.filt
 /* 5.5.13: ชื่อจอในใบเช็ค → คีย์ media|code (ตรงรหัส หรือชื่อในใบเช็คอยู่ในชื่อจอของ Playlist เช่น The Prime 9 ↔ EkamaiExpressway_ThePrime9) */
 const nameHit=(keys,raw)=>{const q=nrm(raw).toUpperCase();let h=keys.filter(k=>nrm(k.split('|')[1]).toUpperCase()===q);if(!h.length&&q.length>=5)h=keys.filter(k=>{const s=DB.find(z=>z.m+'|'+z.c===k);return!!s&&nrm(s.n||'').toUpperCase().includes(q)});return h};
 function buildOn(o){const on=new Map();for(const s of DB){if(s.m==='MetroLED'||!/^(40|80|CITY|Spare)/.test(s.m))continue;if(o.media!=='ทั้งหมด'&&s.m!==o.media)continue;on.set(s.m+'|'+s.c,listOf(s,o))}return on}
+/* 5.5.49: อ่าน Playlist หลายไฟล์พร้อมกัน — ตัดช่องว่าง (slimXlsx) + SheetJS อ่านไฟล์ในเบื้องหลัง (Web Worker) หลายตัวพร้อมกัน แล้วหน้าหลักอ่านรายการหนังต่อทีละไฟล์ตามลำดับเดิม
+   ผลเหมือนอ่านทีละไฟล์ทุกช่อง • ไฟล์น้อยกว่า 3 ไฟล์ / Metro LED / เบราว์เซอร์ที่ใช้ Worker ไม่ได้ / Worker มีปัญหา → อ่านแบบเดิม */
+const PLW={src:null};
+function plwSrc(){if(PLW.src!==null)return PLW.src;let u='';try{const sc=[...document.scripts].map(x=>x.textContent||''),xs=sc.find(t=>/^\/\*! xlsx\.js/.test(t)),jz=sc.find(t=>/JSZip v\d/.test(t.slice(0,200)));
+  if(xs&&jz&&typeof Worker==='function'&&typeof Blob==='function'&&typeof DecompressionStream==='function')u=URL.createObjectURL(new Blob([xs,'\n;',jz,'\n;const EMPTYC=',String(EMPTYC),',WSX=',String(WSX),',FORMC=',String(FORMC),',ROWC=',String(ROWC),',HELPSH=',String(HELPSH),';\n',String(slimXlsx),
+   '\nonmessage=async e=>{const{id,buf}=e.data;try{const s=await slimXlsx(buf),wb=XLSX.read(s,{type:"array"});postMessage({id,buf:s,wb},[s])}catch(err){postMessage({id,err:String(err&&err.message||err)})}};'],{type:'text/javascript'}))}catch(_){u=''}return PLW.src=u}
+function plwRead(arr){const M=new Map(),todo=arr.filter(f=>!/Metro.*LED/i.test(f.name)),src=todo.length>=3?plwSrc():'';if(!src)return M;
+ const n=Math.min(4,todo.length,Math.max(2,(navigator.hardwareConcurrency||2)-1)),ws=[];try{for(let i=0;i<n;i++)ws.push(new Worker(src))}catch(_){ws.forEach(w=>w.terminate());return M}
+ const res=[],q=todo.map((f,i)=>i);let left=todo.length,dead=false;todo.forEach((f,i)=>M.set(f,new Promise(r=>res[i]=r)));
+ const stop=()=>{if(dead)return;dead=true;ws.forEach(w=>w.terminate());res.forEach(r=>r(null))}; /* พัง → ไฟล์ที่ยังไม่เสร็จอ่านแบบเดิม */
+ const next=w=>{if(dead)return;const i=q.shift();if(i==null)return;let c;try{c=todo[i].buf.slice(0)}catch(_){res[i](null);left--;return next(w)}w.postMessage({id:i,buf:c},[c])};
+ for(const w of ws){w.onmessage=e=>{const d=e.data;res[d.id](d.err?null:{name:todo[d.id].name,buf:d.buf,wb:d.wb});if(--left<=0){dead=true;ws.forEach(x=>x.terminate())}else next(w)};w.onerror=ev=>{try{ev.preventDefault()}catch(_){}stop()};next(w)}
+ return M}
 async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try{arr.push({name:f.name,buf:await f.arrayBuffer()})}catch(_){rb.push(f.name)}} /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
  if(rb.length){say(`เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')} — ถ้าลากจากในไฟล์ .zip ที่เปิดดูใน Windows ให้ลากไฟล์ .zip มาทั้งไฟล์ หรือแตกไฟล์ก่อน`);if(!arr.length)return view()}
  if(kind==='ck'){C.push(...arr);MQN='catchck';note=`เพิ่มใบเช็ครูป ${arr.length} ไฟล์`;return view()}
  if(kind==='pj'){PLI=[];try{const o=JSON.parse(new TextDecoder().decode(arr[0].buf));PFS=[];if(Array.isArray(o)){DB=o;PLD=null;PLM={}}else{DB=o.DB||[];PLD=plDate()||(o.PLD?new Date(o.PLD):null)}note='เปิดโปรเจกต์แล้ว';}catch(e){note='ไฟล์โปรเจกต์ไม่ถูกต้อง'}return view()}
  note='กำลังอ่าน Playlist …';view();await new Promise(r=>setTimeout(r,30));let n=0,skip=[];
- const ok=[],emp=[],got=[];let _i=0;for(const f of arr){_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name);let p;try{p=parsePlaylist(/Metro.*LED/i.test(f.name)?f:{name:f.name,buf:await slimXlsx(f.buf)})}catch(e){p=null}PLX=PLX.filter(x=>x.f!==f.name);PLI=PLI.filter(x=>x.f!==f.name);if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
+ const ok=[],emp=[],got=[],PW=plwRead(arr);let _i=0;for(const f of arr){_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name);let p;try{const g=PW.has(f)?await PW.get(f):null;p=parsePlaylist(/Metro.*LED/i.test(f.name)?f:g||{name:f.name,buf:await slimXlsx(f.buf)})}catch(e){p=null}PLX=PLX.filter(x=>x.f!==f.name);PLI=PLI.filter(x=>x.f!==f.name);if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
   if(!p.some(s=>s.rows.some(r=>!r.off))){emp.push(f.name);PLX.push({f:f.name,why:'อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) — ใช้ข้อมูลเดิมไว้ก่อน'});continue} /* อ่านได้แต่ไม่มีรายการหนังเลย → ไม่ลบข้อมูลเดิม */
   const fd0=p.dt||fullNameDate(f.name)||dataDate(p)||nameDate(f.name,autoBase());for(const x of p){x.pf=f.name;x.pd=fd0?+fd0:0}let I2=[];{const I=p.iss||[];plCheck(p,I);I2=I.map(x=>({f:f.name,...x}));PLI.push(...I2)}got.push({f,p,d:fd0?+fd0:0,I:I2})}
  got.sort((a,b)=>a.d-b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
@@ -3897,7 +3910,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.48 (12 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.49 (12 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
