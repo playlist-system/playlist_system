@@ -153,6 +153,7 @@
  *   เวอร์ชัน 5.5.48: Emsphere Pylon = Pylon PlanB + Pylon Em
  *   เวอร์ชัน 5.5.49: อ่าน Playlist หลายไฟล์พร้อมกัน
  *   เวอร์ชัน จัดจอเข้าชีตตามแพค อ่านชีตแบบรหัสจอแถว 10 และใบเปล่า
+ *   เวอร์ชัน ชีต CITY ใหม่ชื่อ City TV
  * ======================================================================
  */
 
@@ -4518,10 +4519,10 @@ const arrangeWb = (() => {
     '40Red': 'PBTV 40 RED',
     '80Blue': 'PBTV 80 BLUE',
     '80Red': 'PBTV 80 RED',
-    CITY: 'CITY TV 25',
+    CITY: 'City TV' /* 5.5.51: แพคเปลี่ยนชื่อจาก CITY TV 25 เป็น City TV */,
     Spare: 'SPARE',
   };
-  const SHEETNAME = { CITY: 'CITY TV 25', Spare: 'Spare' };
+  const SHEETNAME = { CITY: 'City TV', Spare: 'Spare' };
   const nk = c => String(c).replace(/-/g, '').toUpperCase();
   const qn = n => (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(n) ? n : "'" + n.replace(/'/g, "''") + "'");
   const unq = s => (s.startsWith("'") ? s.slice(1, -1).replace(/''/g, "'") : s);
@@ -8732,7 +8733,8 @@ const blkNameFor = (m, names) => {
   const N = names || [],
     sib = N.find(n => /40|80/.test(n) && mediaOf(n)),
     st = N.some(n => /_/.test(n)) ? 'u' : N.some(n => /^PBTV ?\d\d ?[A-Z][a-z]/.test(n)) ? 't' : 'c';
-  if (m === 'CITY') return st === 'u' ? 'CITY_TV_25' : st === 't' ? 'The City 25' : 'CITY TV 25';
+  if (m === 'CITY')
+    return st === 'u' ? 'City_TV' : 'City TV'; /* 5.5.51: ชื่อแพคใหม่ (เดิม CITY TV 25 / The City 25) */
   if (m === 'Spare') return st === 't' ? 'PBTV BKK Spare' : 'Spare';
   if (sib)
     return sib.replace(/40|80/, m.slice(0, 2)).replace(/blue|red/i, w => {
@@ -11083,7 +11085,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.50 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.51 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
