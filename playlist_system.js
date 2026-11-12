@@ -149,6 +149,7 @@
  *   เวอร์ชัน 5.5.44: ปุ่ม/ข้อความ “เปิด PLAYLIST INBOX” (หน้าดึง Playlist แบบใหม่ใน apps_script/Code.gs)
  *   เวอร์ชัน 5.5.45: ดึง Playlist วันนี้ ได้ Playlist เพิ่มเติมด้วย (ข้อความบอกจำนวนแยก)
  *   เวอร์ชัน 5.5.46: ข้ามไฟล์ที่ไม่ใช่ Excel (PDF ฯลฯ) ตอนลากไฟล์/โฟลเดอร์ ไม่ต้องอ่าน
+ *   เวอร์ชัน 5.5.47: Exchange Tower, ไฟล์วันถัดไป, ไฟล์ระหว่างวัน, CTW 360 W98 + NONE
  * ======================================================================
  */
 
@@ -577,15 +578,59 @@ const pfPut = (db, p) => {
   }
   return db.concat(p);
 };
+const plFull = () => {
+  const vd = !PFS.some(pfG),
+    xm = vd && !PFS.some(pfV),
+    xl = xm && !PFS.some(pfX),
+    vl = xl && !PFS.some(pfXL);
+  return { vd, xm, xl, vl, F: !vd ? pfG : !xm ? pfV : !xl ? pfX : !vl ? pfXL : pfVL };
+};
+/* 5.5.47: ไฟล์ของวันหลังวันที่เติมวันสุดท้าย (เช่น Parc Paragon “02 November” ปนมากับไฟล์วันที่ 1) ไม่ใช้ ถ้ามีไฟล์จอชุดเดียวกันของวันนั้นแล้ว — ฉบับวันถัดไปลงถอดเรื่องที่ยังออนวันนี้ไว้ */
+const plWork = () => {
+  const F = plFull().F,
+    ds = PFS.filter(F)
+      .map(e => e.d)
+      .filter(d => d > 0);
+  return ds.length ? Math.max(...ds) : 0;
+};
+function plLater(W) {
+  const sk = new Set();
+  if (!W) return sk;
+  for (const e of PFS) {
+    if (!(e.d > W)) continue;
+    const ms = new Set(e.p.map(s => s.m));
+    if (PFS.some(o => o !== e && o.d === W && o.p.some(s => ms.has(s.m)))) sk.add(e);
+  }
+  return sk;
+}
+const plLaterMsg = (sk, W) =>
+  [...sk].map(e => ({
+    f: e.f,
+    lv: 'info',
+    t: `เป็นไฟล์ของวันที่ ${thd(new Date(e.d))} ซึ่งเลยวันที่เติม (${thd(new Date(W))}) — ระบบใช้ไฟล์ของวันที่ ${new Date(W).getUTCDate()} ของจอชุดเดียวกันแทน • เก็บไฟล์นี้ไว้ใช้ตอนเติมวันที่ ${new Date(e.d).getUTCDate()}`,
+  }));
+function plFix() {
+  const W = plWork(),
+    sk = plLater(W);
+  if (!sk.size) return;
+  const bad = new Set([...sk].map(e => e.f)),
+    ms = new Set(DB.filter(s => bad.has(s.pf)).map(s => s.m));
+  if (ms.size) {
+    let db = DB.filter(s => !bad.has(s.pf));
+    for (const e of [...PFS].filter(e => !sk.has(e)).sort((a, b) => a.d - b.d || a.q - b.q)) {
+      const p = e.p.filter(s => ms.has(s.m));
+      if (p.length) db = pfPut(db, p);
+    }
+    DB = db;
+    PLD = plDate();
+  }
+  PLI = PLI.filter(x => !bad.has(x.f)).concat(plLaterMsg(sk, W));
+}
 function plDays() {
   const sig = PFS.map(e => e.q).join(',');
   if (PDC && PDC.sig === sig) return PDC.G;
   let G = null;
-  const vd = !PFS.some(pfG),
-    xm = vd && !PFS.some(pfV),
-    xl = xm && !PFS.some(pfX),
-    vl = xl && !PFS.some(pfXL),
-    pfFull = !vd ? pfG : !xm ? pfV : !xl ? pfX : !vl ? pfXL : pfVL,
+  const { vd, xm, xl, vl, F: pfFull } = plFull(),
     ds = [...new Set(PFS.filter(pfFull).map(e => e.d))].sort((a, b) => a - b);
   if (ds.length > 1) {
     G = ds.map(d => ({ d, E: [] }));
@@ -593,7 +638,9 @@ function plDays() {
     G.x = xm && !vl;
     G.xl = xl && !vl;
     G.vl = vl;
+    const sk = plLater(ds[ds.length - 1]);
     for (const e of PFS) {
+      if (sk.has(e)) continue;
       let i = pfFull(e) ? ds.indexOf(e.d) : e.d > 0 ? ds.findIndex(d => d >= e.d) : -1;
       if (i < 0) i = ds.length - 1;
       G[i].E.push(e);
@@ -611,16 +658,21 @@ function plDays() {
   return G;
 }
 function plSync() {
-  const G = plDays();
+  const G = plDays(),
+    W = G ? G[G.length - 1].d : plWork(),
+    sk = plLater(W);
   if (G) DB = G[G.length - 1].db;
   else {
     let db = [];
-    for (const e of [...PFS].sort((a, b) => a.d - b.d || a.q - b.q)) db = pfPut(db, e.p);
+    for (const e of [...PFS].filter(e => !sk.has(e)).sort((a, b) => a.d - b.d || a.q - b.q))
+      db = pfPut(db, e.p);
     DB = db;
   }
   PLD = plDate();
   const live = new Set([...DB.map(s => s.pf), ...(G ? PFS.map(e => e.f) : [])]);
-  PLI = PFS.flatMap(e => e.I || []).filter(x => live.has(x.f));
+  PLI = PFS.flatMap(e => e.I || [])
+    .filter(x => live.has(x.f) && !(sk.size && [...sk].some(e => e.f === x.f)))
+    .concat(plLaterMsg(sk, W));
 }
 const THW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
 const rngTxt = G => {
@@ -1413,9 +1465,10 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         }
       }
       if (t) {
+        t.nn = b.pcs.map(L => /^none$/i.test(vOf(L, r)));
         if (!b.cnt.has(nm)) b.cnt.set(nm, []);
         b.cnt.get(nm).push(t);
-      }
+      } /* 5.5.47: จำช่อง NONE เดิม (หนังที่ออกแล้วยังอยู่กลุ่มจอเดิม) */
       if (fx) {
         if (hist) fdrop++;
         continue;
@@ -1674,10 +1727,32 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   const seen = new Set();
   for (const b of B) for (const e of b.ent) if (e.g > +P) seen.add(e.g);
   const dates = [...seen].sort((x, y) => x - y);
-  const srt = L => L.sort((x, y) => y.hash - x.hash || cmpN(x.nm, y.nm));
+  const covI = (b, nm) => {
+    const cv = b.scr && b.scr.cov;
+    if (!cv) return 0;
+    const n = String(nm).replace(/^#/, ''),
+      i = b.pcs.findIndex(L => cv[L] && cv[L].has(n));
+    if (i >= 0) return i;
+    const q = (b.cnt.get(nm) || [])[0],
+      j = q && q.nn && q.nn.some(Boolean) ? q.nn.findIndex(x => !x) : -1;
+    return j < 0 ? 0 : j;
+  }; /* 5.5.47: CTW 360 — หนังจอแรก (มุมบน/ล่าง) ก่อน แล้วหนังที่ออนเฉพาะ W98 */
+  const srt = (L, b) =>
+    L.sort((x, y) => y.hash - x.hash || covI(b, x.nm) - covI(b, y.nm) || cmpN(x.nm, y.nm));
   for (const b of B) {
-    b.main = srt(b.ent.filter(e => e.g === +P));
-    b.grp = new Map(dates.map(k => [k, srt(b.ent.filter(e => e.g === k))]));
+    b.main = srt(
+      b.ent.filter(e => e.g === +P),
+      b,
+    );
+    b.grp = new Map(
+      dates.map(k => [
+        k,
+        srt(
+          b.ent.filter(e => e.g === k),
+          b,
+        ),
+      ]),
+    );
   }
   const OSH = { s: false, p: false, f: false };
   {
@@ -1723,15 +1798,27 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     }
   };
   const put = (b, r, row) => {
-    const q = b.cnt.get(r.nm);
-    if (q && q.length)
-      q.shift().forEach((k, i) => {
-        if (k) {
-          sh.give(b.pcs[i], row, k);
-          moved++;
-        }
-      });
-    sh.setText(b.lc, row, r.nm);
+    const q = b.cnt.get(r.nm),
+      gv = q && q.length ? q.shift() : [];
+    gv.forEach((k, i) => {
+      if (k) {
+        sh.give(b.pcs[i], row, k);
+        moved++;
+      }
+    });
+    {
+      const cv = b.scr && b.scr.cov,
+        n0 = String(r.nm).replace(/^#/, '');
+      if (cv && b.pcs.some(L => cv[L] && cv[L].has(n0)))
+        b.pcs.forEach((L, i) => {
+          if (cv[L] && !cv[L].has(n0) && !gv[i]) sh.setText(L, row, 'NONE');
+        });
+    }
+    /* 5.5.47: ช่องจอที่หนังไม่ออน → NONE (แบบที่ทีมทำ เฉพาะหนังที่ยังอยู่ใน Playlist วันนี้ ช่องที่มีค่าแล้วไม่แตะ) */ sh.setText(
+      b.lc,
+      row,
+      r.nm,
+    );
     if (r.hash) sh.setS(b.lc, row, ST.derive(b.bl, 'yel', { fill: 'FFFFFF00' }));
     else sh.setS(b.lc, row, b.bl);
     if (b.kind !== 'keep') note(b, r, row);
@@ -9432,9 +9519,9 @@ const SIGAL = {
   'The Big Y': ['BIGY', 'THEBIGY'],
   'Ploenchit Interchange': ['PJ', 'PLOENCHIT'],
   'At Narong Interchange': ['AN', 'NARONG', 'ATNARONG'],
-  'Exchange Tower': ['EXT'],
-  'Exchange Tower (SM)': ['EXT'],
-  'Exchange Tower (SM) 2': ['EXT'],
+  'Exchange Tower': ['EXT', 'EXCHANGE', 'EXCHANGETOWER'],
+  'Exchange Tower (SM)': ['EXT', 'EXCHANGE', 'EXCHANGETOWER'],
+  'Exchange Tower (SM) 2': ['EXT', 'EXCHANGE', 'EXCHANGETOWER'],
   Base: ['BASE'],
   ShowDC: ['SDC', 'SHOWDC', 'BRAVO', 'BRAVOBKK'],
   'Dusit Central Park': ['DS', 'DUSIT', 'CENTRALPARKDUSIT'],
@@ -9490,7 +9577,7 @@ const SIGCODE = { 'Exchange Tower': 'Exchange Tower (SM)', 'Exchange Tower (2)':
 const VEN = [
   { k: 'NTW', re: /\bNTW\b/i, ntw: 1 },
   { k: 'Customize Looker', re: /Customize[\s_]*Looker/i, ntw: 1 },
-  { k: 'Central Network', re: /Central\s*Network/i, cont: 'skip' },
+  { k: 'Central Network', re: /Central\s*Network/i, cont: 'skip', keep: /^W98$/i },
   { k: 'Parc Paragon / Interchange', re: /Parc\s*Paragon/i, cont: 'hash' },
   { k: 'EMS 5M', re: /EMS\s*5M/i, cont: 'hash', pre: /^EMS_5M_/i },
   { k: 'LIDO Connect', re: /LIDO/i, cont: 'hash', suf: /_LIDO$/i },
@@ -9539,8 +9626,8 @@ function parseVen(f, wb, V, I) {
       if (!r.ad || JUNK.test(r.ad.trim()) || none(r)) continue;
       const ct =
         /^content/i.test(r.pb || '') || /^Content/i.test(r.ty || '') || /^Content/i.test(r.sec || '');
-      if (ct && V.cont === 'skip') continue;
-      let ad = r.ad;
+      if (ct && V.cont === 'skip' && !(V.keep && V.keep.test(s.c))) continue;
+      /* 5.5.47: CTW 360 — ทีมลงหนัง Content ของจอ W98 (ไม่ใส่ #) */ let ad = r.ad;
       if (pre && ad.startsWith(pre)) ad = ad.slice(pre.length);
       else if (V.pre instanceof RegExp) ad = ad.replace(V.pre, '');
       if (V.suf) ad = ad.replace(V.suf, '');
@@ -9549,7 +9636,7 @@ function parseVen(f, wb, V, I) {
       const x = {
         ...r,
         ad,
-        ty: ct ? 'Content' : /^Content/i.test(r.ty || '') ? '' : r.ty,
+        ty: ct && V.cont !== 'skip' ? 'Content' : /^Content/i.test(r.ty || '') ? '' : r.ty,
         st: /สัญญาใหม่/.test(r.st || '') && !/ขึ้นใหม่/.test(r.st) ? 'ขึ้นใหม่ (สัญญาใหม่)' : r.st,
       };
       delete x.pb;
@@ -9626,6 +9713,7 @@ const VMAP = {
   },
   'Central Network': {
     col: 1,
+    none: 1,
     m: [
       [/W98/, 'W98'],
       [/./, 'CTW360'],
@@ -9693,12 +9781,14 @@ function venScreen(ws, sn, cn, k) {
       const s = (/M5/.test(T(c)) && by('55x5')) || by('Lift,33x3');
       if (s && !P.includes(s)) P.push(s);
     } /* 4.4.2: ชีต M3M5 — คอลัมน์ M5 = กลุ่มจอ 55x5 ที่เหลือ = Lift,33x3 */
+  const CS = {};
   if (R && !P.length)
     for (const c of R.col ? cols : [cn]) {
       const t = R.col ? T(c) + head : head;
       for (const [re, nm] of R.m)
         if (re.test(t)) {
           const s = [].concat(nm).map(by).find(Boolean);
+          if (s && R.col) CS[n2col(c)] = s;
           if (s && !P.includes(s)) P.push(s);
           break;
         }
@@ -9713,6 +9803,10 @@ function venScreen(ws, sn, cn, k) {
         seen.add(r.ad);
         rows.push(r);
       } /* คอลัมน์ของหลายกลุ่มจอใช้รายชื่อร่วมกัน → รวมรายชื่อของทุกกลุ่ม */
+  const cov =
+    R && R.none && !cnx && Object.keys(CS).length
+      ? Object.fromEntries(Object.entries(CS).map(([L, s]) => [L, new Set(s.rows.map(r => r.ad))]))
+      : null; /* 5.5.47: คอลัมน์ไหนเป็นจอไหน (ใส่ NONE) */
   return {
     m: k,
     c: P.map(s => s.c).join(' + '),
@@ -9722,6 +9816,7 @@ function venScreen(ws, sn, cn, k) {
     pd: Math.max(0, ...P.map(s => s.pd || 0)),
     rows: stable(rows),
     ...(cnx ? { noExit: 1 } : {}),
+    ...(cov ? { cov } : {}),
   };
 }
 function parseSig(wb, media, map, opt) {
@@ -10791,6 +10886,34 @@ async function addFiles(kind, files) {
           PLI.push(x);
         }
   } /* 4.4.1 */
+  {
+    const kk = g => [...new Set(g.p.map(x => x.m + '|' + x.c))].sort().join('\n'),
+      gone = (w, l) => {
+        for (const s of w.p) {
+          const o = l.find(x => x.m === s.m && x.c === s.c);
+          if (!o) continue;
+          const have = new Set(s.rows.map(r => r.ad));
+          for (const r of o.rows)
+            if (r.ad && !have.has(r.ad)) {
+              s.rows.push({ ...r, off: true });
+              have.add(r.ad);
+            }
+        }
+      };
+    for (let j = 0; j < got.length; j++) {
+      const w = got[j];
+      if (!w.d) continue;
+      const k = kk(w);
+      for (const l of [
+        ...PFS.filter(e => e.f !== w.f.name && e.d === w.d && kk(e) === k).map(e => e.p),
+        ...got
+          .slice(0, j)
+          .filter(x => x.d === w.d && x.f.name !== w.f.name && kk(x) === k)
+          .map(x => x.p),
+      ])
+        gone(w, l);
+    }
+  } /* 5.5.47: ไฟล์ระหว่างวันไม่มีเรื่องที่จบไปแล้ว → จำวันจบจากฉบับก่อน (ไฟล์รอบเช้า) เป็นแถวถอด เพื่อเขียน “ออกวันที่” */
   for (const { f, p } of got) {
     if (p.every(x => x.rep === 'screen')) {
       const ks = new Set(p.map(x => x.m + '|' + x.c));
@@ -10815,7 +10938,8 @@ async function addFiles(kind, files) {
     const live = new Set(DB.map(s => s.pf));
     PLI = PLI.filter(x => live.has(x.f));
   }
-  if (plDays()) plSync(); /* 4.3: หลายวัน → Playlist ของวันล่าสุด (แบบที่วันนั้นไม่มี ใช้ของวันก่อนหน้า) */
+  if (plDays()) plSync();
+  else plFix(); /* 4.3: หลายวัน → Playlist ของวันล่าสุด (แบบที่วันนั้นไม่มี ใช้ของวันก่อนหน้า) */
   MQN = skip.length || emp.length ? 'warn' : 'catch';
   note =
     `นำเข้า ${new Set(got.flatMap(x => x.p.map(s => s.m + '|' + s.c))).size} จอ` +
@@ -10828,7 +10952,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.46 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.47 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:

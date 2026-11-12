@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
-<meta name="robots" content="noindex,nofollow"><title>PHOTO CHECK STUDIO — ระบบเติมใบเช็ครูป</title><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><title>PHOTO CHECK STUDIO — ระบบเติมใบเช็ครูป</title><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%236D4AFF%22/%3E%3Cstop offset=%221%22 stop-color=%22%232563EB%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2264%22 height=%2264%22 rx=%2215%22 fill=%22url(%23g)%22/%3E%3Cg transform=%22translate(6.4 6.4) scale(2.133)%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%222.3%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%223%22 y=%227%22 width=%2218%22 height=%2213%22 rx=%223.5%22/%3E%3Cpath d=%22M8 7l2-3h4l2 3%22/%3E%3Cpath d=%22M9.2 13.6l2 2 3.8-4%22/%3E%3C/g%3E%3C/svg%3E"><link rel="apple-touch-icon" href="https://playlist-system.github.io/playlist_system/icons/studio-180.png"><!-- 5.5.42: ไอคอนแท็บ (เดิมเป็นรูปลูกโลก) --><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>try{var t=localStorage.getItem('ps_theme');document.documentElement.dataset.theme=t||'dark'}catch(e){document.documentElement.dataset.theme='light'}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
 /* ===== ธีม: สว่าง / มืด — สีหลักมาจากใบเช็ครูป (แถบน้ำเงิน 002060, แถบเขียว 375623, ไฮไลต์เหลือง) ===== */
@@ -1029,7 +1029,12 @@ function namedScreen(label,code,sn){if(/^BASE$/.test(nrm(sn||''))){const h=DB.fi
 const jamList=(s,o)=>listOf(s,o).filter(a=>!/^BJ\d*_\d+_/i.test(a)&&!/weather/i.test(a)&&!/^เวลารวม|^รวมทุกแพค/.test(a));
 /* ---------- แบบใบเช็คที่ทำด้วยมือ: # ก่อน → A-Z, แยกตามวันเริ่ม, ออกวันที่ ---------- */
 const SCR=new Map(),MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-function parseD(t){if(!t)return null;{const x=String(t).trim();let q=x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(q)return new Date(Date.UTC(+q[1],+q[2]-1,+q[3]));q=x.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);if(q){let y=+q[3];if(y<100)y+=2000;if(y>2400)y-=543;if(+q[2]>=1&&+q[2]<=12)return new Date(Date.UTC(y,+q[2]-1,+q[1]))}}const m=String(t).trim().match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ](\d{2,4})$/);if(!m||!(m[2].toLowerCase()in MON))return null;let y=+m[3];if(y<100)y+=2000;if(y>2400)y-=543;return new Date(Date.UTC(y,MON[m[2].toLowerCase()],+m[1]))}
+/* 5.5.43: วันที่ที่พิมพ์ตกเครื่องหมาย / (เช่น “30/112026” “02/92026” “2710/2026”) — อ่านได้ถ้าได้วันที่จริงแบบเดียว ปี 2020–2099 (หรือ พ.ศ.) • บอกใน “ข้อมูล” */
+function dTypo(t){const x=String(t==null?'':t).trim(),ok=(d,m,y)=>{if(y>2400)y-=543;if(y<2020||y>2099||m<1||m>12||d<1)return null;const D=new Date(Date.UTC(y,m-1,d));return D.getUTCDate()===d?D:null};
+ let q=x.match(/^(\d{1,2})[-\/.](\d{1,2})(\d{4})$/);if(q)return ok(+q[1],+q[2],+q[3]);
+ q=x.match(/^(\d{3,4})[-\/.](\d{4})$/);if(q){const a=q[1],L=[ok(+a.slice(0,2),+a.slice(2),+q[2]),a.length===3?ok(+a.slice(0,1),+a.slice(1),+q[2]):null].filter(Boolean);return L.length===1?L[0]:null}return null}
+function parseD(t){return parseD0(t)||(t?dTypo(t):null)}
+function parseD0(t){if(!t)return null;{const x=String(t).trim();let q=x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(q)return new Date(Date.UTC(+q[1],+q[2]-1,+q[3]));q=x.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);if(q){let y=+q[3];if(y<100)y+=2000;if(y>2400)y-=543;if(+q[2]>=1&&+q[2]<=12)return new Date(Date.UTC(y,+q[2]-1,+q[1]))}}const m=String(t).trim().match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ](\d{2,4})$/);if(!m||!(m[2].toLowerCase()in MON))return null;let y=+m[3];if(y<100)y+=2000;if(y>2400)y-=543;return new Date(Date.UTC(y,MON[m[2].toLowerCase()],+m[1]))}
 const serial=d=>Math.round((d-Date.UTC(1899,11,30))/864e5),addD=(d,n)=>new Date(d.getTime()+n*864e5);
 const JUNK=/^(เวลา|รวม|หนังโฆษณา|Version$)|^\d+(\.\d+)?$|^Programm?atic|^ไม่มีไฟล์|เมื่อมีไฟล์|^เริ่มออน|^รอ\s*Memo|^Content\s.*นาที|^On\s*\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s*[A-Za-z]{3}|^แจ้ง\s*HOLD|^HOLD$|^รอ\s*ไฟล์|^ออน(?:แอร์)?\s*เมื่อ/i,MTP=/^(Traffic MTP|PLACE MTP|ETA MTP|EDA)\s*$/i,
  FASTN=/(^|[^a-z])Fast[\s_-]*Ads?/i; /* FastAd4-3_V2, #FAST_ADS: ไม่ใช่หนังโฆษณา ไม่ลงใบเช็ค */
@@ -3822,11 +3827,12 @@ const KST=/ขึ้นใหม่|ไฟล์เดิม|ต่อสัญ�
 /* 5.5.33: ชื่อหนังมีเลขเกินท้ายชื่อ (Playlist พิมพ์เกิน เช่น “…_9Nov26_15s 15” วันถัดไปแก้เป็น “…_9Nov26_15s”) → ตัดออก ทั้งใน Playlist และในใบเช็ค */
 const durTail=v=>typeof v==='string'?v.replace(/(_\d+s)\s+\d+\s*$/i,'$1'):v;
 const stDate=v=>{const x=String(v==null?'':v).trim();if(/^\d{5}(\.\d+)?$/.test(x)&&+x>20000&&+x<80000)return new Date(Date.UTC(1899,11,30)+Math.round(+x)*864e5);return/^\d{1,2}[-\/.](\d{1,2}|[A-Za-z]{3})[-\/.]\d{2,4}$/.test(x)?parseD(x):null};
-function plCheck(p,I){const st=new Map(),bad=new Map(),all=new Set(),shf=[],tl=new Set();
+function plCheck(p,I){const st=new Map(),bad=new Map(),all=new Set(),shf=[],tl=new Set(),typo=new Map();
  for(const s of p)for(const r of s.rows){{const a=durTail(r.ad);if(a!==r.ad){tl.add(String(r.ad).trim()+' → '+a);r.ad=a}}if(!r.ad||r.ad===s.c||JUNK.test(String(r.ad).trim()))continue;all.add(r.ad);
   {const sd=stDate(r.st);if(sd){const a=parseD(r.s),b=parseD(r.e);if(a&&b&&+a<=+b&&+b<=+sd){r.shf={s:r.s,e:r.e,st:r.st};r.s=r.e;r.e=fdU(sd);r.st='';shf.push(`${s.c}: ${r.ad} → เริ่ม ${thdS(b)} สิ้นสุด ${thdS(sd)}`)}else r.st='วันที่ '+thdS(sd)+' '+sd.getUTCFullYear()}}
   const x=String(r.st||'').trim();if(x&&!KST.test(x)){if(!st.has(x))st.set(x,new Set());st.get(x).add(r.ad)}
-  for(const k of['s','e']){const v=String(r[k]||'').trim();if(v&&!parseD(v)&&!NOEND.test(v)){if(!bad.has(r.ad))bad.set(r.ad,(k==='s'?'วันเริ่ม':'วันหมด')+' “'+v+'”');break}}}
+  for(const k of['s','e']){const v=String(r[k]||'').trim();if(v&&!parseD0(v)&&!NOEND.test(v)){const fx=dTypo(v);if(fx){if(!typo.has(v))typo.set(v,thd(fx));continue}if(!bad.has(r.ad))bad.set(r.ad,(k==='s'?'วันเริ่ม':'วันหมด')+' “'+v+'”');break}}}
+ if(typo.size)I.push({lv:'info',t:`วันที่ในไฟล์พิมพ์ตกเครื่องหมาย ${typo.size} แบบ ระบบอ่านให้แล้ว: ${[...typo].slice(0,3).map(([v,d])=>'“'+v+'” = '+d).join(', ')}${typo.size>3?' …':''}`}); /* 5.5.43 */
  if(tl.size)I.push({lv:'info',t:`ชื่อหนังมีเลขเกินท้ายชื่อ ${tl.size} เรื่อง ระบบตัดออกให้: ${[...tl].slice(0,2).join(' • ')}${tl.size>2?' …':''}`}); /* 5.5.33 */
  if(shf.length)I.push({lv:'info',t:`แถวที่ช่องเลื่อน ${shf.length} เรื่อง (ช่องสถานะเป็นวันที่): ระบบใช้วันสิ้นสุดเป็นวันเริ่ม และวันในช่องสถานะเป็นวันสิ้นสุด — ${shf.slice(0,3).join(' • ')}${shf.length>3?' …':''}`}); /* 5.5.32 */
  for(const[x,a]of st)I.push({lv:'stop',t:`สถานะ “${x}” ระบบไม่รู้จัก (${a.size} เรื่อง เช่น ${[...a].slice(0,2).join(', ')}) หนังเหล่านี้จะไม่ถูกนับว่า “ขึ้นใหม่” จึงไม่ลงใต้แถบของวันนี้`});
@@ -3879,7 +3885,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.41 (11 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.46 (12 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4597,7 +4603,7 @@ const vArr=()=>{const F=last.res.filter(r=>r.blob&&arrHas(r.arr));if(!F.length)r
 const vHelp=()=>`<div class="ov"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="hlt"><div class="dlgh"><h2 id="hlt">วิธีใช้ประจำวัน</h2><button class="ib" data-a="help" aria-label="ปิด" data-focus>${IC.x}</button></div>
 <ol class="hs">
 <li><b>เตรียมไฟล์</b><span>Playlist ของวันนี้ 11 แบบ (สรุปรายการหนังแยกจอ 40Blue, 40Red, 80Blue, 80Red, CITY, Spare และ Signature Max, Show DC, BKJ1, BKJ2, Metro LED) กับใบเช็ครูปที่เติมแล้วของวันก่อนหน้า • ถ้ามีใบเช็ค CCTV / MRT ใส่ Playlist เพิ่มเติม Rama9 Connect, Digital MRT, Gateway X, Air Traveller, The 20 ด้วย (ไม่นับใน 11 แบบ)</span></li>
-<li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง (ไฟล์ .zip เช่น จากหน้าเว็บ Playlist รายวัน หรือดาวน์โหลดทั้งโฟลเดอร์จาก Google Drive ลากลงได้เลย ไม่ต้องแตกไฟล์) ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
+<li><b>ขั้นที่ 1 ใส่ Playlist</b><span>ถ้ามีงานของวันก่อนค้างอยู่ กด “ล้าง Playlist (เริ่มวันใหม่)” แล้วลากไฟล์ทั้งหมดลงกล่อง (ไฟล์ .zip เช่น จากหน้า PLAYLIST INBOX หรือดาวน์โหลดทั้งโฟลเดอร์จาก Google Drive ลากลงได้เลย ไม่ต้องแตกไฟล์) ดูว่าช่องในเช็กลิสต์สว่างครบ และ “Playlist วันที่” ถูกต้อง</span></li>
 <li><b>หยุดหลายวัน (เช่น เสาร์–อาทิตย์)</b><span>วันทำงานถัดไป ลากไฟล์ .zip (หรือ Playlist) ของทุกวันที่หยุดลงขั้นที่ 1 พร้อมกัน ระบบเรียงวันให้ในกล่อง “ใส่ Playlist ไว้ … วัน” ตอนกดเติม ระบบเติมต่อกันทีละวันเอง (ใบเช็คที่ได้ของวันหนึ่งเป็นไฟล์ตั้งต้นของวันถัดไป) กดเติมครั้งเดียว บันทึกครั้งเดียว ผลเหมือนเติมทีละวัน • ถ้าขาดวันไหน หรือใบเช็คเติมล่าสุดไม่ถึงวันก่อนหน้า ระบบเตือนก่อนเติม</span></li>
 <li><b>ใบเช็คจอในห้าง / อาคาร (ตั้งแต่ 4.4)</b><span>Siam Paragon (In Mall, Facade, Nextopia), Paragon Max, Parc Paragon / Interchange, Central Network (CTW 360), The District EM, The Panoramix, EMS 5M, UOB Live และ LIDO Connect — ใส่ Playlist ของสื่อเหล่านี้ในขั้นที่ 1 พร้อมไฟล์อื่น (ลาก .zip ได้) ระบบจับคู่ชีตในใบเช็คกับกลุ่มจอเอง ชื่อหนังตัดคำหน้าแบบที่ทีมเขียน (เช่น PRGFC_, EMS_5M_, UOB_LIVE_) • หนัง Content ของห้างใส่ # หรือไม่ใส่ตามแบบที่ทีมทำในแต่ละสื่อ • ไฟล์ที่ไม่ได้ส่งทุกวันใช้ฉบับล่าสุดที่มี • Playlist NTW (Nationwide) และ Customize Looker ระบบอ่านได้แล้ว แต่ยังไม่มีใบเช็คให้เติม</span></li>
 <li><b>ขั้นที่ 2 ตรวจ / แก้ไข (ไม่บังคับ)</b><span>ใช้เมื่อต้องปลด เพิ่ม หรือเปลี่ยนชื่อหนังก่อนเติม</span></li>
@@ -4765,15 +4771,15 @@ function view(){logTick();const ae=document.activeElement,fk=focusKey(ae);let se
 const FB_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbyhGIBAGh4Bi2pFPtqiWYiPPPAZldjjnbH0kXZOl7TySZddGNmbP3Ga1sFMv3fkDu1F/exec';
 /* 5.5.38: หน้า "Playlist รายวัน" (Apps Script ของบริษัท ดึง Playlist จากอีเมลลง Google Drive ทุกชั่วโมง) — ปุ่มในขั้นใส่ Playlist และหน้าหลัก */
 const PLW_URL='https://script.google.com/a/macros/planbmedia.co.th/s/AKfycbzQ1xQ1-tZMflduU9R6xqntXhieDfzR0cJsBwb1ymsn0jVIF-kOtx2Fo0ELrAFeekDjlA/exec',PLW_TIP='ดาวน์โหลด Playlist ทุกไฟล์ของวันนี้จาก Google Drive ของบริษัทเป็น .zip ไฟล์เดียว แล้วลากมาวางที่นี่ (ต้องล็อกอินบัญชี Google ของบริษัท)',
- plwBtn=c=>PLW_URL?`<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิดหน้า Playlist รายวัน</a>`:'',
+ plwBtn=c=>PLW_URL?`<a class="btn ${c}" href="${PLW_URL}" target="_blank" rel="noopener" title="${PLW_TIP}">${IC.dl}เปิด PLAYLIST INBOX</a>`:'',
  /* 5.5.41: ดึง Playlist วันนี้เข้าระบบเอง — เปิดหน้า Playlist รายวันด้วย ?send=studio หน้านั้นรวมไฟล์เป็น .zip แล้วส่งกลับมาทาง postMessage (ไม่ต้องดาวน์โหลด / ลากวาง) */
- plpBtn=c=>PLW_URL?`<button class="btn ${c}" data-a="plpull" title="ดึง Playlist 11 แบบของวันนี้จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP?' disabled':''}>${IC.up}${PLP?'กำลังดึง Playlist …':'ดึง Playlist วันนี้'}</button>`:'';
+ plpBtn=c=>PLW_URL?`<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP?' disabled':''}>${IC.up}${PLP?'กำลังดึง Playlist …':'ดึง Playlist วันนี้'}</button>`:'';
 let PLP=null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
 function plpEnd(msg){if(!PLP)return;clearInterval(PLP.iv);try{PLP.w&&!PLP.w.closed&&PLP.w.close()}catch(_){}PLP=null;if(msg)say(msg);view()}
 addEventListener('message',async e=>{const d=e.data;if(!d||!d.psPL||!PLP||!/(^https:\/\/script\.google\.com$)|(\.googleusercontent\.com$)/.test(e.origin||''))return;
  if(!d.ok){plpEnd('ดึง Playlist ไม่ได้: '+(d.err||'ไม่ทราบสาเหตุ'));return}
  const f=new File([d.blob],d.name||'Playlist.zip',{type:'application/zip'});plpEnd('');if(tab!=='dat'&&tab!=='home'){tab='dat';cs=null}
- await addAny('pl',[f]);note=`ดึง Playlist วันที่ ${thd(new Date(d.day+'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (${d.have}/${d.total} แบบ${d.miss&&d.miss.length?' — ยังขาด '+d.miss.join(', '):' ครบ'})`;MQN='done';view()});
+ await addAny('pl',[f]);note=`ดึง Playlist วันที่ ${thd(new Date(d.day+'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (แบบหลัก ${d.have}/${d.total}${d.miss&&d.miss.length?' — ยังขาด '+d.miss.join(', '):' ครบ'}${d.extra?' • Playlist เพิ่มเติม '+d.extra+' ไฟล์':''})`;MQN='done';view()});
 /* 5.5.37: เวอร์ชันก่อนหน้า — หน้านี้เปิดจาก versions/ (สำเนาเวอร์ชันเก่าที่เก็บไว้ใช้ตอนเวอร์ชันล่าสุดมีปัญหา) → แถบบอก + ลิงก์กลับเวอร์ชันล่าสุด */
 const SITE='https://playlist-system.github.io/playlist_system/',OLDVER=/\/versions\/[^\/]*$/.test(location.pathname);
 if(OLDVER){const a=document.getElementById('prevv');if(a){a.href=SITE+'playlist_system.html';a.textContent='กลับไปเวอร์ชันล่าสุด'}
@@ -4886,6 +4892,9 @@ async function addAny(kind,files){files=[...files];if(!files.length)return;
   if(U.bad.length)say(`เปิดไฟล์ .zip ไม่ได้ หรือในไฟล์ไม่มีไฟล์ Excel: ${U.bad.join(', ')}`);
   if(!files.length)return}
  if(kind==='tc'){await tcAdd(files);return}
+ /* 5.5.46: ไฟล์ที่ไม่ใช่ Excel (เช่น PDF ที่อยู่ในโฟลเดอร์ Playlist เดียวกัน) ข้ามทันที ไม่ต้องอ่าน — เดิมอ่านทุกไฟล์แล้วลองเปิดเป็น Excel 2 รอบ ช้ามากเมื่อลากทั้งโฟลเดอร์จากไดรฟ์เครือข่าย */
+ {const ok=f=>/\.(xlsx|xlsm|xls|xlsb|json)$/i.test(f.name),non=files.filter(f=>!ok(f));if(non.length){files=files.filter(ok);const ex=[...new Set(non.map(f=>((f.name.match(/\.([A-Za-z0-9]{1,5})$/)||[])[1]||'ไม่มีนามสกุล').toUpperCase()))];
+  say(`ข้าม ${non.length} ไฟล์ที่ไม่ใช่ Excel (${ex.join(', ')}) — ระบบใช้แค่ไฟล์ Excel`);if(!files.length)return}}
  const js=files.filter(f=>/\.json$/i.test(f.name)),rest=files.filter(f=>!/\.json$/i.test(f.name));
  if(kind==='pj'||(js.length&&!rest.length)){if(js[0]||files[0])await loadProject(js[0]||files[0]);return}
  const ck=kind==='ck'?rest:rest.filter(f=>/\.xlsm$/i.test(f.name)),pl=kind==='ck'?[]:rest.filter(f=>!/\.xlsm$/i.test(f.name));
@@ -4976,8 +4985,8 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
  clri:()=>{for(const x of PLI)x.ack=1;note='ซ่อนรายการด่านตรวจแล้ว (ยังบันทึกไว้ในรายงาน)';FOCUSSEL='[data-dz="pl"]'},
  plpull:()=>{if(BUSY||FILLING||PLP||!PLW_URL)return;const w=window.open(PLW_URL+'?send=studio','psplp');if(!w){say('เบราว์เซอร์บล็อกหน้าต่างใหม่ — กดอนุญาตป๊อปอัปของหน้านี้ (ไอคอนที่ช่องที่อยู่เว็บ) แล้วกดอีกครั้ง');return}
   PLP={w,t:Date.now()};PLP.iv=setInterval(()=>{if(!PLP)return;const s=(Date.now()-PLP.t)/1000;
-   if(PLP.w.closed)plpEnd('หน้า Playlist รายวันปิด หรือเบราว์เซอร์ตัดการเชื่อมก่อนส่งไฟล์ — ถ้าหน้านั้นยังเปิดอยู่ กด “ดาวน์โหลด (.zip)” แล้วลากมาวางแทน');
-   else if(s>180)plpEnd('รอนานเกิน 3 นาที — ถ้าหน้า Playlist รายวันขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดอีกครั้ง หรือกด “ดาวน์โหลด (.zip)” ในหน้านั้นแล้วลากมาวาง')},1000);
+   if(PLP.w.closed)plpEnd('หน้า PLAYLIST INBOX ปิด หรือเบราว์เซอร์ตัดการเชื่อมก่อนส่งไฟล์ — ถ้าหน้านั้นยังเปิดอยู่ กด “ดาวน์โหลด” แล้วลากไฟล์ .zip มาวางแทน');
+   else if(s>180)plpEnd('รอนานเกิน 3 นาที — ถ้าหน้า PLAYLIST INBOX ขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดอีกครั้ง หรือกด “ดาวน์โหลด” ในหน้านั้นแล้วลากไฟล์ .zip มาวาง')},1000);
   say('กำลังดึง Playlist วันนี้จาก Google Drive … หน้าใหม่จะเปิดแล้วปิดเอง')},
  pick:k=>{if(!BUSY&&!FILLING)openPicker(k)},pickdir:k=>{if(BUSY||FILLING)return;const p=$('#pickdir');if(!p)return;p.dataset.k=k||'pl';p.value='';p.click()},
  adv:()=>{adv=!adv},rx:k=>{RO.has(+k)?RO.delete(+k):RO.add(+k)},tab:k=>{if(BUSY||FILLING)return;if(k==='res'&&!last)return;tab=k;cs=null;window.scrollTo(0,0)},media:k=>{fm=k},open:k=>{if(DB[+k])cs=+k},back:()=>{cs=null},
