@@ -1937,10 +1937,10 @@ const arrangeWb = (() => {
     '40Red': 'PBTV 40 RED',
     '80Blue': 'PBTV 80 BLUE',
     '80Red': 'PBTV 80 RED',
-    CITY: 'CITY TV 25',
+    CITY: 'City TV', /* 5.5.51: แพคเปลี่ยนชื่อจาก CITY TV 25 เป็น City TV */
     Spare: 'SPARE',
   };
-  const SHEETNAME = { CITY: 'CITY TV 25', Spare: 'Spare' };
+  const SHEETNAME = { CITY: 'City TV', Spare: 'Spare' };
   const nk = c => String(c).replace(/-/g, '').toUpperCase();
   const qn = n => (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(n) ? n : "'" + n.replace(/'/g, "''") + "'");
   const unq = s => (s.startsWith("'") ? s.slice(1, -1).replace(/''/g, "'") : s);
@@ -3490,7 +3490,7 @@ const PKGS=new Set(['40Blue','40Red','80Blue','80Red','CITY','Spare']);
 const shUniq=(want,names)=>{const ex=new Set((names||[]).map(n=>String(n).toLowerCase()));let nm=want,i=2;while(ex.has(nm.toLowerCase()))nm=want+' ('+(i++)+')';return nm};
 /* ชื่อชีตแพคใหม่ตามแบบชื่อในไฟล์นั้น (PBTV 80 Blue → PBTV 40 Red • PBTV80 BLUE → PBTV40 RED) */
 const blkNameFor=(m,names)=>{const N=names||[],sib=N.find(n=>/40|80/.test(n)&&mediaOf(n)),st=N.some(n=>/_/.test(n))?'u':N.some(n=>/^PBTV ?\d\d ?[A-Z][a-z]/.test(n))?'t':'c';
- if(m==='CITY')return st==='u'?'CITY_TV_25':st==='t'?'The City 25':'CITY TV 25';
+ if(m==='CITY')return st==='u'?'City_TV':'City TV'; /* 5.5.51: ชื่อแพคใหม่ (เดิม CITY TV 25 / The City 25) */
  if(m==='Spare')return st==='t'?'PBTV BKK Spare':'Spare';
  if(sib)return sib.replace(/40|80/,m.slice(0,2)).replace(/blue|red/i,w=>{const t=m.slice(2);return w===w.toUpperCase()?t.toUpperCase():w[0]===w[0].toUpperCase()?t[0].toUpperCase()+t.slice(1).toLowerCase():t.toLowerCase()});
  return'PBTV '+m.slice(0,2)+' '+m.slice(2)};
@@ -3915,7 +3915,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.50 (12 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.51 (12 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
