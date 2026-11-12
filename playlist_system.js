@@ -154,6 +154,7 @@
  *   เวอร์ชัน 5.5.49: อ่าน Playlist หลายไฟล์พร้อมกัน
  *   เวอร์ชัน จัดจอเข้าชีตตามแพค อ่านชีตแบบรหัสจอแถว 10 และใบเปล่า
  *   เวอร์ชัน ชีต CITY ใหม่ชื่อ City TV
+ *   เวอร์ชัน ย้ายจอ / เพิ่มจอ / แก้สูตร แล้วบันทึกครั้งเดียว
  * ======================================================================
  */
 
@@ -9202,6 +9203,32 @@ let SDB,
     no: new Set(),
     rm: new Set(),
   }; /* 5.5.8: SDX.no = จอที่เลือกไม่เพิ่ม / ไม่ย้าย • SDX.rm = จอที่ไม่มีในฐานข้อมูลแต่เลือกเอาออก (คีย์ ไฟล์|รหัส) */
+/* 5.5.52: ย้ายจอ → เพิ่มจอที่ขาด → แก้สูตร หลายขั้นแล้วกดบันทึกครั้งเดียว — SDA.pend = ทุกไฟล์ที่แก้แต่ยังไม่ได้บันทึก • SDA.kinds = ขั้นที่ทำ */
+const SDAK = { move: 'ย้ายจอ', add: 'เพิ่มจอ', fix: 'แก้สูตร' },
+  sdaL = A => A.pend || A.names,
+  sdaKs = A => A.kinds || [A.kind || 'add'],
+  sdaWhat = A =>
+    sdaKs(A)
+      .map(k => SDAK[k])
+      .join(' + ');
+const sdaPrev = () =>
+  SDA && SDA.sig === ckSig() && !SDA.sv && sdaL(SDA).length
+    ? SDA
+    : null; /* เรียกก่อนแก้ไฟล์ (ckSig เปลี่ยนเมื่อไฟล์เปลี่ยน) */
+const sdaJoin = (P0, kind, names) => ({
+  pend: [...new Set([...(P0 ? sdaL(P0) : []), ...names])],
+  kinds: [...new Set([...(P0 ? sdaKs(P0) : []), kind])],
+});
+const sdaBk = A => {
+  const k = sdaKs(A);
+  return k.includes('move') ? 'สำรองก่อนย้ายจอ' : k.includes('add') ? 'สำรองก่อนเพิ่มจอ' : 'สำรองก่อนแก้สูตร';
+};
+function sdaBtns(A) {
+  const L = sdaL(A);
+  if (A.sv || !L.length) return '';
+  const more = L.length > A.names.length || sdaKs(A).length > 1;
+  return `${more ? `<p class="hint">ยังไม่ได้บันทึก ${L.length} ไฟล์ (${esc(sdaWhat(A))}) — กดบันทึกครั้งเดียวได้ครบทุกขั้น: ${esc(L.join(', '))}</p>` : ''}<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`;
+}
 const sdbKy = (n, c) => n + '|' + sdbK(c); /* 4.8.1: SDA = ผลเพิ่มจอในใบเช็คของหน้านี้ {done,names,sv} */
 const sdb = () => {
   if (SDB === undefined) {
@@ -11085,7 +11112,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.51 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.52 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -13065,9 +13092,9 @@ function vAnaFix() {
     h += alertHTML(
       A.sv ? 'ok' : 'wr',
       A.sv
-        ? `บันทึกใบเช็คที่แก้สูตรแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
+        ? `บันทึกใบเช็คที่${esc(sdaWhat(A))}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
         : `แก้สูตรคะแนนแล้ว ${A.n} แถว (${A.names.length} ไฟล์) — ยังไม่ได้บันทึก`,
-      `<p>${A.fx.map(x => `<b>${esc(x.name)}</b> ${esc(x.fixes.map(z => z.code).join(', '))}`).join('<br>') || '–'}${A.sv ? ` • ไฟล์ก่อนแก้เก็บไว้ในโฟลเดอร์ สำรองก่อนแก้สูตร/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
+      `<p>${A.fx.map(x => `<b>${esc(x.name)}</b> ${esc(x.fixes.map(z => z.code).join(', '))}`).join('<br>') || '–'}${A.sv ? ` • ไฟล์เดิมเก็บไว้ในโฟลเดอร์ ${esc(A.sv.bk || sdaBk(A))}/${esc(A.sv.day)}` : ''}</p>${sdaBtns(A)}`,
     );
   if (!Q) return h + (ANQ && ANQ.run ? '<p class="hint">กำลังตรวจสูตรคะแนนในชีต Analysis …</p>' : '');
   const fx = Q.filter(x => x.fixes.length),
@@ -13117,19 +13144,19 @@ function vSdbAdd() {
     h += alertHTML(
       A.sv ? 'ok' : 'wr',
       A.sv
-        ? `บันทึกใบเช็คที่ย้ายจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
+        ? `บันทึกใบเช็คที่${esc(sdaWhat(A))}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
         : A.newf
           ? `สร้าง ${esc(A.newf.name)} แล้ว — ยังไม่ได้บันทึก`
           : `ย้ายจอแล้ว ${A.go.length} จอ — ยังไม่ได้บันทึก`,
-      `<p>${A.newf ? `<b>${esc(A.newf.name)}</b> ใบเปล่าใหม่ แบบจากใบ ${esc(A.newf.from)} • จอ ${A.newf.n} จาก ${A.newf.want} จอในฐานข้อมูล${A.newf.bad.length ? ' • ใส่ไม่ได้: ' + esc(A.newf.bad.join(' / ')) + ' (ใส่เองในใบเช็ค)' : ''}<br>` : ''}${A.go.map(mvLine).join('<br>') || '–'}${A.no.length ? `<br>ย้ายไม่ได้: ${A.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${postTxt(A.post)}${A.sv ? ` • ไฟล์ก่อนย้ายเก็บไว้ในโฟลเดอร์ สำรองก่อนย้ายจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
+      `<p>${A.newf ? `<b>${esc(A.newf.name)}</b> ใบเปล่าใหม่ แบบจากใบ ${esc(A.newf.from)} • จอ ${A.newf.n} จาก ${A.newf.want} จอในฐานข้อมูล${A.newf.bad.length ? ' • ใส่ไม่ได้: ' + esc(A.newf.bad.join(' / ')) + ' (ใส่เองในใบเช็ค)' : ''}<br>` : ''}${A.go.map(mvLine).join('<br>') || '–'}${A.no.length ? `<br>ย้ายไม่ได้: ${A.no.map(m => `<b>${esc(m.code)}</b> ${esc(m.why)}`).join(' • ')}` : ''}${postTxt(A.post)}${A.sv ? ` • ไฟล์เดิมเก็บไว้ในโฟลเดอร์ ${esc(A.sv.bk || sdaBk(A))}/${esc(A.sv.day)}` : ''}</p>${sdaBtns(A)}`,
     );
   else if (A)
     h += alertHTML(
       A.sv ? 'ok' : 'wr',
       A.sv
-        ? `บันทึกใบเช็คที่เพิ่มจอแล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
+        ? `บันทึกใบเช็คที่${esc(sdaWhat(A))}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${esc(A.sv.dir)}”`
         : `เพิ่มจอแล้ว ${A.done.reduce((t, d) => t + d.ok.length, 0)} จอ — ยังไม่ได้บันทึก`,
-      `<p>${A.done.map(d => `<b>${esc(d.name)}</b> ${esc(d.ok.map(a => a.code + ' (ชีต ' + a.sheet + ')').join(', ') || '–')}${(d.made || []).length ? ' • สร้างชีตใหม่: ' + esc(d.made.join(', ')) : ''}${d.fix ? ' • แก้สูตรคะแนนในชีต Analysis ' + d.fix + ' แถว' : ''}${d.bad.length ? ' • เพิ่มไม่ได้: ' + esc(d.bad.map(z => z[1]).join(' / ')) : ''}`).join('<br>')}${A.sv ? ` • ไฟล์ก่อนเพิ่มเก็บไว้ในโฟลเดอร์ สำรองก่อนเพิ่มจอ/${esc(A.sv.day)}` : ''}</p>${A.sv || !A.names.length ? '' : `<div class="picb">${FSA ? `<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR ? ` (${esc(CKDIR.name)})` : ''}</button>` : ''}<button class="btn ${FSA ? 'secondary' : 'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA ? '<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>' : ''}</div>`}`,
+      `<p>${A.done.map(d => `<b>${esc(d.name)}</b> ${esc(d.ok.map(a => a.code + ' (ชีต ' + a.sheet + ')').join(', ') || '–')}${(d.made || []).length ? ' • สร้างชีตใหม่: ' + esc(d.made.join(', ')) : ''}${d.fix ? ' • แก้สูตรคะแนนในชีต Analysis ' + d.fix + ' แถว' : ''}${d.bad.length ? ' • เพิ่มไม่ได้: ' + esc(d.bad.map(z => z[1]).join(' / ')) : ''}`).join('<br>')}${A.sv ? ` • ไฟล์เดิมเก็บไว้ในโฟลเดอร์ ${esc(A.sv.bk || sdaBk(A))}/${esc(A.sv.day)}` : ''}</p>${sdaBtns(A)}`,
     );
   const PX = PICX && PICX.sig === ckSig() ? PICX : null,
     blank = !!PX && PX.res.filter(r => !r.blank).length < TC.length,
@@ -16487,7 +16514,8 @@ const ACT = {
   } /* 5.5.8: เลือกเพิ่ม / ย้าย / เอาออก ทีละจอ */,
   sdbadd: async () => {
     if (!sdb() || !TC.length || BUSY || FILLING) return;
-    const O = sdbOps(),
+    const P0 = sdaPrev(),
+      O = sdbOps(),
       fs = O.fs,
       P = O.P2;
     if (!P.some(x => x.adds.length)) return;
@@ -16504,7 +16532,7 @@ const ACT = {
     }
     const pv = PICX;
     if (pv) pv.sig = ckSig();
-    SDA = { done, names, sv: null, sig: ckSig() };
+    SDA = { done, names, ...sdaJoin(P0, 'add', names), sv: null, sig: ckSig() };
     SDQ = null;
     await sdbRun();
     const n = done.reduce((t, d) => t + d.ok.length, 0);
@@ -16513,7 +16541,8 @@ const ACT = {
   },
   sdbnew: async k => {
     if (!sdb() || !TC.length || BUSY || FILLING || !k) return;
-    const PX = PICX && PICX.sig === ckSig() ? PICX : null,
+    const P0 = sdaPrev(),
+      PX = PICX && PICX.sig === ckSig() ? PICX : null,
       bl = TC.filter(f => !PX || !PX.res.some(r => r.name === f.name && !r.blank)).map(
         f => f.name,
       ); /* 5.5.28 */
@@ -16561,6 +16590,7 @@ const ACT = {
       no: R.no,
       names: R.names,
       post: R.post,
+      ...sdaJoin(P0, 'move', R.names),
       sv: null,
       sig: ckSig(),
     };
@@ -16571,7 +16601,8 @@ const ACT = {
   },
   sdbmove: async () => {
     if (!sdb() || !TC.length || BUSY || FILLING) return;
-    const O = sdbOps(),
+    const P0 = sdaPrev(),
+      O = sdbOps(),
       fs = O.fs;
     if (!O.mv.length) return; /* 5.4 • 5.5.8: ตามที่เลือก */
     note = 'กำลังย้ายจอ …';
@@ -16593,7 +16624,16 @@ const ACT = {
     }
     const pv = PICX;
     if (pv) pv.sig = ckSig();
-    SDA = { kind: 'move', go: R.go, no: R.no, names: R.names, post: R.post, sv: null, sig: ckSig() };
+    SDA = {
+      kind: 'move',
+      go: R.go,
+      no: R.no,
+      names: R.names,
+      post: R.post,
+      ...sdaJoin(P0, 'move', R.names),
+      sv: null,
+      sig: ckSig(),
+    };
     SDQ = null;
     await sdbRun();
     MQN = R.go.length ? 'done' : 'warn';
@@ -16603,7 +16643,8 @@ const ACT = {
   },
   anafix: async () => {
     if (!TC.length || BUSY || FILLING) return;
-    const Q = ANQ && ANQ.sig === ckSig() ? ANQ.r : null;
+    const P0 = sdaPrev(),
+      Q = ANQ && ANQ.sig === ckSig() ? ANQ.r : null;
     if (!Q) return;
     const fx = [],
       names = [];
@@ -16635,7 +16676,7 @@ const ACT = {
     }
     const pv = PICX;
     if (pv) pv.sig = ckSig();
-    SDA = { kind: 'fix', names, fx, n, sv: null, sig: ckSig() };
+    SDA = { kind: 'fix', names, fx, n, ...sdaJoin(P0, 'fix', names), sv: null, sig: ckSig() };
     SDQ = null;
     await sdbRun();
     MQN = n ? 'done' : 'warn';
@@ -16645,24 +16686,24 @@ const ACT = {
   },
   sdbdl: async () => {
     const A = SDA;
-    if (!A || !A.names.length) return;
+    if (!A || !sdaL(A).length) return;
     const z = new JSZip();
-    for (const n of A.names) {
+    for (const n of sdaL(A)) {
       const f = TC.find(x => x.name === n);
       if (f) z.file(n, f.buf, { createFolders: false });
     }
     saveBlob(
-      A.kind === 'move'
-        ? 'ใบเช็ค_ย้ายจอ.zip'
-        : A.kind === 'fix'
-          ? 'ใบเช็ค_แก้สูตร.zip'
-          : 'ใบเช็ค_เพิ่มจอ.zip',
+      'ใบเช็ค_' +
+        sdaKs(A)
+          .map(k => SDAK[k])
+          .join('_') +
+        '.zip',
       await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
     );
   },
   sdbsave: async k => {
     const A = SDA;
-    if (!A || !A.names.length || !FSA) return;
+    if (!A || !sdaL(A).length || !FSA) return;
     let d = k === 'pick' ? null : CKDIR;
     try {
       if (
@@ -16680,10 +16721,7 @@ const ACT = {
     let bk;
     try {
       bk = await (
-        await d.getDirectoryHandle(
-          A.kind === 'move' ? 'สำรองก่อนย้ายจอ' : A.kind === 'fix' ? 'สำรองก่อนแก้สูตร' : 'สำรองก่อนเพิ่มจอ',
-          { create: true },
-        )
+        await d.getDirectoryHandle(sdaBk(A), { create: true })
       ).getDirectoryHandle(day, { create: true });
     } catch (_) {
       MQN = 'err';
@@ -16691,7 +16729,7 @@ const ACT = {
       return;
     }
     const bad = [];
-    for (const n of A.names) {
+    for (const n of sdaL(A)) {
       const f = TC.find(x => x.name === n);
       if (!f) continue;
       try {
@@ -16723,9 +16761,9 @@ const ACT = {
       note = `บันทึกไม่ได้ ${bad.length} ไฟล์ (${bad.join(', ')}) — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
       return;
     }
-    A.sv = { dir: d.name, day };
+    A.sv = { dir: d.name, day, bk: sdaBk(A) };
     MQN = 'party';
-    note = `บันทึกใบเช็คที่${A.kind === 'fix' ? 'แก้สูตร' : A.kind === 'move' ? 'ย้ายจอ' : 'เพิ่มจอ'}แล้ว ${A.names.length} ไฟล์ลงโฟลเดอร์ “${d.name}”`;
+    note = `บันทึกใบเช็คที่${sdaWhat(A)}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${d.name}”`;
   },
   sdbclear: () => {
     if (!confirm('ลบฐานข้อมูลจอออกจากเครื่องนี้? (ใส่ใหม่ได้ตลอด)')) return;
