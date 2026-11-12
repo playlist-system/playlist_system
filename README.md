@@ -5,7 +5,7 @@
 ไฟล์ทั้งหมดประมวลผลในเครื่องผู้ใช้ ไม่ถูกส่งออกไปที่ใด
 “BUILT WITH AI • 2026” ใต้ชื่อระบบหมายถึงระบบนี้สร้างโดยใช้ AI ช่วยเขียน — ตอนใช้งาน ระบบเติมใบเช็คตามกฎในเครื่อง ไม่ได้ส่งไฟล์ไปให้ AI หรือที่ใด
 
-**เวอร์ชัน 5.5.47 · 12 พ.ย. 2569**
+**เวอร์ชัน 5.5.48 · 12 พ.ย. 2569**
 
 ## วิธีเปิด
 
@@ -47,7 +47,7 @@
 | Paragon Max | ParagonMax, Luxury Parking (จับคู่รายคอลัมน์ ตัดคำหน้าของกลุ่มจอ เช่น WW_, SC_, LPK_) • เฉพาะส่วน Ads. Plan B, “Remove Ads” = ถอด | ไม่ลง |
 | Digital Billboard @ Parc Paragon _ Interchange | PI9 ↔ Parc Paragon • INTERCHANGE ↔ Interchange21 | ใส่ # |
 | Central Network | CTW 360 ↔ CTW360 + W98 • ใบเช็ค Central Network ชีตละห้าง (CTW, Rama3, Pinklao, Ladprao, Rama9, Bangna, Westgate, East Ville, Korat, Mahachai, Chiangrai, Chonburi, Phuket Floresta, Phuket Festival): คอลัมน์ M1 ↔ M1-ห้าง • M4 ↔ M4-ห้าง • VDO Wall ↔ M4(3x1)-CTW (4.4.1) | ไม่ลง |
-| The District EM | EMP_EMQ ↔ Emporium / Emquartier • Emsphere ↔ Emsphere / Pylon PlanB | ใส่ # |
+| The District EM | EMP_EMQ ↔ Emporium / Emquartier • Emsphere ↔ Emsphere / Pylon PlanB + Pylon Em | ใส่ # |
 | The Panoramix Central World | Panoramix ↔ Panoramix & Pylon • Zen ↔ Zen (หมายเหตุ “None Zen” ไม่ลงจอ Zen) | ไม่ลง |
 | EMS 5M | EMWonder (ตัด EMS_5M_) | ใส่ # |
 | UOB Live @Emsphere | UOB (ตัด UOB_LIVE_) | ใส่ # |
@@ -142,6 +142,7 @@
 
 ## ประวัติเวอร์ชัน
 
+- **5.5.48 (12 พ.ย. 2569)** — **Emsphere Pylon อ่าน Pylon PlanB + Pylon Em** • เดิมคอลัมน์ Emsphere Pylon ใช้แค่ชีต Pylon PlanB หนัง Content ที่ชีตนั้นเขียนจำนวนครั้ง 0 / เริ่มช้ากว่า แต่ชีต Pylon Em ของห้างออนแล้วจึงลงช้า (รูปยืนยันว่าฉายตั้งแต่วันแรก) • คอลัมน์ที่รวมหลายกลุ่มจอ เรื่องเดียวกันใช้แถวที่ยังออน / จำนวนครั้งไม่เป็น 0
 - **5.5.47 (12 พ.ย. 2569)** — **แก้ตามผลเทียบใบห้างกับที่ทีมทำ (1–4 พ.ย.)** • Exchange Tower อ่านหมายเหตุ “ออนเฉพาะ … Exchange …” ได้ (เดิมตัดหนังที่ออนจอนี้ทิ้ง) • ไฟล์ห้างของวันถัดไปที่ปนมา ไม่ใช้แทนไฟล์ของวันที่เติม (บอกในด่านตรวจ Playlist) • ไฟล์ระหว่างวันที่ไม่มีเรื่องที่จบไปแล้ว ยังเขียน “ออกวันที่” ให้ (จำจากไฟล์รอบเช้า) • ใบ CTW 360 ลงหนัง Content ของจอ W98 + ใส่ NONE ในช่องจอที่หนังไม่ออน เรียงแบบที่ทีมทำ
 - **5.5.46 (12 พ.ย. 2569)** — **ลากโฟลเดอร์ Playlist ที่มีไฟล์ PDF ปนเร็วขึ้น** • ไฟล์ที่ไม่ใช่ Excel (เช่น PDF ในโฟลเดอร์ Playlist รายวันบนไดรฟ์ X:) ข้ามทันที ไม่อ่าน — เดิมระบบอ่านทุกไฟล์แล้วลองเปิดเป็น Excel 2 รอบ • วัดกับโฟลเดอร์จริง (Excel 28 + PDF 33 ไฟล์): เครื่องช้า (จำลอง CPU ช้า 4 เท่า) จาก 88 วินาที เหลือ 63 วินาที ยังไม่นับเวลาอ่านจากไดรฟ์เครือข่ายที่ลดลงด้วย
 - **5.5.45 (11 พ.ย. 2569)** — **“ดึง Playlist วันนี้” ได้ Playlist เพิ่มเติมด้วยทุกครั้ง** (`apps_script/Code.gs` — ต้องวางโค้ดใหม่แล้วทำให้ใช้งานได้เป็นเวอร์ชันใหม่) • PLAYLIST INBOX ติ๊ก Playlist เพิ่มเติม (CCTV, MRT, NTW, Paragon ฯลฯ) ไว้ให้ตั้งแต่แรก แบบละ 1 ไฟล์ล่าสุด (ไม่รวม Metro LED ลำดับฉาย ฉบับเก่า และไฟล์ที่ไม่อยู่ในรายการ) • ข้อความในระบบหลังดึง: “แบบหลัก 11/11 ครบ • Playlist เพิ่มเติม N ไฟล์” • เปิดหน้า INBOX ด้วยลิงก์ส่งเข้าระบบโดยไม่ได้กดจากปุ่ม (เช่นรีเฟรชแท็บเก่า) ขึ้นเป็นคำแนะนำสีฟ้าแทนคำเตือน

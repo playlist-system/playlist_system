@@ -150,6 +150,7 @@
  *   เวอร์ชัน 5.5.45: ดึง Playlist วันนี้ ได้ Playlist เพิ่มเติมด้วย (ข้อความบอกจำนวนแยก)
  *   เวอร์ชัน 5.5.46: ข้ามไฟล์ที่ไม่ใช่ Excel (PDF ฯลฯ) ตอนลากไฟล์/โฟลเดอร์ ไม่ต้องอ่าน
  *   เวอร์ชัน 5.5.47: Exchange Tower, ไฟล์วันถัดไป, ไฟล์ระหว่างวัน, CTW 360 W98 + NONE
+ *   เวอร์ชัน 5.5.48: Emsphere Pylon = Pylon PlanB + Pylon Em
  * ======================================================================
  */
 
@@ -9721,7 +9722,7 @@ const VMAP = {
   },
   'The District EM': {
     m: [
-      [/PYLON/, 'Pylon PlanB'],
+      [/PYLON/, { all: ['Pylon PlanB', 'Pylon Em'] }],
       [/EMPORIUM/, 'Emporium'],
       [/EMQUARTIER/, 'Emquartier'],
       [/EMSPHERE/, 'Emsphere'],
@@ -9787,22 +9788,28 @@ function venScreen(ws, sn, cn, k) {
       const t = R.col ? T(c) + head : head;
       for (const [re, nm] of R.m)
         if (re.test(t)) {
-          const s = [].concat(nm).map(by).find(Boolean);
-          if (s && R.col) CS[n2col(c)] = s;
-          if (s && !P.includes(s)) P.push(s);
+          for (const s of nm && nm.all
+            ? nm.all.map(by).filter(Boolean)
+            : [[].concat(nm).map(by).find(Boolean)]) {
+            if (s && R.col) CS[n2col(c)] = s;
+            if (s && !P.includes(s)) P.push(s);
+          }
           break;
         }
-    } /* 4.4.2: ชื่อกลุ่มจอสำรอง (ไม่มีกลุ่มแรกใช้กลุ่มถัดไป) */
+    } /* 4.4.2: ชื่อกลุ่มจอสำรอง (ไม่มีกลุ่มแรกใช้กลุ่มถัดไป) • 5.5.48: {all:[…]} = ใช้ทุกกลุ่มรวมกัน */
   if (!P.length) return L.length === 1 ? L[0] : null;
   if (P.length === 1) return cnx ? { ...P[0], noExit: 1 } : P[0];
-  const seen = new Set(),
-    rows = [];
+  const seen = new Map(),
+    rows = [],
+    sc = r => (r.off ? 0 : 2) + (r.cnt === 0 ? 0 : 1);
   for (const s of P)
-    for (const r of s.rows)
-      if (!seen.has(r.ad)) {
-        seen.add(r.ad);
+    for (const r of s.rows) {
+      const i = seen.get(r.ad);
+      if (i == null) {
+        seen.set(r.ad, rows.length);
         rows.push(r);
-      } /* คอลัมน์ของหลายกลุ่มจอใช้รายชื่อร่วมกัน → รวมรายชื่อของทุกกลุ่ม */
+      } else if (sc(r) > sc(rows[i])) rows[i] = r;
+    } /* คอลัมน์ของหลายกลุ่มจอใช้รายชื่อร่วมกัน → รวมรายชื่อของทุกกลุ่ม • 5.5.48: เรื่องเดียวกันหลายกลุ่ม ใช้แถวที่ยังออน / จำนวนครั้งไม่เป็น 0 */
   const cov =
     R && R.none && !cnx && Object.keys(CS).length
       ? Object.fromEntries(Object.entries(CS).map(([L, s]) => [L, new Set(s.rows.map(r => r.ad))]))
@@ -10952,7 +10959,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.47 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.48 (12 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
