@@ -2018,6 +2018,7 @@ const arrangeWb = (() => {
       rows.set(+r.getAttribute('r'), { el: r, cells: m });
     }
     const blocks = [];
+    let crow = 11; /* 5.5.50: แถวที่มีรหัสจอ (10 หรือ 11) */
     for (const rw of r10 ? [11, 10] : [11]) {
       if (blocks.length) break;
       const rr = rows.get(rw);
@@ -2025,11 +2026,11 @@ const arrangeWb = (() => {
         for (const [cn] of rr.cells) {
           const x = wsv[n2col(cn) + rw],
             code = x ? codeOf(x.v) : '';
-          if (code) blocks.push({ code, cc: cn, s: cn - 2 });
+          if (code) blocks.push({ code, cc: cn, s: cn - 2 }), (crow = rw);
         }
     }
     blocks.sort((a, b) => a.s - b.s);
-    return { rows, blocks };
+    return { rows, blocks, crow };
   }
   const hasVal = c => !!c && (c.getElementsByTagNameNS(NS, 'v').length > 0 || c.getElementsByTagNameNS(NS, 'is').length > 0);
   const numV = (wsv, col, r) => {
@@ -2079,7 +2080,7 @@ const arrangeWb = (() => {
       let hr = 0;
       for (let r = 14; r <= 40 && !hr; r++) if (numV(wsv, nc0, r)) hr = r;
       const filled = !!hr && R.blocks.some(b => { for (let r = hr + 1; r <= hr + 600; r++) { const t = strV(wsv, b.s + 1, r); if (t && !FIXR.test(t)) return true } return false }); /* 5.5.2: ใบเปล่าที่แถบแรกมีวันที่ 1 แล้ว (ยังไม่มีหนัง) ยังนับเป็นใบเปล่า */
-      if (!hr && ((opt.adds && opt.adds.length) || (opt.dels && opt.dels.length))) hr = blankHr(wsv); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย */
+      if (!hr && (opt.blank || (opt.adds && opt.adds.length) || (opt.dels && opt.dels.length))) hr = blankHr(wsv); /* 4.8.1: ใบเปล่า (ยังไม่มีแถบวันที่) ใช้แถวแถบแรกแบบเดียวกับตอนเติม • 5.4: ตอนเอาจอออกด้วย • 5.5.50: opt.blank = ตอนเติมครั้งแรก ใบเปล่าก็จัดจอเข้าชีตตามแพค */
       if (!ok || !hr) {
         notes.push([sn, 'ไม่ได้จัด (รูปแบบชีตไม่ตรงแบบบล็อก 3 คอลัมน์)']);
         continue;
@@ -2119,6 +2120,10 @@ const arrangeWb = (() => {
         let to = bySheetMedia(m);
         if (to && !info[to]) {
           notes.push([sn, b.code + ' → ' + m + ': ชีต ' + to + ' ไม่ใช่แบบบล็อกจอ ไม่ได้ย้าย']);
+          continue;
+        }
+        if (to && info[to].crow !== info[sn].crow) { /* 5.5.50: ชีตต้นทาง / ปลายทางเขียนรหัสจอคนละแถว — ย้ายแล้วระบบจะอ่านจอนั้นไม่เจอ */
+          notes.push([sn, b.code + ' → ' + m + ': ชีต ' + to + ' เขียนรหัสจอแถว ' + info[to].crow + ' แต่ชีตนี้แถว ' + info[sn].crow + ' ไม่ได้ย้าย — ย้ายเองในใบเช็ค']);
           continue;
         }
         if (!to) {
@@ -4944,7 +4949,7 @@ async function fillRun(list,o,L,out,bt){const on=buildOn(o),ms=DB.find(s=>s.m===
     const rd=f.nd?readyOf(f):null;
     if(rd&&(rd.bad||rd.empty))r={rep:[['ทั้งไฟล์','ไม่ได้เติม','ตรวจ: '+(rd.bad||'ไม่พบชีตของใบเช็ครูปในไฟล์นี้')+' จึงไม่ได้เติม',0]],blob:null};
     else{const fo={...o,col1:effCol(1,f),col2:effCol(2,f),k16:!!fcol(f.name).k16,padc:effPad(f),padh:padHist()};let A=null,g=f;
-     if(arrOn(o))try{A=await arrangeWb(f.buf,on,{mk:o.arrMk,sort:o.arrSort});if(A.buf!==f.buf)g={...f,buf:A.buf}}catch(e){A={err:1,moves:[],notes:[],relabeled:[],sorted:[],ana:0}} /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม */
+     if(arrOn(o))try{A=await arrangeWb(f.buf,on,{mk:o.arrMk,sort:o.arrSort,r10:true,blank:true});if(A.buf!==f.buf)g={...f,buf:A.buf}}catch(e){A={err:1,moves:[],notes:[],relabeled:[],sorted:[],ana:0}} /* จัดจอเข้าชีตตามแพค (4.1) ก่อนเติม • 5.5.50: r10 = ชีตที่รหัสจออยู่แถว 10 ก็จัดด้วย (เดิมข้ามเงียบ ๆ จอ Spare ที่ Playlist ย้ายไป CITY / 40 Red จึงค้างชีต Spare) */
      try{r=await fillWb(g,on,metro,fo)}catch(e){r=null}
      if(r&&g!==f&&A.moves.length&&![...new Set(A.moves.map(m=>m.to))].every(sn=>r.rep.some(x=>x[0]===sn&&x[1]==='รูปแบบ'&&!/^ตรวจ/.test(x[2]))))r=null; /* ชีตที่รับจอต้องจัดแถวได้ตอนเติม ไม่อย่างนั้นไม่ย้าย */
      if(!r&&g!==f){A={err:1,moves:[],notes:[],relabeled:[],sorted:[],ana:0};try{r=await fillWb(f,on,metro,fo)}catch(e){r=null}} /* จัดจอแล้วเติมไม่ได้ → เติมไฟล์เดิมแบบไม่ย้ายจอ */
