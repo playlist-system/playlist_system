@@ -120,4 +120,3 @@ python3 dev/tests/run_tests.py playlist_system.html photo-check-tests --update  
 ## 7. เรื่องที่รู้แล้วแต่ยังไม่ได้ทำ
 
 - MRT / Gateway X: จอในสถานี / กลุ่มเดียวกันได้โฟลเดอร์หนังชุดเดียวกัน (ยังแยกไม่ได้จากใบเช็ค)
-- เก็บ Playlist จากอีเมลเข้า Google Drive อัตโนมัติด้วย Apps Script ของบริษัท (ยังไม่เริ่ม)
