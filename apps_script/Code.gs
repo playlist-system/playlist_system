@@ -5,6 +5,7 @@
  * ทำงานในบัญชี Google ของคุณเอง (ไม่ผ่านบริการภายนอก ไม่มีค่าใช้จ่าย)
  *   - ทุกชั่วโมง 7:00–18:00 (เวลาไทย) ค้นอีเมลที่มีไฟล์ Excel แนบ
  *   - เก็บ Playlist ของวันนี้ลงโฟลเดอร์ Google Drive "Playlist_ปปปป-ดด-วว"
+ *   - Playlist ที่ส่งมาก่อนวันฉาย (เช่น รอบเสาร์–อาทิตย์ส่งวันศุกร์) เก็บเข้าโฟลเดอร์ของวันนั้นทันที
  *   - ส่งอีเมลสรุปว่าได้กี่แบบแล้ว ขาดแบบไหน (ส่งเฉพาะรอบที่มีไฟล์ใหม่)
  *
  * ตั้งค่าครั้งแรก: แก้ค่าในส่วน "ตั้งค่า" ด้านล่าง (ถ้าต้องการ) แล้วเลือกฟังก์ชัน setup กด Run
@@ -28,6 +29,9 @@ const CONFIG = {
   // แบบที่ไม่ได้ส่งทุกวัน (latest: true) ค้นอีเมลย้อนหลังกี่วัน และใช้คำค้นอะไร
   latestDays: 14,
   latestSearch: 'showdc OR "show dc" OR "LA PlanB" OR LA_PlanB',
+  // Playlist ที่ส่งมาก่อนวันฉาย (วันที่ในชื่อไฟล์เป็นวันข้างหน้า เช่น รอบเสาร์–อาทิตย์ที่ส่งวันศุกร์):
+  //   เก็บเข้าโฟลเดอร์ของวันนั้นทันทีที่อีเมลมา ไม่ต้องรอถึงวัน — รับล่วงหน้าได้ไม่เกินกี่วัน (0 = ไม่เก็บล่วงหน้า)
+  aheadDays: 4,
   // เก็บ Playlist ทุกไฟล์ของวันนี้ แม้ไม่อยู่ในรายการ kinds ด้านล่าง (ชื่อไฟล์ต้องมีคำใน playlistWords)
   //   false = เก็บเฉพาะแบบที่อยู่ในรายการ • ไฟล์ Excel ที่ชื่อไม่มีคำเหล่านี้ (เช่น ใบแจ้งหนี้) ไม่เก็บ แค่แจ้งในอีเมลสรุป
   collectAll: true,
@@ -180,7 +184,7 @@ function skipRe_() {
 }
 
 /** คัดไฟล์ของวันนี้จากรายการไฟล์แนบ [{name, size, day(อีเมล), when, blob}] → {chosen, others} */
-function pick_(atts, today) {
+function pick_(atts, today, ahead) {
   const kinds = CONFIG.kinds.map(k => Object.assign({}, k, { re: new RegExp(k.pattern, 'i') }));
   const skip = skipRe_();
   const thisYear = +today.slice(0, 4);
@@ -200,7 +204,7 @@ function pick_(atts, today) {
       if (word && word.test(name)) {
         const k2 = name + '|' + a.size;
         if (!more[k2]) more[k2] = { kind: OTHER_, name: name, key: k2, day: day, when: a.when, blob: a.blob, size: a.size };
-      } else others[name] = 1;
+      } else if (!ahead) others[name] = 1;
       continue;
     }
     if (day !== today && !kind.latest) continue; // ไฟล์ของวันก่อน
@@ -213,7 +217,7 @@ function pick_(atts, today) {
     const list = Object.values(byKind[k.name] || {});
     const todays = list.filter(f => f.day === today);
     if (todays.length) chosen.push(...todays);
-    else if (k.latest && list.length) {
+    else if (k.latest && list.length && !ahead) {
       list.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.when - b.when));
       chosen.push(list[list.length - 1]); // ฉบับล่าสุดที่มี
     }
@@ -222,7 +226,8 @@ function pick_(atts, today) {
   return { chosen: chosen, others: Object.keys(others) };
 }
 
-/** ไฟล์แนบ Excel จาก Gmail (ย้อนหลัง 2 วัน + แบบที่ไม่ได้ส่งทุกวันย้อนหลัง latestDays วัน) */
+/** ไฟล์แนบ Excel จาก Gmail (ย้อนหลัง 2 วัน + แบบที่ไม่ได้ส่งทุกวันย้อนหลัง latestDays วัน)
+ *  ไฟล์ของวันข้างหน้าในอีเมลชุดนี้ เก็บล่วงหน้าไว้แล้ว (collectAhead_) จึงไม่ต้องค้นย้อนหลังนานกว่านี้ */
 function attachments_() {
   const from = CONFIG.fromFilter ? ' from:(' + CONFIG.fromFilter + ')' : '';
   const qs = ['has:attachment newer_than:2d {filename:xlsx filename:xls}' + from];
@@ -259,7 +264,8 @@ function collect_() {
   const now = new Date();
   const today = Utilities.formatDate(now, TZ, 'yyyy-MM-dd');
   const parent = parentFolder_(false);
-  const P = pick_(attachments_(), today);
+  const atts = attachments_();
+  const P = pick_(atts, today);
   let folder = todayFolder_(parent, today, false);
   // ไฟล์ที่เก็บไว้แล้ว (ชื่อ + ขนาดเดียวกัน) ไม่เก็บซ้ำ
   const have = {};
@@ -299,12 +305,60 @@ function collect_() {
         }
     }
   }
-  const sum = summary_(folder, today, added, P.others, trashed);
-  if (added.length) MailApp.sendEmail({ to: CONFIG.notifyEmail || Session.getEffectiveUser().getEmail(), subject: sum.subject, htmlBody: sum.html, name: 'Playlist อัตโนมัติ' });
-  return { added: added.map(f => f.name), subject: sum.subject, text: sum.subject + (added.length ? ' — เพิ่ม ' + added.length + ' ไฟล์ ส่งอีเมลสรุปแล้ว' : ' — ไม่มีไฟล์ใหม่') };
+  const ahead = collectAhead_(parent, atts, today);
+  const sum = summary_(folder, today, added, P.others, trashed, ahead);
+  if (added.length || ahead.length) MailApp.sendEmail({ to: CONFIG.notifyEmail || Session.getEffectiveUser().getEmail(), subject: sum.subject, htmlBody: sum.html, name: 'Playlist อัตโนมัติ' });
+  const aheadTxt = ahead.length ? ' • เก็บล่วงหน้า ' + ahead.length + ' ไฟล์ (' + aheadDays_(ahead).join(', ') + ')' : '';
+  return { added: added.map(f => f.name), ahead: ahead.map(f => f.name), subject: sum.subject, text: sum.subject + (added.length ? ' — เพิ่ม ' + added.length + ' ไฟล์' : ' — ไม่มีไฟล์ใหม่ของวันนี้') + aheadTxt + (added.length || ahead.length ? ' ส่งอีเมลสรุปแล้ว' : '') };
 }
 
-function summary_(folder, today, added, others, trashed) {
+/** วันที่ (ปปปป-ดด-วว) บวก n วัน */
+function addDays_(day, n) {
+  const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10) + n));
+  return d.toISOString().slice(0, 10);
+}
+
+/** วันในรายการไฟล์ล่วงหน้า เป็นข้อความ เช่น "ส. 21 พ.ย. 6 ไฟล์" */
+function aheadDays_(ahead) {
+  const TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const WD = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const n = {};
+  for (const f of ahead) n[f.day] = (n[f.day] || 0) + 1;
+  return Object.keys(n)
+    .sort()
+    .map(d => WD[new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))).getUTCDay()] + ' ' + +d.slice(8, 10) + ' ' + TH[+d.slice(5, 7) - 1] + ' ' + n[d] + ' ไฟล์');
+}
+
+/** Playlist ที่ส่งมาก่อนวันฉาย (วันที่ในชื่อไฟล์เป็นวันข้างหน้า ไม่เกิน CONFIG.aheadDays วัน) → เก็บเข้าโฟลเดอร์ของวันนั้นเลย
+ *  ถึงวันนั้นไม่ต้องหาอีเมลเก่าอีก (เดิมค้นอีเมลย้อนหลังแค่ 2 วัน รอบวันอาทิตย์ที่ส่งวันศุกร์จึงอาจหลุด)
+ *  เฉพาะไฟล์ที่ระบุวันนั้นจริง — แบบ latest ไม่เอาฉบับเก่ามาใส่แทน และไม่ย้ายไฟล์ใดไปถังขยะ */
+function collectAhead_(parent, atts, today) {
+  const out = [];
+  for (let i = 1; i <= (CONFIG.aheadDays | 0); i++) {
+    const day = addDays_(today, i);
+    const P = pick_(atts, day, true);
+    if (!P.chosen.length) continue;
+    let folder = todayFolder_(parent, day, false);
+    const have = {};
+    if (folder) {
+      const it = folder.getFiles();
+      while (it.hasNext()) {
+        const f = it.next();
+        have[f.getName().normalize('NFC') + '|' + f.getSize()] = 1;
+      }
+    }
+    for (const f of P.chosen) {
+      if (have[f.key]) continue;
+      if (!folder) folder = todayFolder_(parent, day, true);
+      folder.createFile(f.blob.copyBlob().setName(f.name));
+      have[f.key] = 1;
+      out.push(Object.assign({}, f, { day: day }));
+    }
+  }
+  return out;
+}
+
+function summary_(folder, today, added, others, trashed, ahead) {
   const TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const thDay = s => +s.slice(8, 10) + ' ' + TH[+s.slice(5, 7) - 1];
   const day = thDay(today) + ' ' + (+today.slice(0, 4) + 543);
@@ -348,6 +402,9 @@ function summary_(folder, today, added, others, trashed) {
     (extra.length ? '<p>Playlist เพิ่มเติม (ไม่นับใน ' + mail.length + ' แบบ): ' + extra.map(esc).join(', ') + '</p>' : '') +
     (more.length ? '<p>Playlist อื่น ๆ ที่ไม่อยู่ในรายการ (เก็บไว้ให้ด้วย ' + more.length + ' ไฟล์): ' + more.map(esc).join(', ') + '</p>' : '') +
     (multi.length ? '<p style="color:#b35a14"><b>บางแบบมีมากกว่า 1 ไฟล์:</b> ' + multi.map(k => esc(k) + ' (' + counts[k] + ' ไฟล์)').join(', ') + ' — ตรวจว่าต้องใช้ฉบับไหนก่อนลากลงระบบ</p>' : '') +
+    (ahead && ahead.length
+      ? '<p style="color:#1d4f91"><b>Playlist ล่วงหน้า (ส่งมาก่อนวันฉาย)</b> — เก็บเข้าโฟลเดอร์ของวันนั้นแล้ว ถึงวันเปิด PLAYLIST INBOX ได้ตามปกติ: ' + aheadDays_(ahead).map(esc).join(' • ') + '</p>'
+      : '') +
     (trashed && trashed.length ? '<p style="color:#586274">ได้ฉบับของวันนี้แล้ว ย้ายฉบับเก่าไปถังขยะของ Drive: ' + trashed.map(esc).join(', ') + '</p>' : '') +
     (others.length ? '<p style="color:#586274">ไฟล์ Excel อื่นของวันนี้ (ไม่ได้เก็บ เพราะชื่อไม่เหมือน Playlist):</p><ul style="color:#586274">' + others.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '') +
     (webUrl_() ? '<p><a href="' + webUrl_() + '"><b>เปิด PLAYLIST INBOX</b></a> — ดูว่ามาแล้วแบบไหน และดาวน์โหลดทั้งหมดเป็นไฟล์ .zip ไฟล์เดียว</p>' : '') +
