@@ -69,7 +69,8 @@ const CONFIG = {
     { name: 'Rama9 Connect', pattern: 'Rama\\s*9[\\s_]*connect', group: 'MRT และอื่น ๆ', daily: false },
     { name: 'Digital MRT', pattern: 'Digital[\\s_]*MRT', group: 'MRT และอื่น ๆ', daily: false },
     { name: 'Gateway X', pattern: 'Gateway[\\s_]*X', group: 'MRT และอื่น ๆ', daily: false },
-    { name: 'Air Traveller', pattern: 'Air[\\s_]*Travell?er', group: 'MRT และอื่น ๆ', daily: false },
+    // ไม่รวม “Playlist So_Ploenchit_At Narong_Air Traveler Gateway_BIG Y …” = ไฟล์ลำดับฉายของจอ Signature Max (เก็บไว้ในไฟล์อื่น ไม่ติ๊กให้)
+    { name: 'Air Traveller', pattern: 'Air[\\s_]*Travell?er(?![\\s_]*Gateway)', group: 'MRT และอื่น ๆ', daily: false },
     { name: 'The 20', pattern: 'The[\\s_]*20(?!\\d)', group: 'MRT และอื่น ๆ', daily: false },
     { name: 'LA PlanB', pattern: 'LA[\\s_]*Plan[\\s_]*B', latest: true, group: 'MRT และอื่น ๆ', daily: false },
 
