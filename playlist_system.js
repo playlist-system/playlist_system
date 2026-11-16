@@ -157,6 +157,7 @@
  *   เวอร์ชัน ย้ายจอ / เพิ่มจอ / แก้สูตร แล้วบันทึกครั้งเดียว
  *   เวอร์ชัน บันทึกไม่ได้ → บอกสาเหตุ เตือนไฟล์ที่เปิดอยู่ใน Excel
  *   เวอร์ชัน ใส่วันที่ถ่าย: ตามวันที่ของไฟล์รูป
+ *   เวอร์ชัน 5.5.55: ดึง Playlist หลายวันจาก PLAYLIST INBOX (วันจันทร์ / หลังวันหยุด)
  * ======================================================================
  */
 
@@ -11151,7 +11152,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.54 (12 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.55 (16 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -14624,7 +14625,7 @@ const PLW_URL =
   /* 5.5.41: ดึง Playlist วันนี้เข้าระบบเอง — เปิดหน้า Playlist รายวันด้วย ?send=studio หน้านั้นรวมไฟล์เป็น .zip แล้วส่งกลับมาทาง postMessage (ไม่ต้องดาวน์โหลด / ลากวาง) */
   plpBtn = c =>
     PLW_URL
-      ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP ? ' disabled' : ''}>${IC.up}${PLP ? 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</button>`
+      ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย — วันจันทร์ / หลังวันหยุด เลือกดึงวันที่ยังไม่ได้ดึงมาพร้อมกันได้ (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP ? ' disabled' : ''}>${IC.up}${PLP ? 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</button>`
       : '';
 let PLP = null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
 function plpEnd(msg) {
@@ -14657,7 +14658,15 @@ addEventListener('message', async e => {
     cs = null;
   }
   await addAny('pl', [f]);
-  note = `ดึง Playlist วันที่ ${thd(new Date(d.day + 'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (แบบหลัก ${d.have}/${d.total}${d.miss && d.miss.length ? ' — ยังขาด ' + d.miss.join(', ') : ' ครบ'}${d.extra ? ' • Playlist เพิ่มเติม ' + d.extra + ' ไฟล์' : ''})`;
+  const dd = (d.days || []).filter(x => x && x.day),
+    dD = x =>
+      new Date(
+        x.day + 'T00:00:00Z',
+      ); /* 5.5.55: วันจันทร์ / หลังวันหยุด หน้า PLAYLIST INBOX ส่งหลายวันมาใน .zip เดียว (แยกโฟลเดอร์ตามวัน) */
+  note =
+    dd.length > 1
+      ? `ดึง Playlist ${dd.length} วัน (${thdS(dD(dd[0]))} – ${thdS(dD(dd[dd.length - 1]))}) แล้ว ${d.n} ไฟล์ — ${dd.map(x => `${thdS(dD(x))} ${x.have}/${x.total}${x.miss && x.miss.length ? ' ขาด ' + x.miss.join(', ') : ' ครบ'}`).join(' • ')} • ระบบเรียงวันให้แล้ว กดเติมครั้งเดียวได้ทุกวัน`
+      : `ดึง Playlist วันที่ ${thd(new Date(d.day + 'T00:00:00Z'))} แล้ว ${d.n} ไฟล์ (แบบหลัก ${d.have}/${d.total}${d.miss && d.miss.length ? ' — ยังขาด ' + d.miss.join(', ') : ' ครบ'}${d.extra ? ' • Playlist เพิ่มเติม ' + d.extra + ' ไฟล์' : ''})`;
   MQN = 'done';
   view();
 });

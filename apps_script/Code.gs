@@ -90,6 +90,8 @@ const TZ = 'Asia/Bangkok';
 const OTHER_ = 'Playlist อื่น';
 const PROP_FOLDER = 'parentFolderId';
 const PROP_WEB = 'webUrl';
+const PROP_DL = 'downloadedDays'; // วันที่ดาวน์โหลด / ส่งเข้าระบบแล้ว (ใช้ทำกล่อง “ตามงานวันหยุด”)
+const PROP_DLSINCE = 'downloadedSince';
 const STUDIO_URL = 'https://playlist-system.github.io/playlist_system/';
 
 /** ตั้งค่าครั้งแรก: สร้างโฟลเดอร์หลัก (ถ้ายังไม่มี) ตั้งให้ทำงานทุกชั่วโมง แล้วดึงครั้งแรก */
@@ -436,12 +438,8 @@ function webUrl_() {
   }
 }
 
-/** ข้อมูลของวันหนึ่ง (ปปปป-ดด-วว) ให้หน้าเว็บ */
-function webDay(day) {
-  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day || '') || day > today) day = today;
-  const parent = parentFolder_(false);
-  const folder = todayFolder_(parent, day, false);
+/** ไฟล์ในโฟลเดอร์ของวันหนึ่ง เรียงตามเวลาที่เข้า Drive */
+function dayList_(folder, day) {
   const TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const thDay = s => +s.slice(8, 10) + ' ' + TH[+s.slice(5, 7) - 1];
   const kinds = CONFIG.kinds.map(k => Object.assign({}, k, { re: new RegExp(k.pattern, 'i') }));
@@ -471,13 +469,112 @@ function webDay(day) {
     }
   }
   files.sort((a, b) => a.at - b.at);
+  return files;
+}
+
+/** สรุปวันหนึ่งสำหรับกล่อง “Playlist ล่วงหน้า” / “ตามงานวันหยุด”: มาแล้วกี่แบบ ขาดแบบไหน และไฟล์ที่ติ๊กไว้ให้
+ *  (แบบละ 1 ไฟล์ = ฉบับล่าสุด เหมือนค่าเริ่มของหน้าเว็บ) • วันข้างหน้า: แบบ latest นับว่ามี เพราะถึงวันใช้ฉบับล่าสุดให้เอง */
+function daySum_(day, files, today) {
+  const main = CONFIG.kinds.filter(k => !k.extra && k.source !== 'line');
+  const by = {};
+  files.forEach(f => {
+    if (f.kind) (by[f.kind] = by[f.kind] || []).push(f);
+  });
+  const miss = main.filter(k => !by[k.name] && !(k.latest && day > today)).map(k => k.name);
+  const pick = [];
+  let extra = 0;
+  CONFIG.kinds.forEach(k => {
+    const L = by[k.name];
+    if (!L || k.unused) return;
+    pick.push(L[L.length - 1]);
+    if (k.extra) extra++;
+  });
+  let size = 0;
+  pick.forEach(f => (size += f.size));
+  return { day: day, have: main.length - miss.length, total: main.length, miss: miss, extra: extra, n: pick.length, size: size, files: pick.map(f => ({ id: f.id, name: f.name, size: f.size })) };
+}
+
+/** วันที่ดาวน์โหลด / ส่งเข้าระบบแล้ว { 'ปปปป-ดด-วว': 'd' = ดึงแล้ว, 's' = กดไม่ต้อง } */
+function dlGet_() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty(PROP_DL) || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+/** วันแรกที่เริ่มจำการดาวน์โหลด (วันที่ติดตั้งโค้ดนี้) — วันก่อนหน้านั้นถือว่าดึงไปแล้ว ไม่ขึ้นในกล่อง “ตามงานวันหยุด” */
+function dlSince_(today) {
+  const p = PropertiesService.getScriptProperties();
+  let s = p.getProperty(PROP_DLSINCE);
+  if (!s) {
+    s = today;
+    p.setProperty(PROP_DLSINCE, s);
+  }
+  return s;
+}
+
+/** หน้าเว็บบอกว่าดึงวันไหนแล้ว — ดาวน์โหลด .zip / ส่งเข้าระบบ = 'd' • กด “ไม่ต้อง” = 's' */
+function webMark(days, how) {
+  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const m = dlGet_();
+  (days || []).forEach(d => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d || '') && d <= today) m[d] = how === 's' ? 's' : 'd';
+  });
+  const o = {};
+  Object.keys(m)
+    .sort()
+    .slice(-60)
+    .forEach(k => (o[k] = m[k]));
+  PropertiesService.getScriptProperties().setProperty(PROP_DL, JSON.stringify(o));
+  return true;
+}
+
+/** วันก่อนหน้าที่ยังไม่ได้ดึง (วันหยุด / ลา / วันที่ไม่ได้เปิดระบบ) ย้อนจากเมื่อวาน จนถึงวันที่ดึงแล้ว (ไม่เกิน 10 วัน)
+ *  วันที่ไม่มีโฟลเดอร์ (ไม่มี Playlist ส่งมา) ข้ามไปดูวันก่อนหน้าต่อ */
+function catchup_(parent, today) {
+  const dl = dlGet_();
+  const since = dlSince_(today);
+  const out = [];
+  for (let i = 1; i <= 10; i++) {
+    const d = addDays_(today, -i);
+    if (d < since || dl[d]) break;
+    const f = todayFolder_(parent, d, false);
+    if (!f) continue;
+    const L = dayList_(f, d);
+    if (L.length) out.unshift(daySum_(d, L, today));
+  }
+  return out;
+}
+
+/** ข้อมูลของวันหนึ่ง (ปปปป-ดด-วว) ให้หน้าเว็บ — ดูวันข้างหน้าได้ไม่เกิน aheadDays วัน (Playlist ที่ส่งมาก่อนวันฉาย) */
+function webDay(day) {
+  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const maxDay = addDays_(today, CONFIG.aheadDays | 0);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day || '') || day > maxDay) day = today;
+  const parent = parentFolder_(false);
+  const folder = todayFolder_(parent, day, false);
+  const files = dayList_(folder, day);
   let auto = null;
   try {
     auto = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'collectPlaylists');
   } catch (e) {}
+  const ahead = [];
+  let catchup = null;
+  if (day === today) {
+    for (let i = 1; i <= (CONFIG.aheadDays | 0); i++) {
+      const d = addDays_(today, i);
+      const f = todayFolder_(parent, d, false);
+      const L = f ? dayList_(f, d) : [];
+      if (L.length) ahead.push(daySum_(d, L, today));
+    }
+    const prev = catchup_(parent, today);
+    if (prev.length) catchup = { days: prev.concat([daySum_(today, files, today)]) };
+  }
   return {
     day: day,
     today: today,
+    maxDay: maxDay,
     folderUrl: folder ? folder.getUrl() : '',
     parentUrl: parent.getUrl(),
     kinds: CONFIG.kinds.map(k => ({ name: k.name, line: k.source === 'line', extra: !!k.extra, latest: !!k.latest, unused: !!k.unused, tip: k.tip || '' })),
@@ -486,6 +583,8 @@ function webDay(day) {
     startHour: CONFIG.startHour,
     endHour: CONFIG.endHour,
     studio: STUDIO_URL,
+    ahead: ahead,
+    catchup: catchup,
   };
 }
 
@@ -639,6 +738,31 @@ label.tile .hint{color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(92vw,620px);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
 .toast.on{opacity:1}
 .toast.err{background:var(--err);color:#fff}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.aday{position:relative;display:flex;flex-direction:column;gap:3px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--chip);color:inherit;min-width:0}
+label.aday{cursor:pointer;padding-right:44px}
+label.aday:not(:has(input:checked)){opacity:.6}
+.aday input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.aday .box{position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--box);background:var(--surface);display:grid;place-items:center}
+.aday .box svg{opacity:0}
+.aday input:checked+.box{background:var(--ink);border-color:var(--ink)}
+.aday input:checked+.box svg{opacity:1}
+.aday input:focus-visible+.box{outline:3px solid var(--info);outline-offset:2px}
+.aday .dn{font:600 16px/1.3 var(--hd)}
+.aday .dn small{font:500 12px/1 var(--ui);margin-left:6px;padding:2px 8px;border-radius:99px;background:var(--ink);color:var(--surface);vertical-align:2px}
+.aday .st{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ok)}
+.aday .st.part{color:var(--wait)}
+.aday .hint{font-size:12px;line-height:1.45;color:var(--muted)}
+.aday .go{align-self:flex-start;margin-top:4px;padding:2px 0;border:0;background:none;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;color:var(--ink);cursor:pointer}
+.catch{background:var(--infoSoft);border-color:var(--infoLine)}
+.catch .row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px}
+.catch h2{font-size:19px}
+.catch p.lead{margin:4px 0 0;color:var(--ink2);font-size:14px;max-width:70ch}
+.catch .aday{background:var(--surface)}
+.catch .end{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+.pp .days{grid-template-columns:1fr;gap:8px}
+.pp .choice{display:flex;flex-wrap:wrap;gap:10px}
+.pp .choice .pill{flex:1 1 auto}
 @media (max-width:1000px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media (max-width:640px){
  .top .in{padding:12px 16px}
@@ -664,7 +788,7 @@ label.tile .hint{color:var(--muted)}
 <div id="app"><p class="loading">กำลังโหลด…</p></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
-var D = null, SEL = {}, BUSY = '', TT = 0, PROG = 0;
+var D = null, SEL = {}, BUSY = '', TT = 0, PROG = 0, ZTOT = 0, CSEL = {}, SENDASK = false, SENDDAYS = [];
 var SEND = ${send ? 'true' : 'false'}, STUDIO = ${JSON.stringify(CONFIG.studioOrigin || '')}, SENT = false, SENDMSG = '', SENDOK = false, SENTN = 0, SENDINFO = false;
 var TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 var WD = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
@@ -691,18 +815,32 @@ function call(fn, args, ok) {
     toast(m, 1);
   })[fn].apply(null, args);
 }
-function load(day) { BUSY = 'load'; draw(); call('webDay', [day || ''], function (d) { D = d; BUSY = ''; defaults(); draw(); if (SEND && !SENT) { SENT = true; sendStudio(); } }); }
+function load(day) {
+  BUSY = 'load'; draw();
+  call('webDay', [day || ''], function (d) {
+    D = d; BUSY = ''; defaults(); CSEL = {};
+    if (D.catchup) D.catchup.days.forEach(function (a) { CSEL[a.day] = true; });
+    if (SEND && !SENT) { SENT = true; if (D.catchup && opener_()) { SENDASK = true; draw(); } else { draw(); sendStudio([D.day]); } }
+    else draw();
+  });
+}
+/* บอกสคริปต์ว่าดึงวันไหนแล้ว (กล่อง “ตามงานวันหยุด” จะไม่ขึ้นวันนั้นอีก) — เงียบ ๆ ไม่ต้องรอผล */
+function mark(days, how) { days = days.filter(function (d) { return d <= D.today; }); if (days.length) try { google.script.run.withFailureHandler(function () {}).webMark(days, how || 'd'); } catch (e) {} }
+function catchDays() { return D && D.catchup ? D.catchup.days.filter(function (a) { return CSEL[a.day]; }) : []; }
 /* เปิดจากปุ่ม “ดึง Playlist วันนี้” ในระบบ: รวม Playlist ที่ติ๊กไว้ (แบบหลัก) เป็น .zip แล้วส่งกลับให้หน้าระบบ (ส่งให้เฉพาะ studioOrigin) */
 function opener_() { try { return window.top.opener || null; } catch (e) { return null; } }
-function sendStudio() {
+function sendStudio(days) {
   var w = opener_();
+  SENDASK = false; SENDDAYS = days || [D.day];
   if (!w || !STUDIO) { SENDINFO = true; SENDMSG = 'หน้านี้ไม่ได้เปิดจากปุ่ม “ดึง Playlist วันนี้” ในระบบ (หรือเบราว์เซอร์ไม่ให้ส่งกลับ) จึงยังไม่ได้ส่งไฟล์เข้าระบบ — ถ้าจะส่ง กดปุ่มนั้นใน PHOTO CHECK STUDIO หรือกด “ดาวน์โหลด” แล้วลากไฟล์ .zip ลงขั้นที่ 1'; draw(); return; }
   var g = byKind(), main = mainKinds(), miss = main.filter(function (k) { return !g.by[k.name]; }).map(function (k) { return k.name; });
-  if (!picked().length) { try { w.postMessage({ psPL: 1, ok: false, day: D.day, err: 'ยังไม่มี Playlist ของวันนี้ในโฟลเดอร์' }, STUDIO); } catch (e) {} SENDMSG = 'ยังไม่มี Playlist ของวันนี้ — รอระบบดึงจากอีเมล (ทุกชั่วโมง) หรือกด “ดึงตอนนี้”'; draw(); return; }
-  zip(function (name, blob, n) {
-    try { w.postMessage({ psPL: 1, ok: true, day: D.day, name: name, blob: blob, n: n, have: main.length - miss.length, total: main.length, miss: miss, extra: picked().filter(isExtra).length }, STUDIO); }
+  var multi = SENDDAYS.length > 1;
+  if (!multi && !picked().length) { try { w.postMessage({ psPL: 1, ok: false, day: D.day, err: 'ยังไม่มี Playlist ของวันนี้ในโฟลเดอร์' }, STUDIO); } catch (e) {} SENDMSG = 'ยังไม่มี Playlist ของวันนี้ — รอระบบดึงจากอีเมล (ทุกชั่วโมง) หรือกด “ดึงตอนนี้”'; draw(); return; }
+  var info = multi ? D.catchup.days.filter(function (a) { return SENDDAYS.indexOf(a.day) >= 0; }).map(function (a) { return a.day === D.day ? { day: a.day, have: main.length - miss.length, total: main.length, miss: miss } : { day: a.day, have: a.have, total: a.total, miss: a.miss }; }) : null;
+  (multi ? zipDays : zip)(function (name, blob, n) {
+    try { w.postMessage({ psPL: 1, ok: true, day: D.day, name: name, blob: blob, n: n, have: main.length - miss.length, total: main.length, miss: miss, extra: picked().filter(isExtra).length, days: info }, STUDIO); }
     catch (e) { SENDMSG = 'ส่งเข้าระบบไม่ได้: ' + (e && e.message || e) + ' — กด “ดาวน์โหลด” แล้วลากไฟล์ .zip เองแทน'; draw(); return; }
-    SENDOK = true; SENTN = n; SENDMSG = ''; draw();
+    SENDOK = true; SENTN = n; SENDMSG = ''; mark(SENDDAYS); draw();
     setTimeout(function () { try { window.top.close(); } catch (e) {} }, 800);
   });
 }
@@ -751,7 +889,9 @@ function tile(k, L, isToday, wide) {
       '<span class="fn">' + esc(wide || f.name.length <= 26 ? f.name : '…' + f.name.slice(-24)) + '</span>' + meta(f) + '</label>'; // ช่องเล็ก: แสดงท้ายชื่อไฟล์ (ส่วนที่ต่างกัน) ชื่อเต็มอยู่ใน title
   }
   if (k.line) return '<div class="tile line' + w + '"><span class="nm">' + esc(k.short) + '</span><span class="st">' + sv(P.info, 15, 0, 2.4) + 'มาทาง LINE</span><span class="hint">ดาวน์โหลดจาก LINE แล้วลากลงระบบพร้อมไฟล์ .zip</span></div>';
-  var h = !isToday ? 'ไม่มีไฟล์ของวันนั้นในโฟลเดอร์' : k.tip ? k.tip : k.latest ? 'ไม่ได้ส่งทุกวัน ยังไม่มีฉบับไหนในอีเมล' : 'ยังไม่มีอีเมลวันนี้';
+  var fut = D.day > D.today;
+  if (fut && k.latest) return '<div class="tile line' + w + '"><span class="nm">' + esc(k.short) + '</span><span class="st">' + sv(P.info, 15, 0, 2.4) + 'ใช้ฉบับล่าสุด</span><span class="hint">ไม่ได้ส่งทุกวัน ถึงวันระบบใช้ฉบับล่าสุดให้เอง</span></div>';
+  var h = fut ? 'ยังไม่มีไฟล์ล่วงหน้าของวันนั้น' : !isToday ? 'ไม่มีไฟล์ของวันนั้นในโฟลเดอร์' : k.tip ? k.tip : k.latest ? 'ไม่ได้ส่งทุกวัน ยังไม่มีฉบับไหนในอีเมล' : 'ยังไม่มีอีเมลวันนี้';
   return '<div class="tile wait' + w + '"><span class="nm">' + esc(k.short) + '</span><span class="st">' + sv(P.clock, 15, 0, 2.4) + (isToday ? 'รออยู่' : 'ไม่มี') + '</span><span class="hint">' + esc(h) + '</span></div>';
 }
 function chip(f, label, extra) {
@@ -759,26 +899,66 @@ function chip(f, label, extra) {
     '<span class="mt"><b>' + esc(label) + (extra && extra.note ? ' <small>' + esc(extra.note) + '</small>' : '') + '</b>' + (label !== noext(f.name) ? '<span class="fn">' + esc(f.name) + '</span>' : '') +
     '<span class="mm">' + (f.pd ? '<span class="d' + (f.pd !== D.day ? ' other' : '') + '">วันที่ ' + esc(thShort(f.pd)) + '</span> · ' : '') + 'เข้า ' + esc(f.time) + ' · ' + esc(kb(f.size)) + '</span></span></label>';
 }
+function dayName(d) { var t = dt(d); return WD[t.getUTCDay()] + ' ' + t.getUTCDate() + ' ' + TH[t.getUTCMonth()]; }
+function dayCard(a, opt) {
+  var all = a.have >= a.total, st = all ? '<span class="st">' + sv(P.check, 15, 0, 3) + 'ครบ ' + a.total + ' แบบ</span>' : '<span class="st part">' + sv(P.clock, 15, 0, 2.4) + 'มาแล้ว ' + a.have + ' จาก ' + a.total + ' แบบ</span>';
+  var hint = [a.miss.length ? 'ยังขาด ' + (a.miss.length > 3 ? a.miss.length + ' แบบ' : a.miss.join(', ')) : '', a.extra ? 'เพิ่มเติม ' + a.extra + ' ไฟล์' : ''].filter(Boolean).join(' · ');
+  var body = '<span class="dn">' + esc(dayName(a.day)) + (a.day === D.today ? '<small>วันนี้</small>' : '') + '</span>' + st + (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') +
+    '<span class="hint">' + a.n + ' ไฟล์ · ' + esc(kb(a.size)) + '</span>' + (opt.go ? '<button class="go" data-go="' + a.day + '">ดูรายการ</button>' : '');
+  if (!opt.pick) return '<div class="aday">' + body + '</div>';
+  return '<label class="aday"><input type="checkbox" data-cd="' + a.day + '"' + (CSEL[a.day] ? ' checked' : '') + ' aria-label="' + esc(dayName(a.day)) + '"><span class="box" aria-hidden="true">' + sv(P.check, 13, 'var(--surface)', 3.2) + '</span>' + body + '</label>';
+}
+function aheadHtml() {
+  return '<section class="card" aria-label="Playlist ล่วงหน้า"><div class="hd"><h2>Playlist ล่วงหน้า</h2><p>ส่งมาก่อนวันฉาย ระบบเก็บเข้าโฟลเดอร์ของวันนั้นแล้ว ถึงวันเปิดหน้านี้ได้ตามปกติ</p></div><div class="days">' +
+    D.ahead.map(function (a) { return dayCard(a, { go: 1 }); }).join('') + '</div></section>';
+}
+function catchLabel() {
+  var L = catchDays(), n = 0;
+  L.forEach(function (a) { n += a.day === D.day ? picked().length : a.n; });
+  if (BUSY === 'zipall') return 'กำลังเตรียมไฟล์ ' + PROG + '/' + ZTOT + '…';
+  return L.length ? 'ดาวน์โหลด ' + L.length + ' วัน · ' + n + ' ไฟล์ (.zip)' : 'ยังไม่ได้เลือกวัน';
+}
+function catchHtml() {
+  var C = D.catchup.days, first = C[0].day, last = C[C.length - 1].day;
+  return '<section class="card catch" aria-label="ตามงานวันหยุด"><div class="row"><div><h2>ตามงานวันหยุด: ' + esc(dayName(first)) + ' – ' + esc(dayName(last)) + '</h2>' +
+    '<p class="lead">วันที่ยังไม่ได้ดึง Playlist รวมไว้ใน .zip ไฟล์เดียว (แยกโฟลเดอร์ตามวัน) ลากลงขั้นที่ 1 ของ PHOTO CHECK STUDIO ทีเดียว ระบบเรียงวันและเติมต่อกันให้เอง • ติ๊กออกได้ถ้าไม่ต้องการวันไหน</p></div>' +
+    '<div class="end"><button class="pill ok" id="zipall" data-a="zipall"' + (!catchDays().length || BUSY ? ' disabled' : '') + '>' + sv(P.down, 18, 0, 2.2) + esc(catchLabel()) + '</button>' +
+    '<button class="lk" data-a="cskip" title="ดึง Playlist ของวันก่อนหน้าไปแล้วทางอื่น — ไม่ต้องแสดงกล่องนี้อีก">ดึงไปแล้ว ไม่ต้องแสดง</button></div></div>' +
+    '<div class="days">' + C.map(function (a) { return dayCard(a, { pick: 1, go: a.day !== D.today }); }).join('') + '</div></section>';
+}
 function brand(sub) { return '<div class="brand"><div class="logo">' + sv(P.list, 23, '#fff', 2.2) + '</div><div><b>PLAYLIST INBOX</b><small>' + esc(sub) + '</small></div></div>'; }
 function actsHtml() {
   var Pk = picked(), sz = 0, isToday = D.day === D.today, url = D.folderUrl || D.parentUrl;
   Pk.forEach(function (f) { sz += f.size; });
   return (isToday ? '<button class="pill" data-a="collect"' + (BUSY ? ' disabled' : '') + '>' + sv(P.refresh, 16) + (BUSY === 'collect' ? 'กำลังดึง…' : 'ดึงตอนนี้') + '</button>' : '') +
     '<a class="pill" href="' + esc(url) + '" target="_blank" rel="noopener">' + sv(P.folder, 16) + 'เปิดใน Drive</a>' +
-    '<button class="pill ok" data-a="zip"' + (!Pk.length || BUSY ? ' disabled' : '') + ' title="' + (Pk.length ? 'รวม ' + kb(sz) : 'ยังไม่ได้เลือกไฟล์') + '">' + sv(P.down, 18, 0, 2.2) +
-    (BUSY === 'zip' ? 'กำลังเตรียมไฟล์ ' + PROG + '/' + Pk.length + '…' : Pk.length ? 'ดาวน์โหลด ' + Pk.length + ' ไฟล์ (.zip)' : 'ยังไม่ได้เลือกไฟล์') + '</button>';
+    '<button class="pill' + (isToday && D.catchup ? '' : ' ok') + '" data-a="zip"' + (!Pk.length || BUSY ? ' disabled' : '') + ' title="' + (Pk.length ? 'รวม ' + kb(sz) : 'ยังไม่ได้เลือกไฟล์') + '">' + sv(P.down, 18, 0, 2.2) +
+    (BUSY === 'zip' ? 'กำลังเตรียมไฟล์ ' + PROG + '/' + Pk.length + '…' : Pk.length ? (isToday && D.catchup ? 'เฉพาะวันนี้ ' : 'ดาวน์โหลด ') + Pk.length + ' ไฟล์ (.zip)' : 'ยังไม่ได้เลือกไฟล์') + '</button>';
 }
 function sendView() { return SEND && !(SENDMSG && !SENDOK); }
+function drawAsk() {
+  var C = D.catchup.days, L = catchDays(), n = 0;
+  L.forEach(function (a) { n += a.day === D.day ? picked().length : a.n; });
+  $('#app').innerHTML = '<div class="sendp"><div class="pp">' + brand('ส่ง Playlist เข้า PHOTO CHECK STUDIO') +
+    '<div><h1>มี Playlist ที่ยังไม่ได้ดึง ' + (C.length - 1) + ' วัน</h1><p class="when">ส่งพร้อมวันนี้ได้เลย ระบบเรียงวันและเติมต่อกันทีละวันให้เอง • ติ๊กออกได้ถ้าไม่ต้องการวันไหน</p></div>' +
+    '<div class="days">' + C.map(function (a) { return dayCard(a, { pick: 1 }); }).join('') + '</div>' +
+    '<div class="choice"><button class="pill ok" data-a="sendsel"' + (L.length ? '' : ' disabled') + '>' + sv(P.check, 17, 0, 2.6) + (L.length ? 'ส่ง ' + L.length + ' วัน · ' + n + ' ไฟล์' : 'ยังไม่ได้เลือกวัน') + '</button>' +
+    '<button class="pill" data-a="sendtoday">เฉพาะวันนี้</button></div>' +
+    '<div class="ppf"><span>วันที่ไม่ได้ส่งจะไม่ถามอีก ดูย้อนหลังได้ที่ PLAYLIST INBOX</span></div></div></div>';
+}
 function drawSend() {
-  var Pk = D ? picked() : [], n = Pk.length, nx = D ? Pk.filter(isExtra).length : 0, sz = 0, g = D ? byKind() : null;
+  if (SENDASK && D) return drawAsk();
+  var multi = SENDDAYS.length > 1;
+  var Pk = D ? picked() : [], n = multi ? ZTOT : Pk.length, nx = D && !multi ? Pk.filter(isExtra).length : 0, sz = 0, g = D ? byKind() : null;
   Pk.forEach(function (f) { sz += f.size; });
   var miss = D ? mainKinds().filter(function (k) { return !g.by[k.name]; }).map(function (k) { return k.name; }) : [];
   var zipping = BUSY === 'zip', pct = !D ? 8 : SENDOK ? 100 : zipping ? 15 + Math.round(75 * PROG / Math.max(1, n)) : 12;
-  var title = !D ? 'กำลังเตรียม Playlist ของวันนี้…' : SENDOK ? 'ส่ง ' + SENTN + ' ไฟล์เข้าระบบแล้ว' : 'กำลังส่ง ' + n + ' ไฟล์เข้าระบบ';
+  var title = !D ? 'กำลังเตรียม Playlist ของวันนี้…' : SENDOK ? 'ส่ง ' + SENTN + ' ไฟล์เข้าระบบแล้ว' : 'กำลังส่ง ' + n + ' ไฟล์' + (multi ? ' (' + SENDDAYS.length + ' วัน)' : '') + 'เข้าระบบ';
+  if (multi) miss = [];
   var step = function (txt, s) { return '<li class="' + s + '"><span class="i">' + (s === 'done' ? sv(P.check, 13, 'var(--okInk)', 3.2) : '') + '</span>' + txt + '</li>'; };
   var h = '<div class="sendp"><div class="pp">' + brand('ส่ง Playlist เข้า PHOTO CHECK STUDIO') +
-    '<div><h1>' + esc(title) + '</h1><p class="when">Playlist ' + (D ? 'วัน' + esc(thLong(D.day)) + (n ? ' — แบบหลัก ' + (n - nx) + ' ไฟล์' + (nx ? ' + เพิ่มเติม ' + nx + ' ไฟล์' : '') : '') : 'ของวันนี้') + '</p><div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><span style="width:' + pct + '%"></span></div></div>' +
-    '<ol class="steps">' + step('หาไฟล์ของวันนี้ใน Drive', D ? 'done' : 'now') +
+    '<div><h1>' + esc(title) + '</h1><p class="when">Playlist ' + (multi ? esc(dayName(SENDDAYS[0])) + ' – ' + esc(dayName(SENDDAYS[SENDDAYS.length - 1])) : D ? 'วัน' + esc(thLong(D.day)) + (n ? ' — แบบหลัก ' + (n - nx) + ' ไฟล์' + (nx ? ' + เพิ่มเติม ' + nx + ' ไฟล์' : '') : '') : 'ของวันนี้') + '</p><div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><span style="width:' + pct + '%"></span></div></div>' +
+    '<ol class="steps">' + step(multi ? 'หาไฟล์ ' + SENDDAYS.length + ' วันใน Drive' : 'หาไฟล์ของวันนี้ใน Drive', D ? 'done' : 'now') +
     step('รวมเป็นไฟล์ .zip' + (n ? ' (' + kb(sz) + ')' : '') + (zipping ? ' ' + PROG + '/' + n : ''), SENDOK ? 'done' : zipping ? 'now' : '') +
     step('ส่งเข้า PHOTO CHECK STUDIO', SENDOK ? 'done' : '') + '</ol>';
   if (miss.length) h += '<div class="banner">' + sv(P.clock, 18, 0, 2.4) + '<span>ยังขาด ' + andList(miss.map(function (n) { return '<b>' + esc(n) + '</b>'; })) + ' ส่งที่มีไปก่อน มาครบแล้วกดดึงอีกครั้ง</span></div>';
@@ -789,22 +969,23 @@ function draw() {
   if (sendView()) return drawSend();
   var app = $('#app');
   if (!D) { app.innerHTML = '<p class="loading">กำลังโหลด…</p>'; return; }
-  var g = byKind(), day = D.day, isToday = day === D.today;
+  var g = byKind(), day = D.day, isToday = day === D.today, future = day > D.today, maxDay = D.maxDay || D.today;
   var main = mainKinds(), line = D.kinds.filter(function (k) { return k.line; });
-  var have = main.filter(function (k) { return g.by[k.name]; }), miss = main.filter(function (k) { return !g.by[k.name]; });
+  var have = main.filter(function (k) { return g.by[k.name] || (future && k.latest); }), miss = main.filter(function (k) { return !g.by[k.name] && !(future && k.latest); });
   var last = D.files.length ? D.files[D.files.length - 1] : null;
   var h = '<header class="top"><div class="in">' + brand('ส่วนหนึ่งของ PHOTO CHECK STUDIO') + '<div class="tools"><div class="date">' +
     '<button class="nav" data-go="' + shift(day, -1) + '" aria-label="วันก่อนหน้า" title="วันก่อนหน้า">' + sv(P.left, 17, 0, 2.2) + '</button>' +
-    '<label class="cur" title="เลือกวันที่">' + sv(P.cal, 16) + esc(thLong(day)) + (isToday ? '<span class="badge">วันนี้</span>' : '') +
-    '<input type="date" id="pick" value="' + day + '" max="' + D.today + '" aria-label="เลือกวันที่"></label>' +
-    '<button class="nav" data-go="' + shift(day, 1) + '" aria-label="วันถัดไป" title="วันถัดไป"' + (isToday ? ' disabled' : '') + '>' + sv(P.right, 17, 0, 2.2) + '</button></div>' +
+    '<label class="cur" title="เลือกวันที่">' + sv(P.cal, 16) + esc(thLong(day)) + (isToday ? '<span class="badge">วันนี้</span>' : future ? '<span class="badge">ล่วงหน้า</span>' : '') +
+    '<input type="date" id="pick" value="' + day + '" max="' + maxDay + '" aria-label="เลือกวันที่"></label>' +
+    '<button class="nav" data-go="' + shift(day, 1) + '" aria-label="วันถัดไป" title="วันถัดไป"' + (day >= maxDay ? ' disabled' : '') + '>' + sv(P.right, 17, 0, 2.2) + '</button></div>' +
     (isToday ? '' : '<button class="pill" data-go="' + D.today + '">กลับไปวันนี้</button>') +
     '<a class="pill dark" href="' + esc(D.studio) + '" target="_blank" rel="noopener">เปิด PHOTO CHECK STUDIO' + sv(P.ext, 15, 0, 2.2) + '</a></div></div></header>';
   h += '<main' + (BUSY === 'load' ? ' class="dim"' : '') + '>';
   if (SEND && SENDMSG) h += '<div class="banner' + (SENDINFO ? ' info' : '') + '" role="' + (SENDINFO ? 'status' : 'alert') + '">' + sv(P.info, 18, 0, 2.4) + '<span>' + esc(SENDMSG) + '</span></div>';
   // หัวข้อ + ปุ่ม
   var h1, sub;
-  if (!D.files.length) { h1 = isToday ? 'ยังไม่มี Playlist ของวันนี้' : 'ไม่มี Playlist ของวันที่ ' + thShort(day); sub = isToday ? (D.auto === false ? 'ดึงอัตโนมัติปิดอยู่ กด “ดึงตอนนี้” หรือเปิดด้วย setup ในหน้าโค้ด' : 'ระบบดึงจากอีเมลให้เองทุกชั่วโมง ' + D.startHour + ':00–' + D.endHour + ':59 หรือกด “ดึงตอนนี้”') : 'ระบบไม่ได้เก็บ Playlist ของวันนั้นไว้ในโฟลเดอร์'; }
+  if (future) { h1 = D.files.length ? 'ล่วงหน้า: มาแล้ว ' + have.length + ' จาก ' + main.length + ' แบบ' : 'ยังไม่มี Playlist ล่วงหน้าของวันที่ ' + thShort(day); sub = 'Playlist ที่ส่งมาก่อนวันฉาย ระบบเก็บไว้ในโฟลเดอร์ของวันนั้นแล้ว ถึงวันดาวน์โหลดหรือกด “ดึง Playlist วันนี้” ในระบบได้ตามปกติ' + (main.some(function (k) { return k.latest; }) ? ' • แบบที่ไม่ได้ส่งทุกวัน (เช่น Show DC) ถึงวันใช้ฉบับล่าสุดให้เอง' : ''); }
+  else if (!D.files.length) { h1 = isToday ? 'ยังไม่มี Playlist ของวันนี้' : 'ไม่มี Playlist ของวันที่ ' + thShort(day); sub = isToday ? (D.auto === false ? 'ดึงอัตโนมัติปิดอยู่ กด “ดึงตอนนี้” หรือเปิดด้วย setup ในหน้าโค้ด' : 'ระบบดึงจากอีเมลให้เองทุกชั่วโมง ' + D.startHour + ':00–' + D.endHour + ':59 หรือกด “ดึงตอนนี้”') : 'ระบบไม่ได้เก็บ Playlist ของวันนั้นไว้ในโฟลเดอร์'; }
   else if (!miss.length) { h1 = 'ครบ ' + main.length + ' แบบแล้ว'; sub = 'ดาวน์โหลดแล้วลากไฟล์ .zip ลงขั้นที่ 1 ของ PHOTO CHECK STUDIO ได้เลย'; }
   else {
     h1 = 'มาแล้ว ' + have.length + ' จาก ' + main.length + ' แบบ';
@@ -812,11 +993,13 @@ function draw() {
     sub = 'ยังขาด ' + (miss.length > 3 ? miss.length + ' แบบ: ' + names.join(', ') : andList(names)) + (isToday && D.auto !== false ? ' ระบบดึงจากอีเมลให้เองทุกชั่วโมงจนถึง ' + D.endHour + ':59' : '');
   }
   h += '<section class="hero"><div><h1>' + esc(h1) + '</h1><p>' + (sub.indexOf('<b>') >= 0 ? sub : esc(sub)) + '</p></div><div class="acts" id="acts">' + actsHtml() + '</div></section>';
+  if (isToday && D.catchup) h += catchHtml();
+  if (isToday && D.ahead && D.ahead.length) h += aheadHtml();
   // กระดานแบบหลัก
   h += '<section class="board" aria-label="Playlist ที่ระบบเติมใบเช็คใช้">';
   groups(main.concat(line)).forEach(function (gr) {
     h += '<div class="grp"><h2>' + esc(gr.name) + (gr.small ? '<span>' + gr.kinds.length + ' แบบ</span>' : '') + '</h2><div class="tiles">';
-    gr.kinds.forEach(function (k) { h += tile(k, g.by[k.name], isToday, !gr.small); });
+    gr.kinds.forEach(function (k) { h += tile(k, g.by[k.name], isToday || future, !gr.small); });
     h += '</div></div>';
   });
   h += '</section>';
@@ -872,20 +1055,22 @@ function zipBlob(list) {
 }
 function b64u8(s) { var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
 function join(L) { var n = 0, o = 0; L.forEach(function (u) { n += u.length; }); var r = new Uint8Array(n); L.forEach(function (u) { r.set(u, o); o += u.length; }); return r; }
-function zip(cb) {
-  var Pk = picked(), out = [], next = 0, done = 0, failed = false;
-  if (!Pk.length || BUSY) return;
-  BUSY = 'zip'; PROG = 0; draw();
+/* รวมไฟล์เป็น .zip: E = [{day, id, name, path}] (path = ชื่อใน .zip) • cb = ส่งเข้าระบบแทนดาวน์โหลด • after = หลังดาวน์โหลดเสร็จ */
+function zipRun(E, zname, key, cb, after) {
+  var out = [], next = 0, done = 0, failed = false;
+  if (!E.length || BUSY) return;
+  BUSY = cb ? 'zip' : key; PROG = 0; ZTOT = E.length; draw();
+  function prog() { if (BUSY === 'zipall') { var b = $('#zipall'); if (b) b.innerHTML = sv(P.down, 18, 0, 2.2) + esc(catchLabel()); } else drawBar(); }
   function fail(e) { if (failed) return; failed = true; BUSY = ''; if (typeof cb === 'function') SENDMSG = 'รวมไฟล์ไม่สำเร็จ: ' + ((e && e.message) || e) + ' — กด “ดาวน์โหลด” อีกครั้ง หรือใช้ “เปิดใน Drive”'; draw(); toast('ดาวน์โหลดไม่สำเร็จ: ' + ((e && e.message) || e) + ' — ลองอีกครั้ง หรือใช้ปุ่ม “เปิดใน Drive”', 1); }
   function one(i, part, acc) {
     google.script.run.withFailureHandler(fail).withSuccessHandler(function (r) {
       if (failed) return;
       acc.push(b64u8(r.b64));
       if (part + 1 < r.n) return one(i, part + 1, acc);
-      out[i] = { name: Pk[i].name, data: join(acc) }; done++; PROG = done; drawBar();
-      if (next < Pk.length) one(next++, 0, []);
-      else if (done === Pk.length) finish();
-    }).webPart(D.day, Pk[i].id, part);
+      out[i] = { name: E[i].path, data: join(acc) }; done++; PROG = done; prog();
+      if (next < E.length) one(next++, 0, []);
+      else if (done === E.length) finish();
+    }).webPart(E[i].day, E[i].id, part);
   }
   function finish() {
     var used = {};
@@ -894,16 +1079,38 @@ function zip(cb) {
       while (used[n.toLowerCase()]) n = b + ' (' + k++ + ')' + x;
       used[n.toLowerCase()] = 1; e.name = n;
     });
-    var name = 'Playlist_' + D.day + '.zip';
-    if (typeof cb === 'function') { BUSY = ''; draw(); return cb(name, zipBlob(out), out.length); } // ส่งเข้าระบบแทนดาวน์โหลด
+    if (typeof cb === 'function') { BUSY = ''; draw(); return cb(zname, zipBlob(out), out.length); } // ส่งเข้าระบบแทนดาวน์โหลด
     var url = URL.createObjectURL(zipBlob(out));
-    var a = document.createElement('a'); a.href = url; a.download = name; a.target = '_self';
+    var a = document.createElement('a'); a.href = url; a.download = zname; a.target = '_self';
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 60000);
-    BUSY = ''; draw();
-    toast('ดาวน์โหลด ' + name + ' (' + out.length + ' ไฟล์) แล้ว — ลากไฟล์นี้ลงขั้นที่ 1 ของ PHOTO CHECK STUDIO ได้เลย ไม่ต้องแตกไฟล์');
+    BUSY = '';
+    if (after) after();
+    draw();
+    toast('ดาวน์โหลด ' + zname + ' (' + out.length + ' ไฟล์) แล้ว — ลากไฟล์นี้ลงขั้นที่ 1 ของ PHOTO CHECK STUDIO ได้เลย ไม่ต้องแตกไฟล์');
   }
-  for (var k = 0; k < Math.min(3, Pk.length); k++) one(next++, 0, []);
+  for (var k = 0; k < Math.min(3, E.length); k++) one(next++, 0, []);
+}
+function zip(cb) {
+  var Pk = picked();
+  zipRun(Pk.map(function (f) { return { day: D.day, id: f.id, name: f.name, path: f.name }; }), 'Playlist_' + D.day + '.zip', 'zip', cb, function () { mark([D.day]); });
+}
+/* หลายวันใน .zip เดียว แยกโฟลเดอร์ตามวัน — วันที่กำลังดูใช้ไฟล์ที่ติ๊กบนหน้า วันอื่นใช้ไฟล์ที่ติ๊กไว้ให้ (แบบละ 1 ไฟล์) • ไฟล์เดียวกันหลายวัน (เช่น Show DC ฉบับเดิม) ใส่ครั้งเดียว */
+function zipDays(cb) {
+  var L = catchDays(), seen = {}, E = [];
+  L.forEach(function (a) {
+    (a.day === D.day ? picked() : a.files).forEach(function (f) {
+      var k = f.name + '|' + f.size; if (seen[k]) return; seen[k] = 1;
+      E.push({ day: a.day, id: f.id, name: f.name, path: 'Playlist_' + a.day + '/' + f.name });
+    });
+  });
+  if (!L.length) return;
+  var name = L.length > 1 ? 'Playlist_' + L[0].day + '_ถึง_' + L[L.length - 1].day + '.zip' : 'Playlist_' + L[0].day + '.zip';
+  zipRun(E, name, 'zipall', cb, function () {
+    mark(L.map(function (a) { return a.day; }));
+    mark(D.catchup.days.filter(function (a) { return !CSEL[a.day]; }).map(function (a) { return a.day; }), 's');
+    D.catchup = null;
+  });
 }
 function collect() {
   BUSY = 'collect'; draw();
@@ -912,8 +1119,12 @@ function collect() {
 document.addEventListener('click', function (e) {
   var b = e.target.closest('[data-go],[data-a]');
   if (!b || b.disabled || BUSY) return;
-  if (b.dataset.go) { if (b.dataset.go <= D.today) load(b.dataset.go); }
+  if (b.dataset.go) { if (b.dataset.go <= (D.maxDay || D.today)) load(b.dataset.go); }
   else if (b.dataset.a === 'zip') zip();
+  else if (b.dataset.a === 'zipall') zipDays();
+  else if (b.dataset.a === 'cskip') { mark(D.catchup.days.map(function (a) { return a.day; }).filter(function (d) { return d < D.today; }), 's'); D.catchup = null; draw(); toast('ไม่แสดงกล่องนี้แล้ว — ดู Playlist ย้อนหลังรายวันได้จากลูกศรด้านบน'); }
+  else if (b.dataset.a === 'sendsel') { var sel = catchDays().map(function (a) { return a.day; }); mark(D.catchup.days.filter(function (a) { return !CSEL[a.day]; }).map(function (a) { return a.day; }), 's'); sendStudio(sel.length === 1 && sel[0] === D.day ? [D.day] : sel); }
+  else if (b.dataset.a === 'sendtoday') { mark(D.catchup.days.map(function (a) { return a.day; }).filter(function (d) { return d < D.today; }), 's'); sendStudio([D.day]); }
   else if (b.dataset.a === 'collect') collect();
   else if (b.dataset.a === 'sel') {
     var g = byKind(), L = b.dataset.g === 'oth' ? g.oth : extraFiles(g), all = L.every(function (f) { return SEL[f.id]; });
@@ -922,8 +1133,9 @@ document.addEventListener('click', function (e) {
 });
 document.addEventListener('change', function (e) {
   var t = e.target;
-  if (t.id === 'pick') { if (t.value && t.value <= D.today) load(t.value); else t.value = D.day; return; }
-  if (t.dataset.id) { SEL[t.dataset.id] = t.checked; drawBar(); }
+  if (t.id === 'pick') { if (t.value && t.value <= (D.maxDay || D.today)) load(t.value); else t.value = D.day; return; }
+  if (t.dataset.cd) { CSEL[t.dataset.cd] = t.checked; draw(); return; }
+  if (t.dataset.id) { SEL[t.dataset.id] = t.checked; if (D.catchup && !SEND) draw(); else drawBar(); }
 });
 load('');
 </script></body></html>`;
