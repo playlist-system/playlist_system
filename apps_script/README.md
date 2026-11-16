@@ -6,6 +6,7 @@
 - เก็บ Playlist **ของวันนี้** ลง Google Drive ในโฟลเดอร์ `Playlist รายวัน/Playlist_ปปปป-ดด-วว`
   - **Playlist ทั้งหมด 31 แบบ** แบ่ง 6 กลุ่ม (แยกจอ / BKJ / สื่ออื่น / NTW / ห้าง / อาคาร / MRT และอื่น ๆ — `group` และ `groups` ใน `CONFIG`)
   - **ต้องมาทุกวัน 19 แบบ** (นับว่าครบ 19/19): แยกจอ 40Blue, 40Red, 80Blue, 80Red, CITY, Spare • BKJ1, BKJ2 • Show DC, Signature Max, Metro LED • NTW 57Blue_1/2, 57Red_1/2, Full Only, Spare • Parc Paragon, Central Network
+  - ไฟล์ลำดับฉาย “Playlist So_Ploenchit_At Narong_Air Traveler Gateway_BIG Y …” ไม่ใช่ Air Traveller (รายการหนังของจอเหล่านี้อยู่ใน Signature Max) — เก็บไว้ใน “ไฟล์อื่นในโฟลเดอร์” ไม่ติ๊กให้ (ตั้งแต่ 5.5.57: เดิมเข้าช่อง Air Traveller แล้วถูกติ๊กแทนไฟล์ Air Traveller จริง)
   - **ไม่ได้ส่งทุกวัน 12 แบบ** (`daily: false` — ไม่นับใน 19 แบบ ไม่ขึ้นว่าขาด): Rama9 Connect, Digital MRT, Gateway X, Air Traveller, The 20, LA PlanB, Paragon Max, Siam Paragon (in mall / Facade), The District EM, The Panoramix, LIDO Connect • ถ้าบริษัทเปลี่ยนรอบการส่ง แก้ `daily` ในรายการ `kinds` ได้เลย
   - **Playlist อื่น ๆ ทุกไฟล์ของวันนี้** ที่ไม่อยู่ในรายการ ก็เก็บให้ด้วย (`collectAll: true`) — ดูจากชื่อไฟล์ที่มีคำว่า “รายการหนัง” หรือ “Playlist” • ไฟล์ Excel อื่น (เช่น ใบแจ้งหนี้) ไม่เก็บ แค่บอกในอีเมลสรุป
   - **Show DC และ LA PlanB** ไม่ได้ส่งทุกวัน ถ้าวันนี้ยังไม่มีฉบับใหม่ ใช้ฉบับล่าสุดไปก่อน (ค้นย้อนหลัง 14 วัน) พอฉบับของวันนี้มา ฉบับเก่าย้ายไปถังขยะของ Drive ให้เอง

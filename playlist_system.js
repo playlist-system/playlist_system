@@ -159,6 +159,7 @@
  *   เวอร์ชัน ใส่วันที่ถ่าย: ตามวันที่ของไฟล์รูป
  *   เวอร์ชัน 5.5.55: ดึง Playlist หลายวันจาก PLAYLIST INBOX (วันจันทร์ / หลังวันหยุด)
  *   เวอร์ชัน 5.5.56: ข้อความหลังดึง Playlist จาก PLAYLIST INBOX (ต้องมาทุกวัน / ไม่ได้ส่งทุกวัน / ฉบับแก้ไข)
+ *   เวอร์ชัน 5.5.57: BKJ2 ชีต RED/BLUE, ข้ามไฟล์ลำดับฉาย (Playlist Planner)
  * ======================================================================
  */
 
@@ -9982,12 +9983,28 @@ function parseSig(wb, media, map, opt) {
   }
   return out;
 }
-/* Bangkok Jams รายวัน: ชีต BKJ ALL (BKJ1) • BKJ2-A • BKJ2-B */
+/* Bangkok Jams รายวัน: ชีต BKJ ALL (BKJ1) • BKJ2-A • BKJ2-B
+   5.5.57: Playlist BKJ2 ตั้งแต่ 13 พ.ย. 2569 เปลี่ยนชื่อชีต BKJ 2-A → BKJ 2-RED และ BKJ 2-B → BKJ 2-BLUE (จอชุดเดิมทุกจอ เทียบชีต pack แล้ว)
+   ใช้รหัสเดิม BKJ2-A / BKJ2-B ต่อ — ใบเช็คชีต …JAM2_A / _R = A, _B = B เหมือนเดิม */
 const bkjCode = sn => {
   if (/^BKJ\s*1?\s*ALL$/i.test(sn)) return 'BKJ1 ALL';
-  const m = sn.match(/^BKJ\s*2\s*-\s*([AB])$/i);
-  return m ? 'BKJ2-' + m[1].toUpperCase() : null;
+  const m = sn.match(/^BKJ\s*2\s*-\s*(A|B|R|RED|BLUE)$/i);
+  return m ? 'BKJ2-' + (/^B/i.test(m[1]) ? 'B' : 'A') : null;
 };
+/* 5.5.57: ไฟล์ลำดับฉาย (Playlist Planner: ชีต Final_Playlist / input … / Repeat_Report) ไม่ใช่รายการหนัง — รายการหนังของจอเหล่านี้มาจาก Signature Max */
+const isOrderWb = wb =>
+    wb.SheetNames.includes('Final_Playlist') ||
+    (wb.SheetNames.includes('Repeat_Report') && wb.SheetNames.some(n => /^input\s/i.test(n))),
+  orderScr = wb =>
+    wb.SheetNames.filter(
+      n => !/^(input\s|Final_Playlist$|Repeat_Report$|LOG$|Version\s|วิธี|ฟอร์ม|Sheet\d*$)/i.test(n),
+    ),
+  plSkip = (why, info) => {
+    const o = [];
+    o.why = why;
+    o.info = !!info;
+    return o;
+  }; /* ไม่ใช้ไฟล์นี้: บอกเหตุผล (info = ข้ามได้ ไม่ใช่ข้อผิดพลาด) */
 /* 7-Eleven Metro LED: ใช้ชีตของวันล่าสุด (เช่น “2 Oct”) และหาคอลัมน์จากหัวตาราง (การออกอากาศ Start/End, ระยะสัญญา Start/End) */
 /* สถานะของ Metro อยู่ที่สีแถว: อ่านคำอธิบายสีในหัวชีต (เช่น Q1–Q3) แล้วเทียบกับสีช่อง Version ของแต่ละแถว */
 const MCOL = t =>
@@ -10567,6 +10584,21 @@ function parsePlaylist(f) {
       if (V) return ret(parseVen(f, wb, V, I));
     } /* 4.4 */
     if (wb.SheetNames.some(n => bkjCode(n))) return ret(parseSig(wb, 'Bangkok Jams', bkjCode));
+    if (/BKJ|Bangkok\s*Jam/i.test(f.name) || wb.SheetNames.some(n => /^BKJ\s*\d/i.test(n)))
+      return plSkip(
+        `ไฟล์ BKJ แต่ชื่อชีตไม่ตรงแบบที่ระบบรู้จัก (${
+          wb.SheetNames.filter(n => /BKJ/i.test(n))
+            .slice(0, 4)
+            .join(', ') || 'ไม่มีชีต BKJ'
+        }) — ไม่ได้นำเข้า เพื่อไม่ให้ปนกับ Signature Max ส่งไฟล์ให้ผู้ดูแลระบบ`,
+      ); /* 5.5.57: เดิมตกไปอ่านเป็น Signature Max */
+    if (isOrderWb(wb)) {
+      const S = orderScr(wb);
+      return plSkip(
+        `ไฟล์ลำดับฉาย (Playlist Planner)${S.length ? ' ของจอ ' + S.join(', ') : ''} — ไม่ใช่รายการหนัง ระบบไม่ได้ใช้ ข้ามให้แล้ว (รายการหนังของจอเหล่านี้มาจากไฟล์ Signature Max)`,
+        1,
+      );
+    }
     if (isLaWb(wb)) {
       const p = parseSig(wb, 'LA PlanB', () => 'LA PlanB');
       if (p.length) {
@@ -11019,7 +11051,8 @@ async function addFiles(kind, files) {
   view();
   await new Promise(r => setTimeout(r, 30));
   let n = 0,
-    skip = [];
+    skip = [],
+    info = [];
   const ok = [],
     emp = [],
     got = [],
@@ -11037,6 +11070,11 @@ async function addFiles(kind, files) {
     }
     PLX = PLX.filter(x => x.f !== f.name);
     PLI = PLI.filter(x => x.f !== f.name);
+    if (p && p.why) {
+      (p.info ? info : skip).push(f.name);
+      PLX.push({ f: f.name, why: p.why, info: p.info });
+      continue;
+    }
     if (!p) {
       skip.push(f.name);
       PLX.push({
@@ -11145,6 +11183,7 @@ async function addFiles(kind, files) {
   note =
     `นำเข้า ${new Set(got.flatMap(x => x.p.map(s => s.m + '|' + s.c))).size} จอ` +
     (skip.length ? ` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก` : '') +
+    (info.length ? ` • ข้ามไฟล์ที่ไม่ได้ใช้ ${info.length} ไฟล์` : '') +
     (emp.length
       ? ` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`
       : '');
@@ -11153,7 +11192,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.56 (16 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.57 (16 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -12002,7 +12041,29 @@ function vData() {
  <div class="s1">${drop('pl', has ? 'เพิ่มหรือเปลี่ยนไฟล์ Playlist' : 'ลากไฟล์ Playlist มาวางที่นี่', 'หรือคลิกเพื่อเลือกไฟล์ .xlsx / .xls / .zip (ไม่ต้องแตกไฟล์) เลือกหลายไฟล์พร้อมกันได้ ไฟล์ใหม่ของจอเดียวกันจะแทนที่ของเดิม • ลากโฟลเดอร์ของแต่ละวันมาทั้งโฟลเดอร์ก็ได้', '.xlsx,.xls,.xlsm', 'drop-pl', has)}${vDateCard(wd, has)}</div>
  <div class="plrow"><button class="btn quiet ckdir pldir" data-a="pickdir" data-k="pl">${IC.folder}เลือกทั้งโฟลเดอร์ (เช่น โฟลเดอร์วันที่ 1 กับ 2 หรือโฟลเดอร์เดือน)</button>${plpBtn('ckdir pldir')}${plwBtn('quiet ckdir pldir')}</div>
  ${vDays(MD)}${vWall(wd)}
- <div class="stack">${PLX.length ? alertHTML('er', `อ่านไม่ได้ ${PLX.length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`, `<ul>${PLX.map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`).join('')}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`) : ''}
+ <div class="stack">${
+   PLX.some(x => x.info)
+     ? alertHTML(
+         'info',
+         `ไม่ได้ใช้ ${PLX.filter(x => x.info).length} ไฟล์ — ระบบข้ามให้แล้ว`,
+         `<ul>${PLX.filter(x => x.info)
+           .map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`)
+           .join('')}</ul><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`,
+       )
+     : ''
+ }${
+   PLX.some(x => !x.info)
+     ? alertHTML(
+         'er',
+         `อ่านไม่ได้ ${PLX.filter(x => !x.info).length} ไฟล์ ไฟล์เหล่านี้ยังไม่ได้นำเข้าระบบ`,
+         `<ul>${PLX.filter(x => !x.info)
+           .map(x => `<li><b>${esc(x.f)}</b><br>${esc(x.why)}</li>`)
+           .join(
+             '',
+           )}</ul><p>ตรวจว่าเป็นไฟล์ Playlist .xlsx ที่ถูกต้อง ไม่ใช่ PDF หรือไฟล์อื่นที่แนบมาในอีเมลเดียวกัน ถ้าถูกแล้วแต่ยังอ่านไม่ได้ ส่งไฟล์ให้ผู้ดูแลระบบ</p><button class="btn quiet" data-a="clrx">ซ่อนรายการนี้</button>`,
+       )
+     : ''
+ }
  ${vPLI()}
  ${!MD && ds.length > 1 ? alertHTML('wr', `ไฟล์ Playlist มีหลายวันปนกัน (${ds.map(d => thd(new Date(d))).join(', ')})`, `<p>ระบบใช้ ${thd(wd)} เป็นวันทำงาน ช่องไฟเหลืองในเช็กลิสต์คือแบบที่ไฟล์เป็นวันอื่น ใส่ไฟล์ของวันที่ถูกต้องแทน หรือกด “ล้าง Playlist (เริ่มวันใหม่)” แล้วใส่เฉพาะไฟล์ของวันนั้น</p>`) : ''}</div>
  ${fl.length ? `<details class="files" ${FLOPEN ? 'open' : ''}><summary>ไฟล์ Playlist ที่ใส่แล้ว ${fl.length} ไฟล์</summary><div class="flist">${fl.map(([f, d]) => `<span class="fchip">${esc(f)}${d ? `<em>${thd(new Date(d))}</em>` : ''}</span>`).join('')}</div></details>` : ''}
@@ -13812,7 +13873,7 @@ function vHome() {
               `<div class="hfile"><span class="xi" aria-hidden="true">X</span><span><b title="${esc(f)}">${esc(f)}</b><small>${d ? 'วันที่ ' + thd(new Date(d)) : 'ใส่แล้ว'}</small></span><span class="hok" aria-hidden="true">${IC.okc}</span></div>`,
           )
           .join('') +
-        `<p class="hint">${fl.length > 4 ? `และอีก ${fl.length - 4} ไฟล์ • ` : ''}ครบ ${nk} จาก 11 แบบ${PLX.length ? ` • อ่านไม่ได้ ${PLX.length} ไฟล์` : ''}</p>`
+        `<p class="hint">${fl.length > 4 ? `และอีก ${fl.length - 4} ไฟล์ • ` : ''}ครบ ${nk} จาก 11 แบบ${PLX.some(x => !x.info) ? ` • อ่านไม่ได้ ${PLX.filter(x => !x.info).length} ไฟล์` : ''}</p>`
       : `<p class="hint" style="margin-top:0">ยังไม่ได้ใส่ Playlist ลากไฟล์มาวางที่หน้านี้ หรือ</p><div class="hbtns">${plpBtn('secondary')}<button class="btn secondary" data-a="tab" data-k="dat">${IC.up}ไปใส่ Playlist</button></div>`
   }</section>`;
   const resCard = `<section class="hcard" aria-labelledby="hrs"><h2 id="hrs">ผลการเติมล่าสุด</h2>${
