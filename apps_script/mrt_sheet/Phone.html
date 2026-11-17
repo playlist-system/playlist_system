@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="th"><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ใบงานถ่ายรูป MRT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Prompt:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--f-ui:"IBM Plex Sans Thai",Tahoma,sans-serif;--f-hd:"Prompt","IBM Plex Sans Thai",sans-serif;
+ --navy:#022866;--navy2:#0B3478;--cyan:#1BB8EF;--cyt:#0072A8;--cys:#E2F4FC;--bg:#F4F7FB;--sf:#fff;--sf3:#E6EBF3;--ln:#D4DCE8;
+ --tx:#0B1F45;--tx2:#34446A;--mu:#5A6987;--ok:#1B7646;--okb:#2FA866;--wr:#8F5C06;--wrb:#E5A321;--wrs:#FFF2CC;--er:#B9312A;--erb:#DC4F43;--ers:#FCE8E6}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--tx);font:15px/1.5 var(--f-ui);-webkit-text-size-adjust:100%}
+.g{color:var(--ok)}.a{color:var(--wr)}.r{color:var(--er)}
+.app{background:var(--navy);color:#fff;padding:14px 18px 16px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:8px}.pb{font:600 17px/1 var(--f-hd);color:#fff;letter-spacing:.2px}.pb i{font-style:normal;color:var(--cyan)}
+.brand span{font:500 13px var(--f-ui);color:#BFD0EE;border-left:1px solid rgba(255,255,255,.25);padding-left:10px}
+.t{font:600 21px/1.3 var(--f-hd)}.s{font-size:13px;color:#BFD0EE;display:flex;gap:12px;flex-wrap:wrap}
+.back{font-size:14px;color:#9FE0F8;margin-bottom:2px;display:inline-block;text-decoration:none}
+.hero{display:flex;align-items:center;gap:16px;margin-top:12px}.hero svg{flex:none}
+.k{font-size:13px;color:#BFD0EE}.v{font:600 16px/1.4 var(--f-ui)}.v small{font:500 13px var(--f-ui);color:#BFD0EE}
+.mrt{margin-top:6px;display:inline-flex;gap:8px;align-items:baseline;background:var(--navy2);border-radius:10px;padding:4px 10px;font-size:12.5px;color:#BFD0EE}
+.mrt b{font:600 15px var(--f-hd);color:#fff}
+.body{padding:12px 14px 90px}
+.note{background:#FFF8E1;border:1px solid #F1D98A;border-radius:12px;padding:8px 12px;font-size:13px;color:var(--tx2);margin-bottom:10px}
+.newb{display:flex;gap:10px;background:var(--cys);border:1px solid #B8E4F7;border-radius:14px;padding:10px 12px;margin-bottom:10px}
+.newb .dot{width:10px;height:10px;border-radius:50%;background:var(--cyan);margin-top:6px;flex:none}
+.newb b{display:block;font:600 14px var(--f-ui);color:var(--cyt)}.newb span{font-size:13px;color:var(--tx2);display:block;overflow-wrap:anywhere;line-height:1.4}
+.sec{display:flex;align-items:center;gap:8px;margin:12px 2px 7px;font:600 15px var(--f-hd)}
+.sec .n{font:500 12.5px var(--f-ui);color:var(--mu);margin-left:auto}.sec .d{width:9px;height:9px;border-radius:50%}
+.card{display:block;text-decoration:none;color:inherit;background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:11px 14px;margin-bottom:8px}
+.h{display:flex;align-items:baseline;gap:8px}.h b{font:600 17px var(--f-hd)}.h span{font-size:13px;color:var(--mu)}
+.h .sc{margin-left:auto;font:600 19px var(--f-hd)}
+.bar{height:8px;border-radius:8px;background:var(--sf3);margin:8px 0 6px;overflow:hidden}.bar i{display:block;height:100%;border-radius:8px}
+.bg-g{background:var(--okb)}.bg-a{background:var(--wrb)}.bg-r{background:var(--erb)}
+.m{display:flex;justify-content:space-between;gap:6px;font-size:13px;color:var(--tx2);flex-wrap:wrap}.m b{font-weight:600}
+.flag{display:inline-block;font:600 12px var(--f-ui);border-radius:8px;padding:0 8px;background:var(--ers);color:var(--er);margin-left:6px}
+.chips{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.chips button{font:600 13px var(--f-ui);padding:6px 12px;border-radius:99px;background:var(--sf);border:1px solid var(--ln);color:var(--tx2)}
+.chips .on{background:var(--navy);border-color:var(--navy);color:#fff}
+.zero{display:flex;align-items:center;gap:10px;background:var(--sf);border:1px solid #F1C3BE;border-left:5px solid var(--erb);border-radius:14px;padding:9px 12px;margin-bottom:7px}
+.zero b{font:600 16px var(--f-hd)}.zero span{font-size:13px;color:var(--tx2)}
+.zero button{margin-left:auto;font:600 13px var(--f-ui);color:var(--cyt);background:none;border:0;white-space:nowrap}
+.scard{background:var(--sf);border:1px solid var(--ln);border-radius:16px;overflow:hidden;margin-bottom:8px}
+.sh{display:flex;align-items:baseline;gap:8px;padding:10px 14px 8px}.sh b{font:600 17px var(--f-hd)}.sh span{font-size:13px;color:var(--mu)}.sh .sc{margin-left:auto;font:600 15px var(--f-hd)}
+.it{display:grid;grid-template-columns:18px 1fr;gap:9px;padding:8px 14px;border-top:1px solid var(--sf3)}
+.bx{width:16px;height:16px;border:2px solid #A3ACBB;border-radius:4px;margin-top:3px}
+.nm{font:500 14.5px/1.35 var(--f-ui);overflow-wrap:anywhere}
+.tag{display:inline-block;font:600 11.5px/1.5 var(--f-ui);border-radius:7px;padding:0 7px;margin-top:3px}
+.tag.new{background:var(--cys);color:var(--cyt)}.tag.old{background:var(--wrs);color:var(--wr)}
+.okrow{display:flex;justify-content:space-between;background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:8px 14px;margin-bottom:6px;font-size:14px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.tile{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:10px 12px}.tile.dk{background:var(--navy);border-color:var(--navy);color:#fff}
+.tile b{display:block;font:600 27px/1.15 var(--f-hd)}.tile span{font-size:12.5px;color:var(--mu);display:block;line-height:1.35}.tile.dk span{color:#BFD0EE}
+.box{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:6px 14px;margin-bottom:10px}
+.pr{display:grid;grid-template-columns:96px 1fr 46px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--sf3);font-size:13.5px}
+.pr:first-child{border-top:0}.pr .bb{height:9px;border-radius:9px;background:var(--sf3);overflow:hidden}.pr .bb i{display:block;height:100%}
+.pr b{font:600 14px var(--f-hd);text-align:right}.pr .nn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pr .nn small{color:var(--mu);font-size:12px;margin-left:4px}
+.wide{grid-template-columns:1fr 60px 46px}
+.nav{position:fixed;left:0;right:0;bottom:0;height:62px;background:#fff;border-top:1px solid var(--ln);display:flex;justify-content:space-around;align-items:center;padding-bottom:env(safe-area-inset-bottom)}
+.nav a{display:flex;flex-direction:column;align-items:center;gap:2px;font:600 12px var(--f-ui);color:var(--mu);text-decoration:none}
+.nav a.on{color:var(--navy)}.nav svg{stroke:currentColor}
+.app{position:relative}.rf{position:absolute;right:14px;top:12px;background:var(--navy2);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:4px 12px;font:600 12.5px var(--f-ui)}
+.empty{text-align:center;color:var(--mu);padding:40px 10px}
+</style></head><body>
+<div id="v"></div>
+<nav class="nav"><a href="#" id="n0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" stroke-width="2" stroke-linejoin="round"/></svg>งานของฉัน</a>
+<a href="#scores" id="n1"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 20V11M12 20V5M19 20v-7" stroke-width="2.4" stroke-linecap="round"/></svg>คะแนน</a></nav>
+<script>
+const D = <?!= data ?>;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const wb = s => esc(s).replace(/_/g, '_<wbr>');
+const col = p => p >= .9 ? 'g' : p >= .5 ? 'a' : 'r';
+const pc = p => Math.round(p * 100) + '%';
+const MON = (String(D.round).match(/\d+\s*[–-]\s*\d+\s+(\S+)/) || [, ''])[1];
+const scrP = s => s.n ? s.done / s.n : 0;
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+const ST = D.stations.map((s, i) => { const n = s.screens.reduce((a, x) => a + x.n, 0), d = s.screens.reduce((a, x) => a + x.done, 0);
+  return Object.assign({}, s, { i, n, d, z: s.screens.filter(x => x.n && !x.done).length, p: avg(s.screens.map(scrP)) }); });
+const MY = [].concat(...ST.map(s => s.screens.map(x => Object.assign({ st: s.name }, x))));
+const myP = avg(MY.map(scrP)), myN = ST.reduce((a, s) => a + s.n, 0), myD = ST.reduce((a, s) => a + s.d, 0);
+const who = D.email ? D.email.split('@')[0] : '';
+function ring(p) { const r = 43, C = 2 * Math.PI * r, L = C * p;
+  return `<svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="${r}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="10"/>` +
+    `<circle cx="48" cy="48" r="${r}" fill="none" stroke="#1BB8EF" stroke-width="10" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 48 48)"/>` +
+    `<text x="48" y="54" text-anchor="middle" fill="#fff" font-family="Prompt,sans-serif" font-weight="600" font-size="25">${Math.round(p * 100)}<tspan font-size="14">%</tspan></text></svg>`; }
+const RF = '<button class="rf" onclick="location.reload()">อัปเดต</button>';
+const head = (title, sub, extra = '') => `<div class="app">${RF}<div class="brand"><b class="pb">Plan<i>·B</i></b><span>ใบงานถ่ายรูป MRT</span></div><div class="t">${title}</div><div class="s">${sub.map(x => `<span>${esc(x)}</span>`).join('')}</div>${extra}</div>`;
+const bar = p => `<div class="bar"><i class="bg-${col(p)}" style="width:${Math.max(p * 100, 1.5).toFixed(1)}%"></i></div>`;
+function home() {
+  const sub = [who ? 'คุณ ' + who : '', D.round, 'อัปเดต ' + D.updated].filter(Boolean);
+  const hero = `<div class="hero">${ring(myP)}<div><div class="k">${D.assigned ? 'คะแนนของฉัน' : 'คะแนนทุกสถานี'}</div><div class="v">ได้รูปแล้ว ${myD.toLocaleString()} จาก ${myN.toLocaleString()}<br><small>ยังเหลือ ${myN - myD} รูป ใน ${ST.length} สถานี</small></div><div class="mrt">คะแนนรวมทั้ง MRT <b>${(D.mrt * 100).toFixed(1)}%</b></div></div></div>`;
+  let h = head(D.assigned ? 'งานของฉัน' : 'งานทั้งหมด', sub, hero) + '<div class="body">';
+  if (!D.assigned) h += `<div class="note">อีเมลนี้ยังไม่ได้ผูกกับสถานีในแท็บ "ผู้ใช้และสิทธิ์" เลยแสดงทุกสถานีไปก่อน</div>`;
+  if (D.newFilms.length) h += `<div class="newb"><div class="dot"></div><div><b>หนังขึ้นใหม่ ${D.newest} ${MON}</b>${D.newFilms.map(f => `<span>${wb(f)}</span>`).join('')}<span>ต้องถ่ายทุกจอที่ฉายเรื่องนี้</span></div></div>`;
+  const list = ST.slice().sort((a, b) => (b.n - b.d) - (a.n - a.d));
+  h += `<div class="sec">สถานีที่ยังเหลือ<span class="n">เรียงจากเหลือมากสุด</span></div>`;
+  if (!list.length) h += `<div class="empty">ยังไม่มีข้อมูลใบเช็ค</div>`;
+  for (const s of list) {
+    const fl = s.z ? `<span class="flag">${s.z === s.screens.length ? 'ยังไม่มีรูปเลย' : s.z + ' จอยังไม่มีรูป'}</span>` : '';
+    h += `<a class="card" href="#s${s.i}"><div class="h"><b>${esc(s.name)}</b><span>${s.screens.length} จอ</span><span class="sc ${col(s.p)}">${pc(s.p)}</span></div>${bar(s.p)}<div class="m"><span>เหลือ <b class="${col(s.p)}">${s.n - s.d}</b> รูป${fl}</span><span>ได้แล้ว ${s.d}/${s.n}</span></div></a>`;
+  }
+  return h + '</div>';
+}
+let showAll = false;
+function station(i) {
+  const s = ST[i]; if (!s) return home();
+  const extra = '';
+  let h = `<div class="app">${RF}<a class="back" href="#">‹ งานของฉัน</a><div class="t">สถานี${esc(s.name)}</div><div class="s"><span>${s.screens.length} จอ</span><span>ได้แล้ว ${s.d}/${s.n}</span><span>เหลือ ${s.n - s.d} รูป</span><span>คะแนน ${pc(s.p)}</span></div></div><div class="body">`;
+  const zero = s.screens.filter(x => x.n && !x.done), part = s.screens.filter(x => x.done && x.done < x.n).sort((a, b) => b.miss.length - a.miss.length), full = s.screens.filter(x => x.n && x.done >= x.n);
+  h += `<div class="chips"><button class="${showAll ? '' : 'on'}" onclick="showAll=false;draw()">ยังไม่ครบ ${zero.length + part.length} จอ</button><button class="${showAll ? 'on' : ''}" onclick="showAll=true;draw()">ทั้งหมด ${s.screens.length}</button></div>`;
+  const items = x => x.miss.map(([nm, d]) => `<div class="it"><div class="bx"></div><div><div class="nm">${wb(nm)}</div>${d === D.newest && D.newFilms.length ? `<span class="tag new">ขึ้นใหม่ ${d} ${MON}</span>` : `<span class="tag old">ค้างตั้งแต่ ${d} ${MON}</span>`}</div></div>`).join('');
+  if (zero.length) { h += `<div class="sec"><span class="d" style="background:#DC4F43"></span>ยังไม่มีรูปเลย<span class="n">${zero.length} จอ</span></div>`;
+    zero.forEach((x, k) => { h += `<div class="zero"><div><b>${esc(x.code)}</b> <span>${esc(x.type)}</span><br><span>ยังไม่มีรูปเลย ต้องถ่าย ${x.n} เรื่อง</span></div><button onclick="this.parentNode.nextElementSibling.hidden=!this.parentNode.nextElementSibling.hidden">ดูรายการ ›</button></div><div class="scard" hidden>${items(x)}</div>`; }); }
+  if (part.length) { h += `<div class="sec"><span class="d" style="background:#E5A321"></span>ขาดบางเรื่อง<span class="n">${part.length} จอ</span></div>`;
+    part.forEach(x => { h += `<div class="scard"><div class="sh"><b>${esc(x.code)}</b><span>${esc(x.type)}</span><span class="sc ${col(scrP(x))}">เหลือ ${x.miss.length}</span></div>${items(x)}</div>`; }); }
+  if (!zero.length && !part.length) h += `<div class="empty">ได้รูปครบทุกจอแล้ว</div>`;
+  if (showAll && full.length) { h += `<div class="sec"><span class="d" style="background:#2FA866"></span>ครบแล้ว<span class="n">${full.length} จอ</span></div>`;
+    full.forEach(x => { h += `<div class="okrow"><span><b>${esc(x.code)}</b> ${esc(x.type)}</span><span class="g">ครบ ${x.n}/${x.n}</span></div>`; }); }
+  return h + '</div>';
+}
+function scores() {
+  let h = head('คะแนน', [D.round, 'อัปเดต ' + D.updated]) + '<div class="body">';
+  h += `<div class="tiles"><div class="tile dk"><b>${(D.mrt * 100).toFixed(1)}%</b><span>คะแนนรวมทั้ง MRT<br>${D.mrtScreens} จอ</span></div><div class="tile"><b class="${col(myP)}">${(myP * 100).toFixed(1)}%</b><span>${D.assigned ? 'คะแนนของฉัน' : 'สถานีที่แสดง'}<br>${MY.length} จอ ได้ 90% ขึ้นไป ${MY.filter(x => scrP(x) >= .9).length} จอ</span></div></div>`;
+  h += `<div class="sec">แยกตามสถานี</div><div class="box">` + ST.slice().sort((a, b) => a.p - b.p).map(s => `<a class="pr" href="#s${s.i}" style="color:inherit;text-decoration:none"><span class="nn">${esc(s.name)}</span><div class="bb"><i class="bg-${col(s.p)}" style="width:${Math.max(s.p * 100, 1.5)}%"></i></div><b class="${col(s.p)}">${pc(s.p)}</b></a>`).join('') + '</div>';
+  h += `<div class="sec">คะแนนแต่ละจอ<span class="n">น้อยสุดขึ้นก่อน</span></div><div class="box">` + MY.slice().sort((a, b) => scrP(a) - scrP(b)).map(x => `<div class="pr wide"><span class="nn">${esc(x.code)} ${esc(x.type)}<small>${esc(x.st)}</small></span><div class="bb"><i class="bg-${col(scrP(x))}" style="width:${Math.max(scrP(x) * 100, 2)}%"></i></div><b class="${col(scrP(x))}">${pc(scrP(x))}</b></div>`).join('') + '</div>';
+  return h + '</div>';
+}
+function draw() {
+  const hsh = location.hash.slice(1), v = document.getElementById('v');
+  const m = hsh.match(/^s(\d+)$/);
+  v.innerHTML = hsh === 'scores' ? scores() : m ? station(+m[1]) : home();
+  document.getElementById('n0').className = hsh === 'scores' ? '' : 'on';
+  document.getElementById('n1').className = hsh === 'scores' ? 'on' : '';
+}
+window.addEventListener('hashchange', () => { showAll = false; draw(); window.scrollTo(0, 0); });
+draw();
+</script></body></html>
