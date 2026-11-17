@@ -162,6 +162,7 @@
  *   เวอร์ชัน 5.5.57: BKJ2 ชีต RED/BLUE, ข้ามไฟล์ลำดับฉาย (Playlist Planner)
  *   เวอร์ชัน 5.5.58: เตือนเมื่อวันไหนไม่มี Show DC ของวันนั้นตอนเติมหลายวัน
  *   เวอร์ชัน 5.5.59: เช็กลิสต์ Playlist หลายวัน (แถววันที่ในการ์ด เลือกดูทีละวัน สรุปทีละวัน) + ตารางไฟล์ที่ใส่แล้ว แบบ × วัน
+ *   เวอร์ชัน 5.5.60: หมายเหตุที่มีชื่อหนังหลายเรื่อง — แต่ละประโยคใช้กับหนังที่เขียนไว้หน้าประโยค
  * ======================================================================
  */
 
@@ -9635,10 +9636,57 @@ const ntoks = seg => {
   }
   return out.filter(Boolean);
 };
+/* 5.5.60: หมายเหตุที่ระบุชื่อหนังหลายเรื่อง เช่น “A_30s ออนเฉพาะ สาธร และ B_15s ออนเฉพาะ Twin Tube” / “ออนเฉพาะ SDC / AOT 15 วินาที จออื่นออน C_30s”
+   → แต่ละประโยคใช้กับหนังที่เขียนไว้หน้าประโยคนั้นเท่านั้น • ประโยคที่บอกความยาว (15 วินาที) ใช้กับหนังความยาวนั้น • “จออื่นออน <หนัง>” = หนังเรื่องนั้นออนจอที่ไม่อยู่ในรายการ “ออนเฉพาะ”
+   (เดิมอ่านประโยคแรกประโยคเดียว → หนัง 15s ที่ระบุให้ลง Twin Tube ไม่ลง และหนัง 30s ของ “จออื่นออน” ไม่ลงจออื่น) */
+const FILMRE = /[A-Za-z0-9#][\w#.+&-]*_\d+s(?![A-Za-z0-9])/gi,
+  fnm = t =>
+    String(t)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+function noteFilm(al, r, n) {
+  const F = [...n.matchAll(FILMRE)];
+  if (!F.length) return null;
+  const M = [...n.matchAll(/ไม่ออน(?:แอร์|จอ)*|ยกเว\u0e49+น(?:จอ)?|(?:ออน|ขึ้น)?เ?ฉพาะ(?:จอ)?/g)];
+  if (!M.length) return null;
+  const me = fnm(r.ad),
+    len = +r.len || 0,
+    only = [];
+  let pe = 0;
+  for (let i = 0; i < M.length; i++) {
+    const m = M[i],
+      at = m.index,
+      e = at + m[0].length,
+      nx = i + 1 < M.length ? M[i + 1].index : n.length,
+      nf = F.find(f => f.index >= e),
+      sub = F.filter(f => f.index >= pe && f.index < at).pop();
+    pe = e;
+    let L = n
+      .slice(e, Math.min(nx, nf ? nf.index : n.length))
+      .split('//')[0]
+      .split(/จออื่น/)[0];
+    const dm = L.match(/(\d+)\s*(?:วินาที|วิ|sec)/i);
+    L = L.replace(/\d+\s*(?:วินาที|วิ|sec)/gi, ' ');
+    const t = ntoks(L);
+    if (!t.some(x => ALLAL.has(x))) continue;
+    const hit = t.some(x => al.includes(x)),
+      k = /^ไม่ออน/.test(m[0]) ? 'not' : /^ยกเว/.test(m[0]) ? 'exc' : 'only';
+    if (k === 'only') only.push(hit);
+    if (sub ? fnm(sub[0]) !== me : dm && len && +dm[1] !== len) continue;
+    return k === 'only' ? !hit : hit;
+  }
+  const o = n.match(/จออื่น\s*ๆ?\s*(?:ออน|ใช้|เป็น)?\s*([A-Za-z0-9#][\w#.+&-]*_\d+s)/i);
+  if (o && fnm(o[1]) === me && only.length) return only.some(Boolean);
+  return false;
+}
 function noteSkip(scr, r) {
   const al = SIGAL[scr.c];
   if (!al) return false;
   const n = String(r.note || '');
+  {
+    const v = noteFilm(al, r, n);
+    if (v !== null) return v;
+  }
   let m = n.match(/ไม่ออน(?:แอร์|จอ)*\s*(.*)/);
   if (m) return ntoks(m[1].split('//')[0]).some(t => al.includes(t));
   m = n.match(/ยกเว\u0e49+น(?:จอ)?\s*(.*)/);
@@ -11194,7 +11242,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.59 (17 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.60 (17 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
