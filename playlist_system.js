@@ -161,6 +161,7 @@
  *   เวอร์ชัน 5.5.56: ข้อความหลังดึง Playlist จาก PLAYLIST INBOX (ต้องมาทุกวัน / ไม่ได้ส่งทุกวัน / ฉบับแก้ไข)
  *   เวอร์ชัน 5.5.57: BKJ2 ชีต RED/BLUE, ข้ามไฟล์ลำดับฉาย (Playlist Planner)
  *   เวอร์ชัน 5.5.58: เตือนเมื่อวันไหนไม่มี Show DC ของวันนั้นตอนเติมหลายวัน
+ *   เวอร์ชัน 5.5.59: เช็กลิสต์ Playlist หลายวัน (แถววันที่ในการ์ด เลือกดูทีละวัน สรุปทีละวัน) + ตารางไฟล์ที่ใส่แล้ว แบบ × วัน
  * ======================================================================
  */
 
@@ -11193,7 +11194,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.58 (17 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.59 (17 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -11280,7 +11281,10 @@ let FOCUSSEL = null,
   PTR = false,
   DEFER = false,
   TDRAWN = '',
-  OVK = '';
+  OVK = '',
+  WDAY = null,
+  FLV = 'k',
+  FLQ = ''; /* 5.5.59: WDAY = วันที่เลือกดูในเช็กลิสต์หลายวัน • FLV/FLQ = มุมมอง/คำค้นของตารางไฟล์ Playlist */
 const TH = [
   'ม.ค.',
   'ก.พ.',
@@ -11541,8 +11545,8 @@ const kindOn = k => {
   return !!K && DB.some(K.has);
 };
 const kindOfS = s => (KINDS.find(K => K.has(s)) || {}).k || s.m;
-function kState(K, wd) {
-  const L = DB.filter(K.has);
+function kState(K, wd, db = DB) {
+  const L = db.filter(K.has);
   if (!L.length) return { on: false };
   const fm = new Map();
   for (const s of L) if (s.pf) fm.set(s.pf, Math.max(fm.get(s.pf) || 0, s.pd || 0));
@@ -11892,15 +11896,81 @@ const dayLate = (G, g) =>
       return h ? [K.k, h.d] : null;
     })
     .filter(Boolean);
+/* 5.5.59: แบบที่ต้องมีทุกวัน (เหมือนเดิมใน vDays) */
+const dayCore = G =>
+  G.x
+    ? KINDS.filter(K => K.x && !K.v && (G.xl || !K.latest) && PFS.some(e => e.p.some(K.has)))
+    : G.vl
+      ? KINDS.filter(K => K.v && PFS.some(e => e.p.some(K.has)))
+      : G.v
+        ? KINDS.filter(K => K.day)
+        : KINDS.filter(K => !K.x && !K.latest);
+const thdW = d => `${THW[d.getUTCDay()]} ${thd(d)}`;
+/* 5.5.59: สถานะของแบบ K ในวันที่ i — ok มีไฟล์ของวันนั้น • car ไม่มี ใช้ของวันก่อนหน้า • miss ไม่มี (late = วันหลังที่มีไฟล์ ถ้าเป็นแบบที่ไม่ได้ส่งทุกวัน)
+   part มีไม่ครบทุกจอ (แบบที่มาหลายไฟล์ต่างจอกัน เช่น NTW) • old ฉบับเก่า (แบบที่ไม่ได้ส่งทุกวัน) • mis / next ไฟล์เป็นของวันก่อน / หลังวันนั้น */
+function kDay(K, G, i) {
+  const g = G[i],
+    L = g.db.filter(K.has),
+    own = g.E.filter(e => e.p.some(K.has));
+  if (!L.length) {
+    if (own.length) return { st: 'next', fd: Math.max(0, ...own.map(e => e.d)), own };
+    const h = K.latest ? G.find((h, j) => j > i && h.E.some(e => e.p.some(K.has))) : null;
+    return { st: 'miss', late: h ? h.d : 0 };
+  }
+  const fd = Math.max(0, ...L.map(s => s.pd || 0));
+  if (!own.length) return { st: 'car', fd };
+  if (fd && g.d && fd < g.d) return { st: K.latest ? 'old' : 'mis', fd, own };
+  if (fd && g.d && fd > g.d) return { st: 'next', fd, own };
+  if (
+    G.length > 1 &&
+    G.some(h => {
+      const o = h.E.filter(e => e.p.some(K.has));
+      return (
+        o.length > 1 &&
+        new Set(
+          o.map(e =>
+            e.p
+              .filter(K.has)
+              .map(s => s.c)
+              .sort()
+              .join('|'),
+          ),
+        ).size > 1
+      );
+    })
+  ) {
+    const U = new Set(G.flatMap(h => h.E.flatMap(e => e.p.filter(K.has).map(s => s.c))));
+    if (L.length < U.size) return { st: 'part', fd, own, oc: L.length, n: U.size };
+  }
+  return { st: 'ok', fd, own };
+}
+/* 5.5.59: ทุกวันใช้ไฟล์ฉบับเก่าไฟล์เดียวกัน (เช่น LA PlanB ฉบับ 12 พ.ย.) → วันที่ของฉบับนั้น */
+function kOld(K, G, A) {
+  if (!K.latest || A[0].st !== 'old' || !A.every(x => x.st === 'old' || x.st === 'car')) return 0;
+  return new Set(
+    G.map(g =>
+      g.db
+        .filter(K.has)
+        .map(s => s.pf)
+        .sort()
+        .join('|'),
+    ),
+  ).size === 1
+    ? A[0].fd
+    : 0;
+}
+const KDT = {
+  ok: 'มี',
+  car: 'ใช้ของวันก่อน',
+  miss: 'ไม่มี',
+  part: 'ไม่ครบ',
+  old: 'ฉบับเก่า',
+  mis: 'วันที่ไม่ตรง',
+  next: 'วันที่ไม่ตรง',
+};
 function vDays(G) {
   if (!G) return '';
-  const core = G.x
-      ? KINDS.filter(K => K.x && !K.v && (G.xl || !K.latest) && PFS.some(e => e.p.some(K.has)))
-      : G.vl
-        ? KINDS.filter(K => K.v && PFS.some(e => e.p.some(K.has)))
-        : G.v
-          ? KINDS.filter(K => K.day)
-          : KINDS.filter(K => !K.x && !K.latest),
+  const core = dayCore(G),
     gaps = [];
   for (let i = 1; i < G.length; i++) for (let t = G[i - 1].d + 864e5; t < G[i].d; t += 864e5) gaps.push(t);
   const row = (g, i) => {
@@ -11938,7 +12008,144 @@ function vDateCard(wd, has) {
   } /* 4.3 */
   return `<aside class="panel datecard" data-tour="date"><span class="lbl">Playlist วันที่</span><b class="big">${wd ? thd(wd) : 'ไม่พบวันที่'}</b><span class="src">${OP.base ? 'ตามที่พิมพ์ไว้ในขั้นที่ 3' : PLD ? 'จากไฟล์ Playlist ถ้าไม่ตรง แก้ได้ในขั้นที่ 3' : wd ? 'คาดจากวันเริ่มของหนังในไฟล์ ตรวจให้แน่ใจ หรือแก้ในขั้นที่ 3' : 'ใส่วันที่เองได้ในขั้นที่ 3'}</span>${BASEERR ? `<span class="src" style="color:var(--er);font-weight:600">วันที่ที่พิมพ์ในขั้นที่ 3 อ่านไม่ได้ ตอนนี้ใช้วันที่จาก Playlist</span>` : ''}${wd ? rndHTML(wd) : ''}</aside>`;
 }
+/* 5.5.59: เช็กลิสต์หลายวัน — การ์ดแต่ละแบบมีช่องวัน (วันละ 1 แถว) • ปุ่มเลือกดูวัน • สรุปทีละวัน */
+function vWallDays(G, wd) {
+  const di = G.findIndex(g => g.d === WDAY),
+    sel = di >= 0 ? [di] : G.map((_, i) => i),
+    dbS = di >= 0 ? G[di].db : DB,
+    wdS = di >= 0 ? new Date(G[di].d) : wd,
+    two = !G.x && !G.v;
+  const kin = K => G.some(g => g.db.some(K.has)),
+    ST = new Map(KINDS.map(K => [K, G.map((g, i) => kDay(K, G, i))])),
+    core = dayCore(G),
+    bad = x => x.st === 'miss' || x.st === 'part' || x.st === 'mis' || x.st === 'next';
+  const S = KINDS.filter(K => !K.x),
+    SX = KINDS.filter(K => K.x && !K.v && !K.n),
+    SV = KINDS.filter(K => K.v),
+    SN = KINDS.filter(K => K.n && kin(K));
+  const now = new Set(S.filter(K => DB.some(K.has)).map(K => K.k)),
+    pow = new Set([...now].filter(k => !LIT.has(k)));
+  LIT = now;
+  const chip = (x, i) => {
+    const D = new Date(G[i].d),
+      c = {
+        ok: 'dc-ok',
+        car: 'dc-car',
+        miss: 'dc-miss',
+        part: 'dc-part',
+        mis: 'dc-part',
+        next: 'dc-part',
+        old: 'dc-old',
+      }[x.st],
+      ic = { ok: IC.check, car: IC.reset, miss: IC.x, old: IC.info }[x.st] || IC.warn,
+      em =
+        x.st === 'part'
+          ? `มี ${x.oc} จาก ${x.n} จอ`
+          : x.st === 'mis' || x.st === 'next'
+            ? 'ไฟล์เป็นของ ' + thd(new Date(x.fd))
+            : x.st === 'old'
+              ? 'ใช้ฉบับ ' + thd(new Date(x.fd))
+              : '',
+      ti =
+        x.st === 'car'
+          ? `ไม่มีไฟล์ของวันนี้ ใช้ของ ${thd(new Date(x.fd))}`
+          : x.st === 'miss'
+            ? x.late
+              ? `ไม่มีของวันนี้ (ไฟล์ที่ใส่เป็นของ ${thd(new Date(x.late))})`
+              : 'ไม่มีไฟล์ของวันนี้'
+            : x.st === 'ok'
+              ? 'มีไฟล์ของวันนี้'
+              : x.st === 'part'
+                ? `มีไม่ครบทุกจอ (${x.oc} จาก ${x.n} จอ)`
+                : x.st === 'old'
+                  ? `ไม่ได้ส่งทุกวัน ใช้ฉบับ ${thd(new Date(x.fd))}`
+                  : `ไฟล์เป็นของ ${thd(new Date(x.fd))} ไม่ตรงวันนี้`;
+    return `<span class="dc ${c}${em ? ' dc2' : ''}" title="${thdW(D)}: ${ti}">${ic}<span><i class="wd">${THW[D.getUTCDay()]} </i>${thd(D)}</span>${em ? `<em>${em}</em>` : ''}</span>`;
+  };
+  const tile = K => {
+    const s = kState(K, wdS, dbS),
+      A = ST.get(K),
+      on = kin(K),
+      w = on && sel.some(i => bad(A[i])),
+      oa = kOld(K, G, A);
+    const st = !s.on
+      ? on
+        ? 'ไม่มีของวันนี้'
+        : K.tip
+          ? `ยังไม่ได้ใส่ (${K.tip})`
+          : 'ยังไม่ได้ใส่'
+      : `${s.scr.toLocaleString()} จอ · ${s.ads.toLocaleString()} รายการ`;
+    const strip =
+      oa && di < 0
+        ? `<span class="dc dc-old dc-all" title="ไม่ได้ส่งทุกวัน ใช้ฉบับ ${thd(new Date(oa))} ทุกวัน"><span>${IC.info}ฉบับ ${thd(new Date(oa))}</span><small>ใช้ทั้ง ${G.length} วัน</small></span>`
+        : sel.map(i => chip(A[i], i)).join('');
+    return `<div class="tile k-${K.c}${on ? ' on' : ''}${w ? ' wr' : ''}${pow.has(K.k) ? ' pow' : ''}" role="listitem" aria-label="${K.k}: ${st} — ${sel.map(i => thdW(new Date(G[i].d)) + ' ' + KDT[A[i].st]).join(', ')}"><span class="led" aria-hidden="true"></span><b>${K.k}</b><small>${st}</small><div class="kdays" aria-hidden="true">${strip}</div></div>`;
+  };
+  const cnt = g => KINDS.filter(K => (G.x ? K.x && !K.v : G.v ? K.v : !K.x) && g.db.some(K.has)).length;
+  const prob = i => {
+    const g = G[i],
+      miss = [],
+      lat = [],
+      warn = [];
+    for (const K of KINDS) {
+      const x = ST.get(K)[i];
+      if (x.st === 'miss') {
+        if (x.late) lat.push([K.k, x.late]);
+        else if (kin(K) || core.includes(K)) miss.push(K.k);
+      } else if (x.st === 'part') warn.push(`${K.k} มีไม่ครบ (${x.oc} จาก ${x.n} จอ)`);
+      else if (x.st === 'mis' || x.st === 'next') warn.push(`${K.k} เป็นไฟล์ของ ${thd(new Date(x.fd))}`);
+    }
+    return { miss, lat, warn, n: cnt(g) };
+  };
+  const P = G.map((_, i) => prob(i)),
+    okDay = i => !P[i].miss.length && !P[i].lat.length && !P[i].warn.length;
+  const D0 = new Date(G[0].d),
+    D1 = new Date(G[G.length - 1].d),
+    rng =
+      D0.getUTCMonth() === D1.getUTCMonth() && D0.getUTCFullYear() === D1.getUTCFullYear()
+        ? `${THW[D0.getUTCDay()]} ${D0.getUTCDate()} – ${thdW(D1)}`
+        : `${thdW(D0)} – ${thdW(D1)}`;
+  const tabs = `<div class="dtabs" role="group" aria-label="เลือกดูวัน"><button class="dtab${di < 0 ? ' on' : ''}" data-a="wday" data-k="" aria-pressed="${di < 0}">ทุกวัน</button>${G.map((g, i) => `<button class="dtab${di === i ? ' on' : ''}" data-a="wday" data-k="${g.d}" aria-pressed="${di === i}">${thdW(new Date(g.d))} <span class="n ${(two ? P[i].n === 11 : true) && okDay(i) ? 'ok' : 'wr'}">${two ? P[i].n + '/11' : P[i].n + ' แบบ'}</span></button>`).join('')}</div>`;
+  const grp = (t, L, six) =>
+    `<div class="wg${six ? '' : ' o'}"><p>${t}</p><div class="wgrid" role="list">${L.map(tile).join('')}</div></div>`;
+  const sums = sel.map(i => {
+    const D = new Date(G[i].d),
+      { miss, lat, warn, n } = P[i],
+      nm = [...miss, ...lat.map(y => y[0])];
+    if (okDay(i))
+      return `<div class="wsum ok">${IC.okc}<div><b>${thdW(D)} ${!two ? 'ครบ' : n === 11 ? 'ครบ 11 แบบ' : `ไม่มีแบบที่ขาด (${n} จาก 11 แบบ)`}</b></div></div>`;
+    return `<div class="wsum wr">${IC.warn}<div><b>${thdW(D)} ${nm.length ? 'ยังขาด ' + esc(nm.join(', ')) : 'ต้องตรวจ'}</b>${lat.map(([k, d]) => `<span>${esc(k)}: ไฟล์ที่ใส่เป็นของ ${thd(new Date(d))} — ใส่ไฟล์ ${esc(k)} ของวันที่ ${thd(D)} ก่อนกดเติม ไม่งั้นจอของ ${esc(k)} วันนั้นจะไม่ได้เติม</span>`).join('')}${warn.length ? `<span>${esc(warn.join(' • '))}</span>` : ''}</div></div>`;
+  });
+  const leg = `<div class="dlegend" aria-label="ความหมายของช่องวัน">${[
+    ['dc-ok', IC.check, 'มีไฟล์ของวันนั้น'],
+    ['dc-car', IC.reset, 'ไม่มีของวันนั้น ใช้ของวันก่อนหน้า'],
+    ['dc-miss', IC.x, 'ไม่มี'],
+    ['dc-part', IC.warn, 'มีไม่ครบ หรือวันที่ไม่ตรง'],
+    ['dc-old', IC.info, 'ไม่ได้ส่งทุกวัน ใช้ฉบับล่าสุด'],
+  ]
+    .map(
+      ([c, ic, t]) =>
+        `<span><span class="dlk"><span class="dc ${c}">${ic}<span>${c === 'dc-old' ? 'ฉบับเก่า' : thd(D0)}</span></span></span>${t}</span>`,
+    )
+    .join('')}</div>`;
+  const extra = [...new Set(DB.filter(s => !KINDS.some(K => K.has(s))).map(s => s.m))];
+  return `<section class="wall" data-tour="wall" aria-label="เช็กลิสต์ Playlist"><div class="wtop md"><div><h2>เช็กลิสต์ Playlist</h2><p class="wsub2">ใส่ไว้ ${G.length} วัน · ${rng} · ระบบเติมต่อกันทีละวัน</p></div>${tabs}</div>
+ ${grp(
+   'สรุปรายการหนังแยกจอ 6 ไฟล์',
+   S.filter(K => K.g),
+   1,
+ )}${grp(
+   'Playlist อื่น 5 ไฟล์',
+   S.filter(K => !K.g),
+ )}${SX.some(kin) ? grp('Playlist เพิ่มเติม (ใบเช็ค CCTV / MRT / LA PlanB — ไม่นับใน 11 แบบ)', SX) : ''}${SV.some(kin) ? grp('Playlist ห้าง / อาคาร (ใบเช็คจอในห้าง — ไม่นับใน 11 แบบ)', SV) : ''}${SN.length ? grp('NTW (Nationwide) — ระบบอ่านไฟล์ได้แล้ว ยังไม่มีใบเช็คให้เติม', SN) : ''}
+ ${leg}<div class="wsums">${sums.join('')}</div>
+ ${extra.length ? `<p class="wnote">ไฟล์อื่นที่อ่านได้: ${extra.map(esc).join(', ')}</p>` : ''}</section>`;
+}
 function vWall(wd) {
+  {
+    const G = plDays();
+    if (G) return vWallDays(G, wd);
+  }
   const SX = KINDS.filter(K => K.x && !K.v && !K.n).map(K => ({ K, s: kState(K, wd) })),
     SV = KINDS.filter(K => K.v).map(K => ({ K, s: kState(K, wd) })),
     SN = KINDS.filter(K => K.n).map(K => ({ K, s: kState(K, wd) })),
@@ -12023,6 +12230,172 @@ const vPLI = () => {
       : '')
   );
 };
+/* 5.5.59: ไฟล์ Playlist ที่ใส่แล้ว — ตาราง แบบ × วัน (เดิมเป็นชิปเรียงต่อกัน) */
+const FGRP = [
+  ['สรุปรายการหนังแยกจอ', 'blue', K => K.g],
+  ['Playlist อื่น', 'gold', K => !K.x && !K.g && !K.ex],
+  ['Playlist เพิ่มเติม (CCTV / MRT / LA PlanB)', 'teal', K => K.x && !K.v && !K.n],
+  ['ห้าง / อาคาร', 'rose', K => K.v],
+  ['NTW (Nationwide) และอื่น ๆ', 'blue', K => K.n],
+  ['แบบอื่นที่อ่านได้', 'slate', K => K.ex],
+];
+const ICDASH = '<svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>';
+function vFiles(MD, wd) {
+  let G = MD;
+  if (!G) {
+    const E = PFS.length
+      ? [...PFS].sort((a, b) => a.d - b.d || a.q - b.q)
+      : [...new Set(DB.map(s => s.pf).filter(Boolean))].map((f, q) => {
+          const p = DB.filter(s => s.pf === f);
+          return { f, p, d: Math.max(0, ...p.map(s => s.pd || 0)), q };
+        });
+    G = [{ d: wd ? +wd : 0, E, db: DB }];
+  }
+  const nF = G.reduce((n, g) => n + g.E.length, 0),
+    skip = PLX.filter(x => x.info);
+  if (!nF && !skip.length) return '';
+  const multi = G.length > 1,
+    V = FLV === 'd' && multi ? 'd' : FLV === 'w' ? 'w' : 'k',
+    allE = G.flatMap(g => g.E);
+  const ex = [...new Set(allE.flatMap(e => e.p.filter(s => !KINDS.some(K => K.has(s))).map(s => s.m)))].map(
+    m => ({ k: m, c: 's', ex: 1, has: s => s.m === m && !KINDS.some(K => K.has(s)) }),
+  );
+  const R = [...KINDS, ...ex]
+    .filter(K => allE.some(e => e.p.some(K.has)) || G.some(g => g.db.some(K.has)))
+    .map(K => {
+      const S = G.map((g, i) => kDay(K, G, i));
+      return {
+        K,
+        S,
+        hl: S.some(x => x.st === 'miss' || x.st === 'part' || x.st === 'mis' || x.st === 'next'),
+        oa: multi ? kOld(K, G, S) : 0,
+      };
+    });
+  const nW = R.filter(r => r.hl).length,
+    q = FLQ.trim().toLowerCase();
+  const tag = (t, c, ti) =>
+    `<span class="ftag${c ? ' ' + c : ''}"${ti ? ` title="${esc(ti)}"` : ''}>${esc(t)}</span>`;
+  const fl = (f, tg = '', c = '', ic = IC.sheet, b = '') =>
+    `<span class="fli${c ? ' ' + c : ''}"><span class="fic${b}">${ic}</span><span class="fnm" title="${esc(f)}">${esc(f)}</span>${tg}</span>`;
+  const msg = (t, c, ic) =>
+    `<span class="fli ${c}"><span class="fic b">${ic}</span><span class="fnm">${esc(t)}</span></span>`;
+  const srt = o => [...o].sort((a, b) => a.d - b.d || a.q - b.q);
+  const cell = (K, x) => {
+    if (x.st === 'car') return msg(`ไม่มีไฟล์ของวันนี้ — ใช้ของ ${thd(new Date(x.fd))}`, 'car', IC.reset);
+    if (x.st === 'miss')
+      return x.late
+        ? msg(`ไม่มีของวันนี้ — ไฟล์ที่ใส่เป็นของ ${thd(new Date(x.late))}`, 'wrd', IC.warn)
+        : msg('ไม่มีไฟล์', 'miss', IC.x);
+    const o = srt(x.own),
+      le = o[o.length - 1],
+      sc = e => e.p.filter(K.has).map(s => s.c),
+      ls = new Set(sc(le)),
+      rev = o.every(e => sc(e).every(c => ls.has(c)));
+    const t =
+      x.st === 'old'
+        ? tag('ฉบับ ' + thd(new Date(x.fd)), 'in', 'ไม่ได้ส่งทุกวัน ใช้ฉบับล่าสุดที่มี')
+        : x.st === 'mis' || x.st === 'next'
+          ? tag(
+              'ไฟล์ ' + thd(new Date(x.fd)),
+              'wr',
+              x.st === 'next' ? 'เป็นไฟล์ของวันหลังวันนี้' : 'วันที่ของไฟล์ไม่ตรงวันนี้',
+            )
+          : x.st === 'part'
+            ? tag(`${x.oc}/${x.n} จอ`, 'wr', 'บางจอไม่มีในไฟล์ของวันนี้')
+            : '';
+    if (rev)
+      return fl(
+        le.f,
+        (o.length > 1
+          ? tag(
+              `+${o.length - 1} ฉบับ`,
+              '',
+              `ระบบใช้ไฟล์ที่ใส่ทีหลัง • ฉบับก่อนหน้า: ${o
+                .slice(0, -1)
+                .map(e => e.f)
+                .join(' • ')}`,
+            )
+          : '') + t,
+      );
+    return o.map((e, j) => fl(e.f, j === o.length - 1 ? t : '')).join('');
+  };
+  const key = r => (r.K.k + ' ' + r.S.flatMap(x => (x.own || []).map(e => e.f)).join(' ')).toLowerCase(),
+    hid = k => (q && !k.includes(q) ? ' hidden' : '');
+  const cols = V === 'd' ? 1 : G.length,
+    style = `style="--fcols:minmax(120px,170px) repeat(${cols},minmax(220px,1fr));min-width:${170 + cols * 220}px"`;
+  let body = '';
+  const row = (r, cells, gi, hl) => {
+    const k = key(r);
+    return `<div class="ftr${hl ? ' hl' : ''}" role="row" data-g="${gi}" data-s="${esc(k)}"${hid(k)}><div class="fkind" role="cell">${esc(r.K.k)}</div>${cells}</div>`;
+  };
+  if (V === 'd')
+    G.forEach((g, i) => {
+      const D = new Date(g.d),
+        rs = R.filter(r => r.S[i].st !== 'miss' || r.hl),
+        vis = rs.filter(r => !hid(key(r))).length;
+      body += `<div class="ftr tg" data-g="${i}"${vis ? '' : ' hidden'} style="--x:var(--blue)"><div><i></i>${thdW(D)}<small>${g.E.length} ไฟล์</small></div></div>`;
+      for (const r of rs) {
+        const x = r.S[i];
+        body += row(
+          r,
+          `<div class="fcell" role="cell">${cell(r.K, x)}</div>`,
+          i,
+          x.st === 'miss' || x.st === 'part' || x.st === 'mis' || x.st === 'next',
+        );
+      }
+    });
+  else {
+    FGRP.forEach(([t, c, f], gi) => {
+      const rs = R.filter(r => f(r.K) && (V !== 'w' || r.hl));
+      if (!rs.length) return;
+      const vis = rs.filter(r => !hid(key(r))).length;
+      body += `<div class="ftr tg" data-g="${gi}"${vis ? '' : ' hidden'} style="--x:var(--${c})"><div><i></i>${t}<small>${rs.length} แบบ</small></div></div>`;
+      for (const r of rs) {
+        const le = r.oa ? srt(r.S[0].own).pop() : null;
+        body += row(
+          r,
+          le
+            ? `<div class="fcell span" role="cell">${fl(le.f, tag(`ฉบับ ${thd(new Date(r.oa))} · ใช้ทั้ง ${G.length} วัน`, 'in', 'ไม่ได้ส่งทุกวัน ใช้ฉบับล่าสุดที่มีทุกวัน'))}</div>`
+            : r.S.map(x => `<div class="fcell" role="cell">${cell(r.K, x)}</div>`).join(''),
+          gi,
+          r.hl,
+        );
+      }
+    });
+    if (skip.length && V === 'k') {
+      const gi = FGRP.length,
+        ks = skip.map(x => ({ x, k: (x.f + ' ' + x.why).toLowerCase() })),
+        vis = ks.filter(y => !hid(y.k)).length;
+      body += `<div class="ftr tg" data-g="${gi}"${vis ? '' : ' hidden'} style="--x:var(--slate)"><div><i></i>ไม่ได้ใช้ — ระบบข้ามให้<small>${skip.length} ไฟล์</small></div></div>`;
+      for (const { x, k } of ks)
+        body += `<div class="ftr" role="row" data-g="${gi}" data-s="${esc(k)}"${hid(k)}><div class="fkind" role="cell">${esc(
+          String(x.why)
+            .split(/\s*[—(]/)[0]
+            .slice(0, 40) || 'ไม่ได้ใช้',
+        )}</div><div class="fcell span" role="cell">${fl(x.f, tag('ข้าม', '', x.why), 'skip', ICDASH, ' b')}</div></div>`;
+    }
+  }
+  const head =
+    V === 'd'
+      ? ''
+      : `<div class="ftr th" role="row"><div role="columnheader">แบบ</div>${G.map(g => `<div role="columnheader"><b>${g.d ? thdW(new Date(g.d)) : 'ไฟล์ที่ใส่'}</b>${g.E.length} ไฟล์</div>`).join('')}</div>`;
+  const seg = `<div class="fseg" role="group" aria-label="มุมมองของตารางไฟล์">${[['k', 'ตามแบบ'], ...(multi ? [['d', 'ตามวัน']] : []), ['w', `เฉพาะที่ต้องดู (${nW})`]].map(([k, t]) => `<button class="${V === k ? 'on' : ''}" data-a="flv" data-k="${k}" aria-pressed="${V === k}">${t}</button>`).join('')}</div>`;
+  return `<details class="files" ${FLOPEN ? 'open' : ''}><summary>ไฟล์ Playlist ที่ใส่แล้ว ${nF} ไฟล์${multi ? ` · ${G.length} วัน` : ''}${nW ? ` · <span class="fwarn">ต้องดู ${nW} แบบ</span>` : ''}</summary>
+ <div class="ftools">${seg}<label class="fsearch">${IC.search}<input id="flq" type="search" placeholder="ค้นชื่อไฟล์หรือแบบ" value="${esc(FLQ)}" aria-label="ค้นชื่อไฟล์หรือแบบ" autocomplete="off"></label></div>
+ ${body ? `<div class="ftbl"><div role="table" aria-label="ไฟล์ Playlist ที่ใส่แล้ว" ${style}>${head}${body}</div></div>` : `<p class="fempty">${V === 'w' ? 'ไม่มีแบบที่ต้องดู — ไฟล์ครบทุกวัน' : 'ยังไม่มีไฟล์'}</p>`}
+ <div class="ffoot"><span>ชี้ที่ชื่อไฟล์เพื่อดูชื่อเต็ม · “+2 ฉบับ” = ใส่ไฟล์แบบเดียวกันวันเดียวกันหลายไฟล์ ระบบใช้ไฟล์ที่ใส่ทีหลัง</span>${nW ? '<span>แถวสีเหลือง = ต้องดูก่อนเติม</span>' : ''}</div></details>`;
+}
+function flApply() {
+  const q = FLQ.trim().toLowerCase();
+  document.querySelectorAll('.ftbl .ftr[data-s]').forEach(r => {
+    r.hidden = !!q && !r.dataset.s.includes(q);
+  });
+  document.querySelectorAll('.ftbl .ftr.tg[data-g]').forEach(h => {
+    h.hidden = ![...document.querySelectorAll(`.ftbl .ftr[data-s][data-g="${h.dataset.g}"]`)].some(
+      r => !r.hidden,
+    );
+  });
+}
 function vData() {
   const has = DB.length > 0,
     wd = has ? workDate() : null,
@@ -12076,7 +12449,7 @@ function vData() {
  }
  ${vPLI()}
  ${!MD && ds.length > 1 ? alertHTML('wr', `ไฟล์ Playlist มีหลายวันปนกัน (${ds.map(d => thd(new Date(d))).join(', ')})`, `<p>ระบบใช้ ${thd(wd)} เป็นวันทำงาน ช่องไฟเหลืองในเช็กลิสต์คือแบบที่ไฟล์เป็นวันอื่น ใส่ไฟล์ของวันที่ถูกต้องแทน หรือกด “ล้าง Playlist (เริ่มวันใหม่)” แล้วใส่เฉพาะไฟล์ของวันนั้น</p>`) : ''}</div>
- ${fl.length ? `<details class="files" ${FLOPEN ? 'open' : ''}><summary>ไฟล์ Playlist ที่ใส่แล้ว ${fl.length} ไฟล์</summary><div class="flist">${fl.map(([f, d]) => `<span class="fchip">${esc(f)}${d ? `<em>${thd(new Date(d))}</em>` : ''}</span>`).join('')}</div></details>` : ''}
+ ${vFiles(MD, wd)}
  <div class="actbar"><div class="tools">${has ? `<button class="btn quiet" data-a="savepj">${IC.save}บันทึกโปรเจกต์</button>` : ''}<button class="btn quiet" data-a="pick" data-k="pj">${IC.folder}เปิดโปรเจกต์</button>${has ? `<button class="btn quiet" data-a="expx">${IC.dl}ส่งออก Playlist (.xlsx)</button><button class="btn quiet" data-a="reset">${IC.reset}ล้าง Playlist (เริ่มวันใหม่)</button>` : ''}</div>
  <div class="go"><button class="btn secondary" data-a="tab" data-k="pl" ${has ? '' : 'disabled'}>ตรวจ / แก้ไขก่อน</button><button class="btn primary" data-a="tab" data-k="fl" data-tour="next1" ${has ? '' : 'disabled'}>ไปเติมใบเช็ครูป</button></div></div>`;
 }
@@ -14207,7 +14580,7 @@ const TOURS = {
     {
       t: 'wall',
       h: 'เช็กลิสต์ 11 แบบ',
-      p: 'แต่ละช่องคือ Playlist 1 แบบ ช่องจะสว่างพร้อมไฟเขียวเมื่อใส่ไฟล์แล้ว ช่องเส้นประคือแบบที่ยังขาด ไฟเหลืองคือวันที่ไม่ตรงกับวันทำงาน',
+      p: 'แต่ละช่องคือ Playlist 1 แบบ ช่องจะสว่างพร้อมไฟเขียวเมื่อใส่ไฟล์แล้ว ช่องเส้นประคือแบบที่ยังขาด ไฟเหลืองคือวันที่ไม่ตรงกับวันทำงาน • ใส่หลายวัน: แถวล่างของช่องบอกทีละวัน (✓ มี ↺ ใช้ของวันก่อน ✕ ไม่มี)',
     },
     {
       t: 'date',
@@ -15107,6 +15480,12 @@ document.addEventListener('keydown', e => {
   }
 });
 document.addEventListener('input', e => {
+  if (e.target && e.target.id === 'flq') {
+    FLQ = e.target.value;
+    flApply();
+  }
+}); /* 5.5.59 */
+document.addEventListener('input', e => {
   if (e.target && e.target.id === 'fq') {
     const r = $('#fres');
     if (r) r.innerHTML = findRes(e.target.value);
@@ -15882,6 +16261,13 @@ const ACT = {
     PLX = [];
     FOCUSSEL = '[data-dz="pl"]';
   },
+  wday: k => {
+    WDAY = k ? +k : null;
+  },
+  flv: k => {
+    FLV = k || 'k';
+    FOCUSSEL = `.fseg [data-k="${FLV}"]`;
+  } /* 5.5.59 */,
   clri: () => {
     for (const x of PLI) x.ack = 1;
     note = 'ซ่อนรายการด่านตรวจแล้ว (ยังบันทึกไว้ในรายงาน)';
