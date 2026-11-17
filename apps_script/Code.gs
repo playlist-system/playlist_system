@@ -197,7 +197,8 @@ function nameDate_(n, thisYear) {
   if (m) return ymd_(yy_(m[3]), +m[2] - 1, +m[1]);
   m = n.replace(/\s+/g, '').match(/(\d{1,2})(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?)(\d{2,4})?/);
   if (m) return ymd_(m[3] ? yy_(m[3]) : thisYear, THM_[m[2].replace(/\./g, '')], +m[1]);
-  m = n.match(/(?:^|[^A-Za-z\d])(\d{1,2})[-_ ]*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-_ ]*(\d{2,4})?(?![A-Za-z])/i);
+  // วัน + ชื่อเดือน (เช่น 17 Nov 2026) — ตัวเลขติดตัวอักษรได้ เช่น Show DC “On17 Nov 26” (เดิมอ่านไม่ได้ เลยใช้วันที่ของอีเมลแทน)
+  m = n.match(/(?:^|[^\d])(\d{1,2})[-_ ]*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-_ ]*(\d{2,4})?(?![A-Za-z])/i);
   if (m) return ymd_(m[3] ? yy_(m[3]) : thisYear, MON_[m[2].toLowerCase()], +m[1]);
   return null;
 }
@@ -350,6 +351,8 @@ function mailOf_(file) {
 function saveDay_(parent, day, chosen) {
   let folder = todayFolder_(parent, day, false);
   const kinds = kindsRe_();
+  const latest = {};
+  kinds.forEach(k => (latest[k.name] = !!k.latest));
   const thisYear = +day.slice(0, 4);
   const have = {};
   const ex = [];
@@ -369,9 +372,12 @@ function saveDay_(parent, day, chosen) {
     if (have[c.key]) continue;
     if (!folder) folder = todayFolder_(parent, day, true);
     const old = [];
-    if (c.kind !== OTHER_ && c.day === day)
+    // แบบที่ไม่ได้ส่งทุกวัน (Show DC / LA PlanB): นับเป็นฉบับแก้ไขเฉพาะเมื่อชื่อไฟล์ทั้งสองระบุวันเดียวกัน (กันฉบับของวันอื่นมาแทนกัน)
+    const strict = latest[c.kind] && !nameDate_(c.name, thisYear);
+    if (c.kind !== OTHER_ && c.day === day && !strict)
       for (const x of ex) {
         if (x.gone || x.k !== c.kind || x.pd !== day) continue;
+        if (latest[c.kind] && !nameDate_(x.n, thisYear)) continue;
         const m = mailOf_(x.f);
         const t = m ? m.when : x.f.getDateCreated().getTime();
         // ฉบับเดิมมาจากอีเมลฉบับก่อน (ไฟล์ที่เก็บก่อนมีระบบนี้: เก็บเข้า Drive ก่อนอีเมลใหม่มาถึง)
