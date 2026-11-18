@@ -351,10 +351,10 @@ function doGet() {
   return t.evaluate().setTitle('ใบงานถ่ายรูป MRT').addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/** อ่านทุกแท็บสถานี (แคช 60 วินาที) */
+/** อ่านทุกแท็บสถานี (แคช 60 วินาที) — ข้อมูลทั้ง MRT ใหญ่เกิน 100 KB ที่แคชของ Google รับได้ จึงบีบอัด (gzip) ก่อนเก็บ */
 function readAll_() {
   const cache = CacheService.getScriptCache(), hit = cache.get('mrt-all');
-  if (hit) return JSON.parse(hit);
+  if (hit) { try { return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(hit), 'application/x-gzip')).getDataAsString('UTF-8')); } catch (err) { /* แคชเสีย → อ่านใหม่ */ } }
   const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID') || SpreadsheetApp.getActive().getId());
   const out = { stations: [], users: {}, round: '' };
   for (const sh of stationSheets_(ss)) {
@@ -365,7 +365,7 @@ function readAll_() {
   if (us) us.getDataRange().getValues().slice(4).forEach(r => { if (r[0]) out.users[String(r[0]).trim()] = { owner: String(r[1] || ''), photo: String(r[3] || '').toLowerCase() }; });
   const sm = ss.getSheetByName(CFG.summarySheet);
   if (sm) out.round = String(sm.getRange(1, 1).getValue()).replace(/^สรุปคะแนน MRT\s*/, '');
-  try { cache.put('mrt-all', JSON.stringify(out), 60); } catch (err) { /* ใหญ่เกินแคช */ }
+  try { const z = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(out), 'application/json')).getBytes()); if (z.length < 100000) cache.put('mrt-all', z, 60); } catch (err) { /* ใหญ่เกินแคช */ }
   return out;
 }
 
