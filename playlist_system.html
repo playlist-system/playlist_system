@@ -1368,7 +1368,7 @@ function screen10(ws,sn,cn){const b=nrm(txt10(ws,cn).join(' ')),k=kind10(ws,sn,c
    ช่วงวันที่ 16 ขึ้นไปเลือกได้ (3.10): rs = 'cur' รอบ 16–สิ้นเดือน (ค่าเริ่มต้น) / '1' รอบ 1–15 / 'both' ทั้ง 2 รอบ — รอบ 1–15 ข้ามจอที่ไม่มีหนังรอบนั้น
    upto = เอาหนังที่เริ่ม (แถบวันที่) ไม่เกินวันนี้ของเดือน 0 = ทั้งหมด • upto ก่อนวันที่ 16 ไม่สร้างรอบ 16
    จับคู่จอกับโฟลเดอร์: DGT / ID ดูรหัสหน้าชื่อโฟลเดอร์ • BKJ1_04 / BKJ2_20 ดูเลขจอในหัวคอลัมน์ • METRO_07 ดู 007 • จออื่น (So Bangkok, Twin Tube, The Big Y, BASE) ดูชื่อ ----- */
-const pzFilm=(b,n)=>!((b.jam||b.metro)&&/^#/.test(n)); /* 5.5.63: จอ BKJ / Metro ไม่สร้างโฟลเดอร์แถว # (#BANGKOK JAM_ETA / #EDA / #Traffic MTP … = ข้อมูลจราจร/ข่าว ไม่ใช่หนัง) • #Fast Ads / #Module ยังสร้าง */ const PMON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],PMOD=['#Fast Ads','#Module ขาว','#Module ดำ','#Module สี'], /* 5.5: #Fast Ads ทุกจอ */
+const pzFilm=(b,n,R)=>!(R&&R.t&&(b.jam||b.metro)&&/^#/.test(n)); /* 5.5.63–64: จอ BKJ / Metro รอบ 16–สิ้นเดือน ไม่สร้างโฟลเดอร์แถว # (#BANGKOK JAM_ETA / #EDA / #Traffic MTP …) • รอบ 1–15 ยังสร้างเหมือนเดิม • #Fast Ads / #Module ยังสร้างทุกรอบ */ const PMON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],PMOD=['#Fast Ads','#Module ขาว','#Module ดำ','#Module สี'], /* 5.5: #Fast Ads ทุกจอ */
  p2=n=>String(n).padStart(2,'0'),
  fsafe=n=>String(n).replace(/[<>:"\/\\|?*\u0000-\u001f]/g,'_').replace(/[\s.]+$/,'').trim(),
  isMonD=n=>/^\d{1,2}\s*[A-Za-z]{3}[A-Za-z]*\s*\d{2,4}$/.test(String(n).trim()),
@@ -1544,7 +1544,7 @@ function pzPlan(W,res,rs,upto,X){ /* 5.5.1: X = {S, shut, dir} จากโฟ�
  const T=new Map(),skip=[],closed=[],FXC=fxCtx(res); /* 5.5.30: จำนวนจอต่อสถานี MRT */
  for(const r of res||[])for(const b of r.fold||[]){const pack=pzPack(b);
   if(!pack){skip.push({f:r.name,sn:b.sn,id:b.code?codeOf(b.raw)||b.code:''});continue}
-  const fs=RS.map(R=>[...new Set((b.items||[]).filter(([n,g,,,pre])=>n&&(pre||(R.t?g>=cut:g<cut))&&g<capT&&g>=m0&&g<m1).map(([n])=>String(n).trim()).filter(n=>n&&pzFilm(b,n)))]);
+  const fs=RS.map(R=>[...new Set((b.items||[]).filter(([n,g,,,pre])=>n&&(pre||(R.t?g>=cut:g<cut))&&g<capT&&g>=m0&&g<m1).map(([n])=>String(n).trim()).filter(n=>n&&pzFilm(b,n,R)))]);
   const fk=fxKind(b),Ls=pzScr(b,pack,FXC),T0=X&&!fk?picTg(b,X.S):[];
   for(let[id,key,path,mods]of Ls){let ns='ck';
    if(fk){const I=X&&X.fx&&X.fx[fk],p0=I&&fxPick(fk,0,I.best,path[0]);if(p0){path=[p0,...path.slice(1)];ns='fd'}} /* 5.5.30: แพคใหม่ → ชื่อเดิมในโฟลเดอร์ที่เลือก */
@@ -1596,7 +1596,7 @@ async function picPlan(root, W, res, rs, upto) {
         }
         continue;
       }
-      const fs = RS.map(R => [...new Set((b.items || []).filter(([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1).map(([n]) => String(n).trim()).filter(n => n && pzFilm(b, n)))]);
+      const fs = RS.map(R => [...new Set((b.items || []).filter(([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1).map(([n]) => String(n).trim()).filter(n => n && pzFilm(b, n, R)))]);
       for (let [id, k, s] of picTg(b, S)) {
         if (!s) {
           if (k && shut.some(x => sameK(x, k))) { closed.push({ f: r.name, sn: b.sn, id }); continue; }
@@ -4032,7 +4032,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(info.length?` • ข้ามไฟล์ที่ไม่ได้ใช้ ${info.length} ไฟล์`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.63 (18 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.64 (18 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
