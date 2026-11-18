@@ -2,7 +2,7 @@
  * ใบเช็ครูป MRT บน Google Sheets (ทดลอง) — ส่วนหนึ่งของ PHOTO CHECK STUDIO
  *
  * - เมนู "ใบเช็ครูป" ในชีต: นำเข้าใบเช็ค Excel (.xlsm) จากโฟลเดอร์ใน Drive → แท็บละสถานี
- * - คนคัดรูปติ๊กช่องในชีต (ระบบจดวันเวลาที่ติ๊กไว้ในโน้ตของช่อง)
+ * - คนคัดรูปพิมพ์เลขวันที่ถ่ายในช่องแบบใบเช็ค (ระบบจดว่าใครใส่ เมื่อไร ไว้ในโน้ตของช่อง)
  * - หน้าเว็บมือถือสำหรับคนถ่ายรูป (doGet) อ่านจากชีตนี้ ดูได้อย่างเดียว
  * ไม่มีการใช้ AI ในการทำงาน — เป็นสูตรและสคริปต์ธรรมดา
  */
@@ -65,12 +65,12 @@ function importFromDrive() {
   }
   const stations = [].concat(...books.map(b => b.stations));
   let round = roundOf_(stations, new Date());
-  // ขึ้นรอบใหม่: ถามก่อน → เก็บสำเนารอบเก่าไว้ แล้วเริ่มติ๊กใหม่ (ไม่เอาติ๊กของรอบก่อนมาปน)
+  // ขึ้นรอบใหม่: ถามก่อน → เก็บสำเนารอบเก่าไว้ แล้วเริ่มใหม่ (ไม่เอาวันที่ที่ใส่ในรอบก่อนมาปน)
   const props = PropertiesService.getScriptProperties(), prev = props.getProperty('ROUND');
   let fresh = !!prev && prev !== round.label;
   if (fresh) {
     const ui = SpreadsheetApp.getUi();
-    const a = ui.alert('ขึ้นรอบใหม่?', `ใบเช็คที่นำเข้าเป็นของ ${round.label}\nชีตตอนนี้เป็น ${prev}\n\nกด "ใช่" = เริ่ม ${round.label} (เก็บสำเนา ${prev} ไว้ใน Drive แล้วเริ่มติ๊กใหม่)\nกด "ไม่" = นำเข้าใน ${prev} ต่อ`, ui.ButtonSet.YES_NO);
+    const a = ui.alert('ขึ้นรอบใหม่?', `ใบเช็คที่นำเข้าเป็นของ ${round.label}\nชีตตอนนี้เป็น ${prev}\n\nกด "ใช่" = เริ่ม ${round.label} (เก็บสำเนา ${prev} ไว้ใน Drive แล้วเริ่มใหม่)\nกด "ไม่" = นำเข้าใน ${prev} ต่อ`, ui.ButtonSet.YES_NO);
     if (a === ui.Button.CLOSE) { ss.toast('ยังไม่ได้นำเข้า', 'ใบเช็ครูป', 5); return; }
     if (a !== ui.Button.YES) { fresh = false; round = Object.assign({}, round, { label: prev }); }
   }
@@ -109,13 +109,12 @@ function parseBook_(fileName, sheets) {
       let exit = null;
       if (typeof cv === 'string' && /ออก/.test(cv)) { const m = cv.match(/\d+/); exit = m ? +m[0] : null; }
       let day = 0;
-      const marks = screens.map((_, i) => {
-        const x = row[4 + i];
-        if (typeof x === 'number' && x >= 1 && x <= 31) day = Math.max(day, Math.floor(x));
-        if (typeof x === 'number' || x instanceof Date) return 1;
-        if (typeof x === 'string' && x.trim().toLowerCase() === 'none') return 2;
-        if (x === true) return 1;
-        return 0;
+      const marks = screens.map((_, i) => {   // ค่าในช่องแบบใบเช็ค: เลขวันที่ถ่าย / 'ไม่ฉาย' / ''
+        let x = row[4 + i];
+        if (x instanceof Date) x = +Utilities.formatDate(x, CFG.tz, 'd');
+        if (typeof x === 'number') { if (x >= 1 && x <= 31) day = Math.max(day, Math.floor(x)); return x; }
+        if (typeof x === 'string' && /^(none|ไม่ฉาย)$/i.test(x.trim())) return CFG.none;
+        return '';
       });
       films.push({ name: nm, add: cur, exit, marks, day });
     }
@@ -150,22 +149,25 @@ function stationGrid_(st, round, old) {
       rows.push([label, ''].concat(Array(nS).fill(''))); kinds.push('band');
       lastAdd = ak; first = false;
     }
-    const cells = f.marks.map((m, i) => {
+    const cells = f.marks.map((m, i) => {   // ค่าที่คนคัดรูปพิมพ์ในชีตชนะ ถ้าไม่มี ใช้ค่าจากใบเช็ค Excel
       const o = old && old[key(f.name, st.screens[i])];
-      if (m === 2 || o === CFG.none) return CFG.none;
-      return m === 1 || o === true;
+      if (typeof o === 'number') return o;
+      if (isNone_(o)) return CFG.none;
+      return m;
     });
     rows.push([f.exit ? `ออก ${f.exit} ${TH_MON[round.m - 1]}` : '', f.name].concat(cells)); kinds.push('film');
   }
   return { rows, kinds };
 }
 
+const isNone_ = (x) => typeof x === 'string' && /^(none|ไม่ฉาย)$/i.test(x.trim());
+const isDone_ = (x) => typeof x === 'number' || x instanceof Date || x === true || isNone_(x);
 function colA1_(c) { let s = ''; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = (c - m - 1) / 26; } return s; }
 
 function writeStation_(ss, st, round, fresh) {
   let sh = ss.getSheetByName(st.station);
   const nS = st.screens.length, fr = CFG.firstRow, fc = CFG.firstCol;
-  // เก็บติ๊กและโน้ตเดิม (ติ๊กในชีตไม่หาย เมื่อนำเข้าใหม่)
+  // เก็บค่าและโน้ตเดิม (วันที่ที่พิมพ์ในชีตไม่หาย เมื่อนำเข้าใหม่)
   const old = {}, oldNotes = {};
   if (sh && !fresh && sh.getLastRow() >= fr) {
     const hdr = sh.getRange(2, fc, 1, sh.getLastColumn() - fc + 1).getValues()[0].map(h => String(h).split('\n')[0]);
@@ -173,7 +175,10 @@ function writeStation_(ss, st, round, fresh) {
     const vals = sh.getRange(fr, 2, n, w + 1).getValues(), notes = sh.getRange(fr, fc, n, w).getNotes();
     vals.forEach((r, i) => { if (!r[0]) return; hdr.forEach((h, j) => {
       const k = r[0] + '\u0001' + h, x = r[j + 1];
-      if (x === true || x === CFG.none) old[k] = x;
+      // ช่องที่คนคัดรูปพิมพ์ในชีต (มีโน้ต "ใส่ … เมื่อ …") ชนะ • ช่องที่มาจาก Excel รอบก่อน ใช้ค่าจาก Excel ใหม่
+      if (!notes[i][j]) return;
+      if (typeof x === 'number' || isNone_(x)) old[k] = x;
+      else if (x === true) { const m = String(notes[i][j]).match(/(\d{1,2})\/\d{1,2}\/\d{4}/); if (m) old[k] = +m[1]; }  // ติ๊กจากฉบับช่องติ๊ก → วันที่ในโน้ต
       if (notes[i][j]) oldNotes[k] = notes[i][j]; }); });
     // จับคู่ด้วยเลขจอ
     st.screens.forEach(code => { const num = code.split(/\s+/)[0]; for (const k in old) if (k.endsWith('\u0001' + num)) old[k.replace(/\u0001.*$/, '\u0001' + code)] = old[k]; });
@@ -197,7 +202,7 @@ function writeStation_(ss, st, round, fresh) {
   sh.getRange(2, 1, 1, 2).setHorizontalAlignment('left');
   sh.getRange(3, 1, 3, 2).setValues([['คะแนนจอ', `คุณ${st.person}  ${round.label}`], ['ได้รูป / ทั้งหมด', ''], ['ยังไม่ได้รูป', '']]).setFontColor('#5A6987').setFontWeight('bold');
   const f3 = [], f4 = [], f5 = [];
-  for (let i = 0; i < nS; i++) { const L = colA1_(fc + i), rng = `${L}$${fr}:${L}`, done = `(COUNTIF(${rng},TRUE)+COUNTIF(${rng},"${CFG.none}"))`, tot = `COUNTA($B$${fr}:$B)`;
+  for (let i = 0; i < nS; i++) { const L = colA1_(fc + i), rng = `${L}$${fr}:${L}`, done = doneF_(rng), tot = `COUNTA($B$${fr}:$B)`;
     f3.push(`=IFERROR(${done}/${tot},0)`); f4.push(`=${done}&"/"&${tot}`); f5.push(`="เหลือ "&(${tot}-${done})`); }
   sh.getRange(3, fc, 1, nS).setFormulas([f3]).setNumberFormat('0%').setFontWeight('bold').setHorizontalAlignment('center');
   sh.getRange(4, fc, 1, nS).setFormulas([f4]).setHorizontalAlignment('center').setFontColor('#5A6987');
@@ -207,27 +212,27 @@ function writeStation_(ss, st, round, fresh) {
   if (nR) {
     const body = sh.getRange(fr, 1, nR, W);
     body.setValues(g.rows).setVerticalAlignment('middle');
-    const ticks = sh.getRange(fr, fc, nR, nS);
-    ticks.insertCheckboxes();
-    const noCb = [], bands = [], exits = [];
+    const ticks = sh.getRange(fr, fc, nR, nS), C1 = `${colA1_(fc)}${fr}`;
+    // ช่องแบบใบเช็ค: พิมพ์เลขวันที่ถ่าย 1–31 หรือ ไม่ฉาย (พิมพ์อย่างอื่นขึ้นเตือน ไม่บล็อก)
+    ticks.setDataValidation(SpreadsheetApp.newDataValidation().requireFormulaSatisfied(`=OR(${C1}="",AND(ISNUMBER(${C1}),${C1}>=1,${C1}<=31),${C1}="${CFG.none}",LOWER(${C1})="none")`)
+      .setAllowInvalid(true).setHelpText('ใส่เลขวันที่ถ่าย (1–31) หรือ ไม่ฉาย').build());
+    const bands = [], exits = [];
     g.kinds.forEach((k, i) => { const r = fr + i;
-      if (k === 'band') { noCb.push(`${colA1_(fc)}${r}:${colA1_(fc + nS - 1)}${r}`); bands.push(`A${r}:${lastCol}${r}`); }
-      else { g.rows[i].slice(2).forEach((x, j) => { if (x === CFG.none) noCb.push(colA1_(fc + j) + r); }); if (g.rows[i][0]) exits.push('A' + r); } });
-    if (noCb.length) sh.getRangeList(noCb).clearDataValidations();
-    body.setValues(g.rows);  // ใส่ค่าอีกรอบหลังใส่ช่องติ๊ก (insertCheckboxes ตั้งค่าเป็น false ทั้งหมด)
+      if (k === 'band') bands.push(`A${r}:${lastCol}${r}`); else if (g.rows[i][0]) exits.push('A' + r); });
     if (bands.length) sh.getRangeList(bands).setBackground(COLORS.band).setFontColor(COLORS.bandText).setFontWeight('bold');
     if (exits.length) sh.getRangeList(exits).setFontColor(COLORS.exit).setFontWeight('bold');
-    ticks.setHorizontalAlignment('center');
-    // โน้ตวันที่ติ๊กเดิม
+    ticks.setHorizontalAlignment('center').setFontWeight('bold');
+    // โน้ตเดิม (ใครใส่ เมื่อไร)
     const notes = g.rows.map((r, i) => r.slice(2).map((_, j) => (g.kinds[i] === 'film' && oldNotes[r[1] + '\u0001' + st.screens[j]]) || ''));
     ticks.setNotes(notes);
   }
   // สีตามสถานะ
   const tickA1 = `${colA1_(fc)}${fr}:${colA1_(fc + nS - 1)}${lastRow}`, rules = [];
   const tk = sh.getRange(tickA1), sc = sh.getRange(3, fc, 1, nS), C0 = colA1_(fc);
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=${C0}${fr}=TRUE`).setBackground(COLORS.ok).setRanges([tk]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=${C0}${fr}="${CFG.none}"`).setBackground(COLORS.none).setFontColor('#5A6987').setRanges([tk]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=AND($B${fr}<>"",${C0}${fr}=FALSE)`).setBackground(COLORS.todo).setRanges([tk]).build());
+  // แบบใบเช็ค: มีเลขวันที่ถ่าย = พื้นดำตัวเลขขาว • ไม่ฉาย = เทา • ยังไม่มีรูป = เหลือง
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=ISNUMBER(${C0}${fr})`).setBackground('#000000').setFontColor('#FFFFFF').setRanges([tk]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=OR(${C0}${fr}="${CFG.none}",LOWER(${C0}${fr})="none")`).setBackground(COLORS.none).setFontColor('#5A6987').setRanges([tk]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=AND($B${fr}<>"",${C0}${fr}="")`).setBackground(COLORS.todo).setRanges([tk]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(0.9).setBackground('#E1F3E8').setFontColor('#1B7646').setRanges([sc]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(0.5).setBackground('#FFF2CC').setFontColor('#8F5C06').setRanges([sc]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberLessThan(0.5).setBackground(COLORS.r).setFontColor('#FFFFFF').setRanges([sc]).build());
@@ -239,9 +244,11 @@ function writeStation_(ss, st, round, fresh) {
   sh.getRange(1, 1, lastRow, W).setFontFamily('IBM Plex Sans Thai');
 }
 
+/** สูตรนับช่องที่ได้รูปแล้ว: เลขวันที่ถ่าย + ไม่ฉาย (+ ติ๊กจากฉบับก่อน) เหมือนสูตรในใบเช็ค Excel */
+const doneF_ = (rng) => `(COUNT(${rng})+COUNTIF(${rng},"${CFG.none}")+COUNTIF(${rng},"none")+COUNTIF(${rng},TRUE))`;
 function stationScoreFormula_(c1, c2, fr) {
   const a = colA1_(c1), b = colA1_(c2), tot = `COUNTA($B$${fr}:$B)*COLUMNS(${a}2:${b}2)`;
-  const done = `(COUNTIF(${a}${fr}:${b},TRUE)+COUNTIF(${a}${fr}:${b},"${CFG.none}"))`;
+  const done = doneF_(`${a}${fr}:${b}`);
   return `="ได้รูป "&${done}&"/"&${tot}&"   เหลือ "&(${tot}-${done})&"   คะแนน "&TEXT(IFERROR(AVERAGE(${a}3:${b}3),0),"0.0%")`;
 }
 
@@ -258,7 +265,7 @@ function writeUsers_(ss, stations) {
   sh.getRange(1, 1).setValue('ผู้ใช้และสิทธิ์').setFontSize(14).setFontWeight('bold').setFontColor(COLORS.navy);
   sh.getRange(2, 1, 1, 2).setValues([['ผู้ดูแลระบบ / หัวหน้า (อีเมล คั่นด้วย ,)', admins]]);
   sh.getRange(3, 1).setValue('ใส่อีเมลบริษัท แล้วกดเมนู ใบเช็ครูป → ตั้งสิทธิ์ตามแท็บผู้ใช้  •  คนถ่ายรูปไม่ต้องได้สิทธิ์ชีต ใช้หน้ามือถือ').setFontColor('#5A6987');
-  const rows = [['สถานี', 'ใบเช็คของ', 'อีเมลคนคัดรูป (ติ๊กได้)', 'อีเมลคนถ่ายรูป (เห็นในมือถือ คั่นด้วย ,)']];
+  const rows = [['สถานี', 'ใบเช็คของ', 'อีเมลคนคัดรูป (ใส่วันที่ได้)', 'อีเมลคนถ่ายรูป (เห็นในมือถือ คั่นด้วย ,)']];
   stations.forEach(s => rows.push([s.station, 'คุณ' + s.person].concat(keep[s.station] || ['', ''])));
   sh.getRange(4, 1, rows.length, 4).setValues(rows);
   sh.getRange(4, 1, 1, 4).setBackground(COLORS.navy).setFontColor('#FFFFFF').setFontWeight('bold');
@@ -300,7 +307,7 @@ function tabColor_(sh) {
   sh.setTabColor(p >= 0.9 ? COLORS.g : p >= 0.5 ? COLORS.a : COLORS.r);
 }
 
-// ===================== จดวันที่ติ๊ก =====================
+// ===================== จดว่าใครใส่ เมื่อไร =====================
 function onEdit(e) {
   const sh = e.range.getSheet();
   if (e.range.getRow() < CFG.firstRow || e.range.getColumn() < CFG.firstCol) return;
@@ -308,7 +315,7 @@ function onEdit(e) {
   const vals = e.range.getValues(), now = Utilities.formatDate(new Date(), CFG.tz, 'd/M/yyyy HH:mm');
   let who = '';
   try { who = Session.getActiveUser().getEmail(); } catch (err) { who = ''; }
-  const notes = vals.map(r => r.map(x => x === true ? `ติ๊กแล้ว ${now}${who ? ' โดย ' + who : ''}` : ''));
+  const notes = vals.map(r => r.map(x => x === '' || x === false || x == null ? '' : `ใส่ ${x === true ? '✓' : x} เมื่อ ${now}${who ? ' โดย ' + who : ''}`));
   e.range.setNotes(notes);
   tabColor_(sh);
 }
@@ -336,7 +343,7 @@ function applyPermissions() {
       const tick = sh.getRange(CFG.firstRow, CFG.firstCol, n, w);
       p.setUnprotectedRanges([tick]);
       lock(p, admins);
-      const rp = tick.protect().setDescription('ช่องติ๊กของสถานี' + sh.getName());
+      const rp = tick.protect().setDescription('ช่องวันที่ถ่ายของสถานี' + sh.getName());
       lock(rp, admins.concat(map[sh.getName()] || []));
     } else lock(p, admins);
   }
@@ -378,7 +385,7 @@ function sheetModel_(name, v) {
     const row = v[r], nm = String(row[1] || '').trim();
     if (!nm) { const m = String(row[0] || '').match(/ขึ้น(?:ใหม่)?\s*(\d+)/); if (m) { add = +m[1]; newest = Math.max(newest, add); if (!first) first = add; } continue; }
     films.push([nm, add]);
-    screens.forEach((s, i) => { const x = row[fc + i]; s.n++; if (x === true || x === CFG.none) s.done++; else s.miss.push([nm, add]); });
+    screens.forEach((s, i) => { const x = row[fc + i]; s.n++; if (isDone_(x)) s.done++; else s.miss.push([nm, add]); });
   }
   return { station: name, screens, newest, first, films };
 }
