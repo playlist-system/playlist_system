@@ -64,10 +64,16 @@ function importFromDrive() {
     } finally { DriveApp.getFileById(conv.id).setTrashed(true); }
   }
   const stations = [].concat(...books.map(b => b.stations));
-  const round = roundOf_(stations);
-  // ขึ้นรอบใหม่: เก็บสำเนารอบเก่าไว้ แล้วเริ่มติ๊กใหม่ (ไม่เอาติ๊กของรอบก่อนมาปน)
+  let round = roundOf_(stations, new Date());
+  // ขึ้นรอบใหม่: ถามก่อน → เก็บสำเนารอบเก่าไว้ แล้วเริ่มติ๊กใหม่ (ไม่เอาติ๊กของรอบก่อนมาปน)
   const props = PropertiesService.getScriptProperties(), prev = props.getProperty('ROUND');
-  const fresh = !!prev && prev !== round.label;
+  let fresh = !!prev && prev !== round.label;
+  if (fresh) {
+    const ui = SpreadsheetApp.getUi();
+    const a = ui.alert('ขึ้นรอบใหม่?', `ใบเช็คที่นำเข้าเป็นของ ${round.label}\nชีตตอนนี้เป็น ${prev}\n\nกด "ใช่" = เริ่ม ${round.label} (เก็บสำเนา ${prev} ไว้ใน Drive แล้วเริ่มติ๊กใหม่)\nกด "ไม่" = นำเข้าใน ${prev} ต่อ`, ui.ButtonSet.YES_NO);
+    if (a === ui.Button.CLOSE) { ss.toast('ยังไม่ได้นำเข้า', 'ใบเช็ครูป', 5); return; }
+    if (a !== ui.Button.YES) { fresh = false; round = Object.assign({}, round, { label: prev }); }
+  }
   if (fresh) DriveApp.getFileById(ss.getId()).makeCopy(`ใบเช็ครูป MRT ${prev} (เก็บไว้)`);
   for (const st of stations) writeStation_(ss, st, round, fresh);
   props.setProperty('ROUND', round.label);
@@ -102,27 +108,33 @@ function parseBook_(fileName, sheets) {
       if (!nm) continue;
       let exit = null;
       if (typeof cv === 'string' && /ออก/.test(cv)) { const m = cv.match(/\d+/); exit = m ? +m[0] : null; }
+      let day = 0;
       const marks = screens.map((_, i) => {
         const x = row[4 + i];
+        if (typeof x === 'number' && x >= 1 && x <= 31) day = Math.max(day, Math.floor(x));
         if (typeof x === 'number' || x instanceof Date) return 1;
         if (typeof x === 'string' && x.trim().toLowerCase() === 'none') return 2;
         if (x === true) return 1;
         return 0;
       });
-      films.push({ name: nm, add: cur, exit, marks });
+      films.push({ name: nm, add: cur, exit, marks, day });
     }
     stations.push({ station: sh.name.trim(), person, screens, films });
   }
   return { person, stations };
 }
 
-function roundOf_(stations) {
-  let min = null;
-  for (const s of stations) for (const f of s.films) if (f.add && (!min || f.add < min)) min = f.add;
-  const d = min || new Date();
-  const y = +Utilities.formatDate(d, CFG.tz, 'yyyy'), m = +Utilities.formatDate(d, CFG.tz, 'M'), day = +Utilities.formatDate(d, CFG.tz, 'd');
+// ใบเช็ค MRT เป็นไฟล์ทั้งเดือน: รอบ 16–31 ยังมีแถบ "ขึ้น 1 …" อยู่บนสุด จึงใช้แถบแรกบอกได้แค่เดือน
+// รอบ: มีวันที่ถ่าย 16 ขึ้นไป = รอบ 16–31 • ไม่มี → ตามวันที่นำเข้า (เดือนของไฟล์ผ่านไปแล้ว = รอบ 16–31)
+function roundOf_(stations, today) {
+  today = today || new Date();
+  let min = null, shot = 0;
+  for (const s of stations) for (const f of s.films) { if (f.add && (!min || f.add < min)) min = f.add; if (f.day > shot) shot = f.day; }
+  const ymd = (d) => [+Utilities.formatDate(d, CFG.tz, 'yyyy'), +Utilities.formatDate(d, CFG.tz, 'M'), +Utilities.formatDate(d, CFG.tz, 'd')];
+  const [y, m] = ymd(min || today), [ty, tm, td] = ymd(today);
+  const half = shot >= 16 ? 2 : ty * 12 + tm > y * 12 + m ? 2 : ty * 12 + tm < y * 12 + m ? 1 : td <= 15 ? 1 : 2;
   const last = new Date(y, m, 0).getDate();
-  return { y, m, half: day <= 15 ? 1 : 2, label: `รอบ ${day <= 15 ? '1–15' : '16–' + last} ${TH_MON[m - 1]} ${(y + 543) % 100}` };
+  return { y, m, half, label: `รอบ ${half === 1 ? '1–15' : '16–' + last} ${TH_MON[m - 1]} ${(y + 543) % 100}` };
 }
 const thDay_ = (d) => `${+Utilities.formatDate(d, CFG.tz, 'd')} ${TH_MON[+Utilities.formatDate(d, CFG.tz, 'M') - 1]} ${(+Utilities.formatDate(d, CFG.tz, 'yyyy') + 543) % 100}`;
 
