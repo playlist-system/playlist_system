@@ -347,7 +347,7 @@ function applyPermissions() {
 function doGet() {
   const email = (Session.getActiveUser().getEmail() || '').toLowerCase();
   const t = HtmlService.createTemplateFromFile('Phone');
-  t.data = JSON.stringify(phoneData_(email)).replace(/</g, '\\u003c');
+  t.data = JSON.stringify(Object.assign(phoneData_(email), { url: ScriptApp.getService().getUrl() })).replace(/</g, '\\u003c');
   return t.evaluate().setTitle('ใบงานถ่ายรูป MRT').addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 

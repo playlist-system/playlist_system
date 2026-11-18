@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="th"><head><base target="_top"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ใบงานถ่ายรูป MRT</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Prompt:wght@600&display=swap" rel="stylesheet">
@@ -82,7 +82,11 @@ function ring(p) { const r = 43, C = 2 * Math.PI * r, L = C * p;
   return `<svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="${r}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="10"/>` +
     `<circle cx="48" cy="48" r="${r}" fill="none" stroke="#1BB8EF" stroke-width="10" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 48 48)"/>` +
     `<text x="48" y="54" text-anchor="middle" fill="#fff" font-family="Prompt,sans-serif" font-weight="600" font-size="25">${Math.round(p * 100)}<tspan font-size="14">%</tspan></text></svg>`; }
-const RF = '<button class="rf" onclick="location.reload()">อัปเดต</button>';
+// หน้านี้อยู่ในกรอบ (iframe) ของ Apps Script: ย้ายหน้าด้วย google.script.history (ปุ่มย้อนกลับของมือถือใช้ได้) • อัปเดต = เปิดลิงก์เว็บแอปใหม่ทั้งหน้า
+const RF = '<button class="rf" onclick="refresh()">อัปเดต</button>';
+let R = '';
+const GS = (window.google && google.script && google.script.history) ? google.script : null;
+function refresh() { if (D.url) window.open(D.url + (R ? '#' + R : ''), '_top'); else location.reload(); }
 const head = (title, sub, extra = '') => `<div class="app">${RF}<div class="brand"><b class="pb">Plan<i>·B</i></b><span>ใบงานถ่ายรูป MRT</span></div><div class="t">${title}</div><div class="s">${sub.map(x => `<span>${esc(x)}</span>`).join('')}</div>${extra}</div>`;
 const bar = p => `<div class="bar"><i class="bg-${col(p)}" style="width:${Math.max(p * 100, 1.5).toFixed(1)}%"></i></div>`;
 function home() {
@@ -124,13 +128,24 @@ function scores() {
   h += `<div class="sec">คะแนนแต่ละจอ<span class="n">น้อยสุดขึ้นก่อน</span></div><div class="box">` + MY.slice().sort((a, b) => scrP(a) - scrP(b)).map(x => `<div class="pr wide"><span class="nn">${esc(x.code)} ${esc(x.type)}<small>${esc(x.st)}</small></span><div class="bb"><i class="bg-${col(scrP(x))}" style="width:${Math.max(scrP(x) * 100, 2)}%"></i></div><b class="${col(scrP(x))}">${pc(scrP(x))}</b></div>`).join('') + '</div>';
   return h + '</div>';
 }
+function go(h) {
+  if (GS) { R = h; showAll = false; GS.history.push({ r: h }, {}, h); draw(); window.scrollTo(0, 0); }
+  else if (location.hash.slice(1) !== h) location.hash = h;
+}
+document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); go(a.getAttribute('href').slice(1)); });
 function draw() {
-  const hsh = location.hash.slice(1), v = document.getElementById('v');
+  const hsh = R, v = document.getElementById('v');
   const m = hsh.match(/^s(\d+)$/);
   v.innerHTML = hsh === 'scores' ? scores() : m ? station(+m[1]) : home();
   document.getElementById('n0').className = hsh === 'scores' ? '' : 'on';
   document.getElementById('n1').className = hsh === 'scores' ? 'on' : '';
 }
-window.addEventListener('hashchange', () => { showAll = false; draw(); window.scrollTo(0, 0); });
+if (GS) {
+  GS.history.setChangeHandler(e => { R = (e.location && e.location.hash) || ''; showAll = false; draw(); window.scrollTo(0, 0); });
+  GS.url.getLocation(l => { const h = (l && l.hash) || ''; if (h !== R) { R = h; draw(); } });
+} else {
+  R = location.hash.slice(1);
+  window.addEventListener('hashchange', () => { R = location.hash.slice(1); showAll = false; draw(); window.scrollTo(0, 0); });
+}
 draw();
 </script></body></html>
