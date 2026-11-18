@@ -165,6 +165,7 @@
  *   เวอร์ชัน 5.5.60: หมายเหตุที่มีชื่อหนังหลายเรื่อง — แต่ละประโยคใช้กับหนังที่เขียนไว้หน้าประโยค
  *   เวอร์ชัน 5.5.61: ใส่ “ออกวันที่” ให้หนังที่หายไปจาก Playlist ของจอนั้น
  *   เวอร์ชัน 5.5.62: บันทึกลงโฟลเดอร์ใบเช็คแบบ 2 ขั้น เมื่อ Chrome ไม่ให้แก้ไฟล์ + รายละเอียดสาเหตุ
+ *   เวอร์ชัน 5.5.63: จอ Metro / BKJ ไม่สร้างโฟลเดอร์แถว #
  * ======================================================================
  */
 
@@ -2260,7 +2261,9 @@ function screen10(ws, sn, cn) {
    ช่วงวันที่ 16 ขึ้นไปเลือกได้ (3.10): rs = 'cur' รอบ 16–สิ้นเดือน (ค่าเริ่มต้น) / '1' รอบ 1–15 / 'both' ทั้ง 2 รอบ — รอบ 1–15 ข้ามจอที่ไม่มีหนังรอบนั้น
    upto = เอาหนังที่เริ่ม (แถบวันที่) ไม่เกินวันนี้ของเดือน 0 = ทั้งหมด • upto ก่อนวันที่ 16 ไม่สร้างรอบ 16
    จับคู่จอกับโฟลเดอร์: DGT / ID ดูรหัสหน้าชื่อโฟลเดอร์ • BKJ1_04 / BKJ2_20 ดูเลขจอในหัวคอลัมน์ • METRO_07 ดู 007 • จออื่น (So Bangkok, Twin Tube, The Big Y, BASE) ดูชื่อ ----- */
-const PMON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+const pzFilm = (b, n) => !((b.jam || b.metro) && /^#/.test(n));
+/* 5.5.63: จอ BKJ / Metro ไม่สร้างโฟลเดอร์แถว # (#BANGKOK JAM_ETA / #EDA / #Traffic MTP … = ข้อมูลจราจร/ข่าว ไม่ใช่หนัง) • #Fast Ads / #Module ยังสร้าง */ const PMON =
+    ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
   PMOD = ['#Fast Ads', '#Module ขาว', '#Module ดำ', '#Module สี'] /* 5.5: #Fast Ads ทุกจอ */,
   p2 = n => String(n).padStart(2, '0'),
   fsafe = n =>
@@ -2822,7 +2825,7 @@ function pzPlan(W, res, rs, upto, X) {
               ([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1,
             )
             .map(([n]) => String(n).trim())
-            .filter(Boolean),
+            .filter(n => n && pzFilm(b, n)),
         ),
       ]);
       const fk = fxKind(b),
@@ -3041,7 +3044,7 @@ async function picPlan(root, W, res, rs, upto) {
               ([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1,
             )
             .map(([n]) => String(n).trim())
-            .filter(Boolean),
+            .filter(n => n && pzFilm(b, n)),
         ),
       ]);
       for (let [id, k, s] of picTg(b, S)) {
@@ -11307,7 +11310,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.62 (18 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.63 (18 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
