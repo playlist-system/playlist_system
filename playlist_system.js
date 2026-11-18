@@ -164,6 +164,7 @@
  *   เวอร์ชัน 5.5.59: เช็กลิสต์ Playlist หลายวัน (แถววันที่ในการ์ด เลือกดูทีละวัน สรุปทีละวัน) + ตารางไฟล์ที่ใส่แล้ว แบบ × วัน
  *   เวอร์ชัน 5.5.60: หมายเหตุที่มีชื่อหนังหลายเรื่อง — แต่ละประโยคใช้กับหนังที่เขียนไว้หน้าประโยค
  *   เวอร์ชัน 5.5.61: ใส่ “ออกวันที่” ให้หนังที่หายไปจาก Playlist ของจอนั้น
+ *   เวอร์ชัน 5.5.62: บันทึกลงโฟลเดอร์ใบเช็คแบบ 2 ขั้น เมื่อ Chrome ไม่ให้แก้ไฟล์ + รายละเอียดสาเหตุ
  * ======================================================================
  */
 
@@ -9582,6 +9583,17 @@ const errN = e => {
   const n = e && e.name;
   return n && n !== 'Error' ? n : String((e && e.message) || e || '');
 };
+/* 5.5.62: รายละเอียดเมื่อเลือกโฟลเดอร์ / ขอสิทธิ์แก้ไฟล์ไม่ได้ — ให้ผู้ใช้ส่งภาพมาให้ผู้ดูแลดูได้ */
+const pkInfo = (e, t0) => {
+  const v = navigator.userAgent.match(/(Edg|Chrome)\/(\d+)/) || [];
+  let f = '';
+  try {
+    f = window.top !== window.self ? ' • เปิดอยู่ในกรอบ' : '';
+  } catch (_) {
+    f = ' • เปิดอยู่ในกรอบ';
+  }
+  return `${typeof e === 'string' ? e : errN(e) + (e && e.message && e.message !== errN(e) ? ': ' + e.message : '')}${t0 ? ` • ${((Date.now() - t0) / 1000).toFixed(1)} วินาที` : ''} • ${v[1] === 'Edg' ? 'Edge' : v[1] ? 'Chrome' : 'เบราว์เซอร์'} ${v[2] || ''}${location.protocol === 'file:' ? ' • เปิดจากไฟล์ในเครื่อง' : ''}${f}`;
+};
 const xlWhy = W => (W.length ? ' — ' + W.map(([n, e]) => n + (e ? ' (' + e + ')' : '')).join(', ') : '');
 const saveBlob = (n, d) => {
   const a = document.createElement('a');
@@ -11295,7 +11307,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.61 (17 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.62 (18 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -13231,6 +13243,7 @@ const vShot = () => {
           .join('')}</ul></details>`
       : '';
     b = `${D ? (D.bad ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`) : alertHTML('ok', `${D.n && D.ns ? `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง • แก้สี ${D.ns.toLocaleString()} ช่อง` : D.n || !D.ns ? `ใส่วันที่ถ่ายแล้ว ${D.n.toLocaleString()} ช่อง` : `แก้สีช่องวันที่ถ่ายแล้ว ${D.ns.toLocaleString()} ช่อง`} ใน ${D.files.length} ไฟล์`, `<p>${TCS === 'c' ? 'ใบเช็คในขั้นที่ 3 เป็นฉบับที่ใส่แล้วด้วย (ถ้ากดเติมต่อ ระบบใช้ฉบับนี้)' : TCS === 'last' ? 'ผลการเติมในขั้นที่ 4 เป็นฉบับที่ใส่แล้วด้วย' : 'ใบเช็คชุดนี้เป็นฉบับที่ใส่แล้ว'} ${D.saved && D.sv ? `<b>บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว</b> (ทับ ${D.sv.ok - D.sv.neu} ไฟล์${D.sv.neu ? ` • ไฟล์ใหม่ ${D.sv.neu} ไฟล์ เพราะโฟลเดอร์นี้ไม่มีไฟล์ชื่อเดียวกัน` : ''}) — ไฟล์ก่อนใส่อยู่ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย/${esc(D.sv.day)}` : 'ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็คด้านล่าง'}</p>`)) : ''}
+ ${D && !D.saved && (D.pkf || D.pk) ? alertHTML('wr', 'ยังบันทึกลงโฟลเดอร์ไม่ได้ — ลองบันทึกแบบ 2 ขั้น', `<p>ใบเช็คที่ใส่วันที่แล้วยังอยู่ครบ <b>1</b> กดเลือกโฟลเดอร์ใบเช็ค (เช่น 16-31) • <b>2</b> กดอนุญาตให้บันทึก — ถ้า Chrome ถาม ให้กดอนุญาตทั้ง 2 ครั้ง</p>` + `<div class="picb"><button class="btn secondary" data-a="shotpk1">${IC.folder}1. ${D.pk ? 'เลือกโฟลเดอร์ใหม่…' : 'เลือกโฟลเดอร์ใบเช็ค…'}</button><button class="btn ${D.pk ? 'primary' : 'secondary'}" data-a="shotpk2" ${D.pk ? '' : 'disabled'}>2. อนุญาตให้บันทึก${D.pk ? ` ในโฟลเดอร์ “${esc(D.pk.d.name)}”` : ''}</button></div>` + `<p>ถ้ายังไม่ได้ กด <b>ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</b> แล้วแตกไฟล์ไปวางทับในโฟลเดอร์ใบเช็ค (คัดลอกไฟล์เดิมเก็บไว้ก่อน)</p>${D.pkf ? `<p class="hint">รายละเอียด (ส่งภาพนี้ให้ผู้ดูแลได้): ${esc(D.pkf)}</p>` : ''}`) : ''}
  <p class="hint">โฟลเดอร์ “${esc(R.dir)}” • ตรวจ ${R.cells.toLocaleString()} ช่อง${R.read.length ? ` • เปิดไม่ได้: ${esc(R.read.join(', '))}` : ''}</p>
  ${D ? '' : NF ? `<details class="picd" open><summary><b>จะใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง</b> ใน ${nr} จอ</summary>${lst(FL, x => x.nm + ' = ' + x.day + (x.man === 2 ? ' (วันที่ของไฟล์รูป)' : x.man ? ' (เลือกเอง)' : x.src ? ' (รูปในโฟลเดอร์ ' + x.src + ')' : ''))}</details>` : '<p class="hint">ไม่มีช่องว่างที่มีรูปให้ใส่วันที่</p>'}${D || !NS ? '' : `<p class="hint">ช่องวันที่ถ่ายที่ใส่ไว้แล้ว <b>${NS.toLocaleString()} ช่อง</b> ยังไม่ใช่พื้นดำตัวเลขขาว — กดปุ่มด้านล่าง ระบบแก้สีให้ (เลขเหมือนเดิม)</p>`}
  <div class="shg">${grp('มีเลขในใบเช็ค แต่ไม่พบรูปในโฟลเดอร์', R.has, 'อาจลืมคัดลอกรูป หรือชื่อโฟลเดอร์ไม่ตรงกับชื่อหนัง', x => x.nm + ' (' + x.v + ')')}
@@ -16597,11 +16610,15 @@ const ACT = {
   ckdir: async () => {
     if (!FSA) return;
     let d;
+    const t0 = Date.now();
     try {
       d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
     } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      note = 'เปิดโฟลเดอร์ไม่ได้';
+      if (e && e.name === 'AbortError') {
+        note = `ยังไม่ได้เปิดโฟลเดอร์ — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ (รายละเอียด: ${pkInfo(e, t0)})`;
+        return;
+      }
+      note = `เปิดโฟลเดอร์ไม่ได้ (${errN(e)})`;
       return;
     }
     const fs = [];
@@ -16799,7 +16816,8 @@ const ACT = {
   shotsave: async k => {
     const D = SHOT && SHOT.done;
     if (!D || !FSA) return;
-    let d = k === 'pick' ? null : CKDIR;
+    let d = k === 'two' ? D.pk && D.pk.d : k === 'pick' ? null : CKDIR;
+    const t0 = Date.now();
     try {
       if (
         d &&
@@ -16810,7 +16828,10 @@ const ACT = {
       if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
     } catch (e) {
       if (e && e.name === 'AbortError') {
-        note = 'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ (หรือไม่ได้กดอนุญาตให้แก้ไฟล์)';
+        D.pkf = pkInfo(e, t0);
+        MQN = 'warn';
+        note =
+          'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ลองวิธี 2 ขั้นในกล่องด้านบน หรือดาวน์โหลด .zip';
         return;
       }
       MQN = 'err';
@@ -16911,9 +16932,55 @@ const ACT = {
       return;
     }
     D.saved = true;
+    D.pkf = D.pk = null;
     D.sv = { dir: d.name, ok: D.files.length, neu, day };
     MQN = 'done';
     note = `บันทึกลงโฟลเดอร์ “${d.name}” แล้ว ${D.files.length} ไฟล์`;
+  },
+  /* 5.5.62: บันทึกแบบ 2 ขั้น — 1 เลือกโฟลเดอร์ (อ่าน) 2 กดอีกครั้งเพื่อขอสิทธิ์แก้ไฟล์ แยกให้เห็นว่าติดขั้นไหน */
+  shotpk1: async () => {
+    const D = SHOT && SHOT.done;
+    if (!D || D.saved || !FSA) return;
+    const t0 = Date.now();
+    let d;
+    try {
+      d = await showDirectoryPicker({ id: 'ck', mode: 'read', startIn: 'desktop' });
+    } catch (e) {
+      D.pk = null;
+      D.pkf = 'ขั้น 1: ' + pkInfo(e, t0);
+      MQN = 'warn';
+      note =
+        e && e.name === 'AbortError'
+          ? 'ขั้น 1 ยังไม่สำเร็จ — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้ดูไฟล์'
+          : `ขั้น 1 เลือกโฟลเดอร์ไม่ได้ (${errN(e)})`;
+      return;
+    }
+    D.pk = { d };
+    D.pkf = D.pkf && D.pkf.startsWith('ขั้น') ? null : D.pkf;
+    MQN = 'find';
+    note = `ขั้น 1 เสร็จ — ได้โฟลเดอร์ “${d.name}” แล้ว กดปุ่ม 2 อนุญาตให้บันทึก`;
+  },
+  shotpk2: async () => {
+    const D = SHOT && SHOT.done,
+      d = D && D.pk && D.pk.d;
+    if (!d || D.saved) return;
+    const t0 = Date.now();
+    let r;
+    try {
+      r = await d.requestPermission({ mode: 'readwrite' });
+    } catch (e) {
+      D.pkf = 'ขั้น 2: ' + pkInfo(e, t0);
+      MQN = 'warn';
+      note = `ขั้น 2 ขอสิทธิ์แก้ไฟล์ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;
+      return;
+    }
+    if (r !== 'granted') {
+      D.pkf = 'ขั้น 2: ' + pkInfo('ผลการขอสิทธิ์ = ' + r, t0);
+      MQN = 'warn';
+      note = `ขั้น 2 Chrome ไม่อนุญาตให้แก้ไฟล์ในโฟลเดอร์ “${d.name}” — ยังไม่ได้บันทึก ใช้ปุ่มดาวน์โหลด .zip แทนได้`;
+      return;
+    }
+    await ACT.shotsave('two');
   },
   picck: async () => {
     if (!TC.length) return;
@@ -17540,11 +17607,15 @@ const ACT = {
   tcdir: async () => {
     if (!FSA) return;
     let d;
+    const t0 = Date.now();
     try {
       d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
     } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      note = 'เปิดโฟลเดอร์ไม่ได้';
+      if (e && e.name === 'AbortError') {
+        note = `ยังไม่ได้เปิดโฟลเดอร์ — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ (รายละเอียด: ${pkInfo(e, t0)})`;
+        return;
+      }
+      note = `เปิดโฟลเดอร์ไม่ได้ (${errN(e)})`;
       return;
     }
     const fs = [];
@@ -17713,10 +17784,19 @@ const ACT = {
         (await d.requestPermission({ mode: 'readwrite' })) !== 'granted'
       )
         d = null;
-      if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
+      if (!d) {
+        const t0 = Date.now();
+        try {
+          d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
+        } catch (e) {
+          if (e && e.name === 'AbortError') e.pk = pkInfo(e, t0);
+          throw e;
+        }
+      }
     } catch (e) {
       if (e && e.name === 'AbortError') {
-        note = 'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ (หรือไม่ได้กดอนุญาตให้แก้ไฟล์)';
+        MQN = 'warn';
+        note = `ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้${e.pk ? ` (รายละเอียด: ${e.pk})` : ''}`;
         return;
       }
       MQN = 'err';
