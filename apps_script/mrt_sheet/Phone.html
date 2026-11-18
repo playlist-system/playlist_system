@@ -87,7 +87,7 @@ const head = (title, sub, extra = '') => `<div class="app">${RF}<div class="bran
 const bar = p => `<div class="bar"><i class="bg-${col(p)}" style="width:${Math.max(p * 100, 1.5).toFixed(1)}%"></i></div>`;
 function home() {
   const sub = [who ? 'คุณ ' + who : '', D.round, 'อัปเดต ' + D.updated].filter(Boolean);
-  const hero = `<div class="hero">${ring(myP)}<div><div class="k">${D.assigned ? 'คะแนนของฉัน' : 'คะแนนทุกสถานี'}</div><div class="v">ได้รูปแล้ว ${myD.toLocaleString()} จาก ${myN.toLocaleString()}<br><small>ยังเหลือ ${myN - myD} รูป ใน ${ST.length} สถานี</small></div><div class="mrt">คะแนนรวมทั้ง MRT <b>${(D.mrt * 100).toFixed(1)}%</b></div></div></div>`;
+  const hero = `<div class="hero">${ring(myP)}<div><div class="k">${D.assigned ? 'คะแนนของฉัน' : 'คะแนนทุกสถานี'}</div><div class="v">ได้รูปแล้ว ${myD.toLocaleString()} จาก ${myN.toLocaleString()}<br><small>ยังเหลือ ${(myN - myD).toLocaleString()} รูป ใน ${ST.length} สถานี</small></div><div class="mrt">คะแนนรวมทั้ง MRT <b>${(D.mrt * 100).toFixed(1)}%</b></div></div></div>`;
   let h = head(D.assigned ? 'งานของฉัน' : 'งานทั้งหมด', sub, hero) + '<div class="body">';
   if (!D.assigned) h += `<div class="note">อีเมลนี้ยังไม่ได้ผูกกับสถานีในแท็บ "ผู้ใช้และสิทธิ์" เลยแสดงทุกสถานีไปก่อน</div>`;
   if (D.newFilms.length) h += `<div class="newb"><div class="dot"></div><div><b>หนังขึ้นใหม่ ${D.newest} ${MON}</b>${D.newFilms.map(f => `<span>${wb(f)}</span>`).join('')}<span>ต้องถ่ายทุกจอที่ฉายเรื่องนี้</span></div></div>`;
