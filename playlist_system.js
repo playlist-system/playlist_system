@@ -169,6 +169,7 @@
  *   เวอร์ชัน 5.5.64: โฟลเดอร์ # ของ Metro / BKJ — รอบ 1–15 ยังสร้าง
  *   เวอร์ชัน 5.5.65: จอแพค Nation ในฐานข้อมูลจอ = คน … Nation
  *   เวอร์ชัน 5.5.66: ใบเปล่าที่มีแถบวันที่แล้ว อ่านจอได้
+ *   เวอร์ชัน 5.5.67: อ่าน Playlist ทีละไฟล์ + เวลาที่เหลือ + ยกเลิก
  * ======================================================================
  */
 
@@ -11088,7 +11089,9 @@ function plwSrc() {
   }
   return (PLW.src = u);
 }
-function plwRead(arr) {
+const plBuf = async x => x.buf || (x.buf = await x.file.arrayBuffer());
+let PLSTOP = false;
+/* 5.5.67: Playlist อ่านทีละไฟล์ • PLSTOP = กดยกเลิกระหว่างอ่าน */ function plwRead(arr) {
   const M = new Map(),
     todo = arr.filter(f => !/Metro.*LED/i.test(f.name)),
     src = todo.length >= 3 ? plwSrc() : '';
@@ -11104,28 +11107,46 @@ function plwRead(arr) {
   const res = [],
     q = todo.map((f, i) => i);
   let left = todo.length,
-    dead = false;
-  todo.forEach((f, i) => M.set(f, new Promise(r => (res[i] = r))));
+    dead = false,
+    ahead = 0;
+  const idle = [],
+    LIM = n + 4;
+  todo.forEach((f, i) =>
+    M.set(f, new Promise(r => (res[i] = r))),
+  ); /* 5.5.67: อ่านไฟล์ตอนส่งให้ worker และอ่านล่วงหน้าไม่เกิน LIM ไฟล์ (Playlist ทั้งเดือนไม่ต้องอยู่ในหน่วยความจำพร้อมกัน) */
   const stop = () => {
     if (dead) return;
     dead = true;
     ws.forEach(w => w.terminate());
     res.forEach(r => r(null));
   }; /* พัง → ไฟล์ที่ยังไม่เสร็จอ่านแบบเดิม */
-  const next = w => {
+  const next = async w => {
     if (dead) return;
+    if (ahead >= LIM) {
+      idle.push(w);
+      return;
+    }
     const i = q.shift();
     if (i == null) return;
+    ahead++;
     let c;
     try {
-      c = todo[i].buf.slice(0);
+      c = (await plBuf(todo[i])).slice(0);
+      if (todo[i].file) todo[i].buf = null;
     } catch (_) {
       res[i](null);
       left--;
+      ahead--;
       return next(w);
     }
+    if (dead) return;
     w.postMessage({ id: i, buf: c }, [c]);
   };
+  M.free = () => {
+    ahead--;
+    if (idle.length && !dead) next(idle.shift());
+  };
+  M.stop = stop;
   for (const w of ws) {
     w.onmessage = e => {
       const d = e.data;
@@ -11148,13 +11169,21 @@ function plwRead(arr) {
 async function addFiles(kind, files) {
   const arr = [],
     rb = [];
-  for (const f of files) {
-    try {
-      arr.push({ name: f.name, buf: await f.arrayBuffer() });
-    } catch (_) {
-      rb.push(f.name);
-    }
-  } /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
+  if (kind === 'pl')
+    for (const f of files)
+      arr.push({
+        name: f.name,
+        file: f,
+        buf: null,
+      }); /* 5.5.67: Playlist อ่านทีละไฟล์ในลูป (แถบขยับตั้งแต่ไฟล์แรก) */
+  else
+    for (const f of files) {
+      try {
+        arr.push({ name: f.name, buf: await f.arrayBuffer() });
+      } catch (_) {
+        rb.push(f.name);
+      }
+    } /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
   if (rb.length) {
     say(
       `เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')} — ถ้าลากจากในไฟล์ .zip ที่เปิดดูใน Windows ให้ลากไฟล์ .zip มาทั้งไฟล์ หรือแตกไฟล์ก่อน`,
@@ -11195,18 +11224,35 @@ async function addFiles(kind, files) {
   const ok = [],
     emp = [],
     got = [],
-    PW = plwRead(arr);
+    PW = plwRead(arr),
+    PLX0 = PLX.slice(),
+    PLI0 = PLI.slice(),
+    t0 = performance.now();
   let _i = 0;
+  PLSTOP = false;
   for (const f of arr) {
+    if (PLSTOP) break;
     _i++;
-    if (typeof busyStep === 'function') await busyStep('กำลังอ่าน Playlist', _i, arr.length, f.name);
+    if (typeof busyStep === 'function') await busyStep('กำลังอ่าน Playlist', _i, arr.length, f.name, t0);
     let p;
     try {
-      const g = PW.has(f) ? await PW.get(f) : null;
+      const inW = PW.has(f),
+        g = inW ? await PW.get(f) : null;
+      if (inW && PW.free) PW.free();
+      if (PLSTOP) break;
+      if (!g) {
+        try {
+          await plBuf(f);
+        } catch (_) {
+          rb.push(f.name);
+          continue;
+        }
+      }
       p = parsePlaylist(/Metro.*LED/i.test(f.name) ? f : g || { name: f.name, buf: await slimXlsx(f.buf) });
     } catch (e) {
       p = null;
     }
+    if (f.file) f.buf = null;
     PLX = PLX.filter(x => x.f !== f.name);
     PLI = PLI.filter(x => x.f !== f.name);
     if (p && p.why) {
@@ -11241,6 +11287,18 @@ async function addFiles(kind, files) {
     }
     got.push({ f, p, d: fd0 ? +fd0 : 0, I: I2 });
   }
+  if (PLSTOP) {
+    if (PW.stop) PW.stop();
+    PLSTOP = false;
+    PLX = PLX0;
+    PLI = PLI0;
+    MQN = 'warn';
+    note = `ยกเลิกแล้ว — ยังไม่ได้นำเข้า Playlist ชุดนี้ (อ่านไป ${_i} จาก ${arr.length} ไฟล์)`;
+    if (typeof busyDone === 'function') busyDone();
+    return view();
+  }
+  /* 5.5.67: ยกเลิก → ไม่นำเข้าอะไรจากชุดนี้ */ if (kind === 'pl' && rb.length)
+    say(`เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')}`);
   got.sort((a, b) => a.d - b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
   {
     const kk = g => new Set(g.p.map(x => x.m + '|' + x.c)),
@@ -11331,7 +11389,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.66 (19 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.67 (19 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -12016,8 +12074,8 @@ function busyDone() {
     $('.wrap').inert = false;
   }
 }
-async function busyStep(t, i, n, f) {
-  BUSY = { t, i, n, f };
+async function busyStep(t, i, n, f, t0) {
+  BUSY = { t, i, n, f, t0, stop: !!t0 && n >= 20 };
   busyPaint();
   $('.wrap').inert = true;
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
@@ -13565,8 +13623,13 @@ IC.bot =
   '<svg viewBox="0 0 24 24"><rect x="4.5" y="8" width="15" height="11" rx="4.5"/><path d="M12 8V5.5M9.5 13h.01M14.5 13h.01M10 16c1.2.8 2.8.8 4 0"/><circle cx="12" cy="4.5" r="1"/></svg>';
 IC.cam = '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="4"/></svg>';
 IC.cmpi = '<svg viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7zM7 9h1M16 9h1"/></svg>';
-const vBusyIn = () =>
-  `<b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small><small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>`;
+const busyLeft = () => {
+  if (!BUSY.t0 || BUSY.i < 4) return '';
+  const s = Math.round((((performance.now() - BUSY.t0) / (BUSY.i - 1)) * (BUSY.n - BUSY.i + 1)) / 1000);
+  return s < 5 ? '' : s < 90 ? `เหลือประมาณ ${s} วินาที` : `เหลือประมาณ ${Math.round(s / 60)} นาที`;
+};
+/* 5.5.67 */ const vBusyIn = () =>
+  `<b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft() ? `<small><b>${busyLeft()}</b></small>` : ''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop ? '<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>' : ''}`;
 /* วาดกล่องรอ: ถ้ามีกล่องอยู่แล้วเปลี่ยนเฉพาะข้อความ น้องโฟกัสจะได้ขยับต่อเนื่อง ไม่เริ่มใหม่ทุกไฟล์ */
 function busyPaint() {
   const b = $('#busy');
@@ -17524,6 +17587,13 @@ const ACT = {
     }
     store.set('ps_sdb', '');
     note = 'ลบฐานข้อมูลจอแล้ว';
+  },
+  plstop: () => {
+    PLSTOP = true;
+    if (BUSY) {
+      BUSY.f = 'กำลังยกเลิก …';
+      busyPaint();
+    }
   },
   toolv: k => {
     if (!['pic', 'shot', 'cmp', 'blank', 'sdb'].includes(k)) return;
