@@ -168,6 +168,7 @@
  *   เวอร์ชัน 5.5.63: จอ Metro / BKJ ไม่สร้างโฟลเดอร์แถว #
  *   เวอร์ชัน 5.5.64: โฟลเดอร์ # ของ Metro / BKJ — รอบ 1–15 ยังสร้าง
  *   เวอร์ชัน 5.5.65: จอแพค Nation ในฐานข้อมูลจอ = คน … Nation
+ *   เวอร์ชัน 5.5.66: ใบเปล่าที่มีแถบวันที่แล้ว อ่านจอได้
  * ======================================================================
  */
 
@@ -3424,14 +3425,21 @@ async function chkFold(f) {
   const R = await chkRead(f, { blank: 1 }),
     fold =
       []; /* 5.5.29: ชีตใบเปล่า (ยังไม่มีรายการหนัง) → จอก็สร้างโฟลเดอร์ได้ (พร้อม #Fast Ads / #Module และแถว # ของจอ) */
+  const none =
+    R.sheets.some(x => x.blocks.length) &&
+    R.sheets.every(
+      x => x.blank || x.blocks.every(b => !b.items.some(i => !i[4])),
+    ); /* 5.5.66: ทั้งไฟล์ไม่มีหนังเลย แต่มีแถบวันที่แล้ว (ใบเปล่าแบบเก่า) → ถือเป็นใบเปล่า อ่านจอได้ */
   for (const x of R.sheets)
     for (const b of x.blocks)
-      if (b.items.some(i => !i[4]) || x.blank)
+      if (b.items.some(i => !i[4]) || x.blank || none)
         fold.push({
           sn: x.sn,
           lc: b.lc,
-          items: b.items.filter(i => !RMK(i[0])).map(i => [durTail(i[0]), ...i.slice(1)]),
-          /* 5.5.31 • 5.5.33 */ blank: x.blank ? 1 : 0,
+          items: b.items
+            .filter(i => !RMK(i[0]))
+            .map(i => [durTail(i[0]), ...(none && !x.blank ? [null, ...i.slice(2)] : i.slice(1))]),
+          /* 5.5.31 • 5.5.33 */ blank: x.blank || none ? 1 : 0,
           ...picId(x.ws, x.sn, b.lc),
         });
   return { fold, mx: R.mx };
@@ -11323,7 +11331,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.65 (19 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.66 (19 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -13287,8 +13295,8 @@ const cHl = (a, b) => {
 const vCmp = () => {
   const L = PICX;
   if (!L || !L.res.some(r => (r.fold || []).some(b => CPN[b.media])))
-    return L && L.res.length
-      ? `<section class="pic cmp" data-tour="tcmp"><h3>${IC.folder}ตรวจโฟลเดอร์เทียบจอ Plan B TV BKK</h3><p class="hint">ไม่มีจอ Plan B TV (40 / 80 / CITY / Spare) ในใบเช็คชุดนี้</p></section>`
+    return L
+      ? `<section class="pic cmp" data-tour="tcmp"><h3>${IC.folder}ตรวจโฟลเดอร์เทียบจอ Plan B TV BKK</h3><p class="hint">${L.res.length ? 'ไม่มีจอ Plan B TV (40 / 80 / CITY / Spare) ในใบเช็คชุดนี้' : 'อ่านจอจากใบเช็คที่เลือกไม่ได้'}${(L.bad || []).length ? ` • อ่านไม่ได้ ${L.bad.length} ไฟล์: ${L.bad.map(esc).join(', ')}` : ''}</p></section>`
       : '';
   const c = L.cmp,
     R = c && c.R;
@@ -13993,7 +14001,7 @@ function tcStat() {
           nIss ? `ควรดูอีก ${nIss.toLocaleString()} ช่อง` : 'ไม่มีช่องที่ต้องดูเพิ่ม',
         ];
   const cmp = !hasCP
-    ? ['mu', '—', '', 'ไม่มีจอ Plan B TV ในใบเช็คชุดนี้']
+    ? ['mu', '—', '', L && !L.res.length ? 'อ่านจอจากใบเช็คไม่ได้' : 'ไม่มีจอ Plan B TV ในใบเช็คชุดนี้']
     : !CR
       ? ['mu', '—', '', 'ยังไม่ได้ตรวจ']
       : CR.err
