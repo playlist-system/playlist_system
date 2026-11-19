@@ -167,6 +167,7 @@
  *   เวอร์ชัน 5.5.62: บันทึกลงโฟลเดอร์ใบเช็คแบบ 2 ขั้น เมื่อ Chrome ไม่ให้แก้ไฟล์ + รายละเอียดสาเหตุ
  *   เวอร์ชัน 5.5.63: จอ Metro / BKJ ไม่สร้างโฟลเดอร์แถว #
  *   เวอร์ชัน 5.5.64: โฟลเดอร์ # ของ Metro / BKJ — รอบ 1–15 ยังสร้าง
+ *   เวอร์ชัน 5.5.65: จอแพค Nation ในฐานข้อมูลจอ = คน … Nation
  * ======================================================================
  */
 
@@ -9313,9 +9314,20 @@ const sdb = () => {
       SDB = null;
     }
     if (SDB && !Array.isArray(SDB.rows)) SDB = null;
+    if (SDB) sdbNat(SDB);
   }
   return SDB;
 };
+/* 5.5.65: จอแพค Nation เป็นของทีม Nation (ชื่อเล่นซ้ำกับคนในกรุงเทพฯ ได้ เช่น เดฟ) → นับเป็นคน “<ชื่อ> Nation” แยกจากใบเช็คของคนชื่อเดียวกัน */ function sdbNat(
+  D,
+) {
+  for (const r of D.rows || [])
+    if (/nation/i.test(r.pk) && !/nation/i.test(r.w)) {
+      r.w = r.w + ' Nation';
+      r.p = sdbP(r.w);
+    }
+  return D;
+}
 function sdbRead(buf, name) {
   const wb = XLSX.read(buf, { type: 'array' }),
     ord = [...wb.SheetNames].sort(
@@ -9358,13 +9370,13 @@ function sdbRead(buf, name) {
       }
       if (rows.length >= 10) {
         const dm = String(name || '').match(/(\d{1,2})[-_.](\d{1,2})[-_.](\d{2,4})/);
-        return {
+        return sdbNat({
           name: String(name || ''),
           sn,
           date: dm ? dm[1] + '-' + dm[2] + '-' + dm[3] : '',
           at: Date.now(),
           rows,
-        };
+        });
       }
     }
   }
@@ -11311,7 +11323,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.64 (18 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.65 (19 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
