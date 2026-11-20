@@ -1132,7 +1132,7 @@ const today0=()=>{const n=new Date();return Date.UTC(n.getFullYear(),n.getMonth(
 /* วันที่จากข้อมูลในไฟล์: วันเริ่มล่าสุดของหนังที่ออนอยู่ (ไม่เกินวันนี้) */
 function dataDate(p){let b=0;const cap=today0();for(const s of p)for(const r of s.rows){if(r.off||!r.ad||JUNK.test(r.ad.trim())||/เมื่อมีไฟล์/.test(r.ad))continue;const d=parseD(r.s);if(d&&+d<=cap&&+d>b)b=+d}return b?new Date(b):null}
 function nameDate(n,ref){const d=fullNameDate(n);if(d)return d;const m=String(n).match(/แยกจอ_?(\d{1,2})_/);if(m&&ref&&+m[1]>=1&&+m[1]<=31)return new Date(Date.UTC(ref.getUTCFullYear(),ref.getUTCMonth(),+m[1]));return null}
-const plDate=()=>{let b=0,a=0;for(const s of DB){if(s.pd>a)a=s.pd;if(!KINDS.some(K=>K.latest&&K.has(s))&&s.pd>b)b=s.pd}b=b||a;return b?new Date(b):null}; /* Show DC / LA PlanB ไม่ได้ส่งทุกวัน (อาจเป็นฉบับเก่าหรือของรอบถัดไป) จึงไม่ใช้กำหนดวันทำงาน */
+const plDate=()=>{const W=plWork();let b=0,a=0;for(const s of DB){if(s.pd>a)a=s.pd;if(!KINDS.some(K=>K.latest&&K.has(s))&&s.pd>b&&!(W&&s.pd>W))b=s.pd}b=b||a;return b?new Date(b):null}; /* 5.5.70: ไฟล์ที่ลงวันที่ล่วงหน้า (เช่น BKJ2 ลงวันพรุ่งนี้) ที่ใช้แทนเพราะไม่มีไฟล์ของวันที่เติม ไม่เลื่อนวันที่เติม */ /* Show DC / LA PlanB ไม่ได้ส่งทุกวัน (อาจเป็นฉบับเก่าหรือของรอบถัดไป) จึงไม่ใช้กำหนดวันทำงาน */
 const workDate=()=>parseD(OP.base)||PLD||autoBase();
 /* 4.3: เติมหลายวันต่อกัน — วันทำงาน = วันที่มีไฟล์ สรุปรายการหนังแยกจอ (6 แพค) • ไฟล์แบบอื่น (Show DC, Metro LED, BKJ …) อยู่กับวันแรกที่ไม่ก่อนวันของไฟล์ (ไม่มี → วันล่าสุด)
    แต่ละวันใช้ไฟล์ของวันนั้น แบบที่วันนั้นไม่มี ใช้ของวันก่อนหน้าทั้งแบบ — ถ้าทุกวันมีครบ ผลเหมือนเติมทีละวัน */
@@ -1143,18 +1143,21 @@ const pfPut=(db,p)=>{if(p.every(x=>x.rep==='screen')){const ks=new Set(p.map(x=>
 const plFull=()=>{const vd=!PFS.some(pfG),xm=vd&&!PFS.some(pfV),xl=xm&&!PFS.some(pfX),vl=xl&&!PFS.some(pfXL);return{vd,xm,xl,vl,F:!vd?pfG:!xm?pfV:!xl?pfX:!vl?pfXL:pfVL}};
 /* 5.5.47: ไฟล์ของวันหลังวันที่เติมวันสุดท้าย (เช่น Parc Paragon “02 November” ปนมากับไฟล์วันที่ 1) ไม่ใช้ ถ้ามีไฟล์จอชุดเดียวกันของวันนั้นแล้ว — ฉบับวันถัดไปลงถอดเรื่องที่ยังออนวันนี้ไว้ */
 const plWork=()=>{const F=plFull().F,ds=PFS.filter(F).map(e=>e.d).filter(d=>d>0);return ds.length?Math.max(...ds):0};
-function plLater(W){const sk=new Set();if(!W)return sk;for(const e of PFS){if(!(e.d>W))continue;const ms=new Set(e.p.map(s=>s.m));if(PFS.some(o=>o!==e&&o.d===W&&o.p.some(s=>ms.has(s.m))))sk.add(e)}return sk}
+/* 5.5.70: เทียบจอชุดเดียวกันทีละจอสำหรับไฟล์ที่แยกจอ (เช่น BKJ1 กับ BKJ2 ชื่อสื่อเดียวกัน “Bangkok Jams” แต่คนละไฟล์คนละจอ) — เดิมเทียบแค่ชื่อสื่อ ไฟล์ BKJ2 ของวันถัดไปจึงถูกทิ้ง เพราะมี BKJ1 ของวันที่เติม */
+const plSame=(a,b)=>a.m===b.m&&(a.rep!=='screen'||b.rep!=='screen'||a.c===b.c);
+function plLater(W){const sk=new Set();if(!W)return sk;for(const e of PFS){if(!(e.d>W))continue;if(PFS.some(o=>o!==e&&o.d===W&&o.p.some(s=>e.p.some(t=>plSame(s,t)))))sk.add(e)}return sk}
 const plLaterMsg=(sk,W)=>[...sk].map(e=>({f:e.f,lv:'info',t:`เป็นไฟล์ของวันที่ ${thd(new Date(e.d))} ซึ่งเลยวันที่เติม (${thd(new Date(W))}) — ระบบใช้ไฟล์ของวันที่ ${new Date(W).getUTCDate()} ของจอชุดเดียวกันแทน • เก็บไฟล์นี้ไว้ใช้ตอนเติมวันที่ ${new Date(e.d).getUTCDate()}`}));
-function plFix(){const W=plWork(),sk=plLater(W);if(!sk.size)return;const bad=new Set([...sk].map(e=>e.f)),ms=new Set(DB.filter(s=>bad.has(s.pf)).map(s=>s.m));
+const plAheadMsg=(sk,W)=>W?PFS.filter(e=>e.d>W&&!sk.has(e)&&DB.some(s=>s.pf===e.f&&!KINDS.some(K=>K.latest&&K.has(s)))).map(e=>({f:e.f,lv:'info',ahead:1,t:`เป็นไฟล์ของวันที่ ${thd(new Date(e.d))} ซึ่งเลยวันที่เติม (${thd(new Date(W))}) แต่ไม่มีไฟล์ของวันที่ ${new Date(W).getUTCDate()} ของจอชุดนี้ — ระบบใช้ไฟล์นี้เติมวันที่ ${new Date(W).getUTCDate()} ไปก่อน หนังที่เริ่มหลังวันที่ ${new Date(W).getUTCDate()} ยังไม่ใส่ • ถ้ามีไฟล์ของวันที่ ${new Date(W).getUTCDate()} ใส่เพิ่มได้ ระบบจะใช้ไฟล์นั้นแทน`})):[]; /* 5.5.70 */
+function plFix(){const W=plWork(),sk=plLater(W);PLI=PLI.filter(x=>!x.ahead);if(!sk.size){PLI=PLI.concat(plAheadMsg(sk,W));return}const bad=new Set([...sk].map(e=>e.f)),ms=new Set(DB.filter(s=>bad.has(s.pf)).map(s=>s.m));
  if(ms.size){let db=DB.filter(s=>!bad.has(s.pf));for(const e of [...PFS].filter(e=>!sk.has(e)).sort((a,b)=>a.d-b.d||a.q-b.q)){const p=e.p.filter(s=>ms.has(s.m));if(p.length)db=pfPut(db,p)}DB=db;PLD=plDate()}
- PLI=PLI.filter(x=>!bad.has(x.f)).concat(plLaterMsg(sk,W))}
+ PLI=PLI.filter(x=>!bad.has(x.f)).concat(plLaterMsg(sk,W),plAheadMsg(sk,W))}
 function plDays(){const sig=PFS.map(e=>e.q).join(',');if(PDC&&PDC.sig===sig)return PDC.G;
  let G=null;const{vd,xm,xl,vl,F:pfFull}=plFull(),ds=[...new Set(PFS.filter(pfFull).map(e=>e.d))].sort((a,b)=>a-b);
  if(ds.length>1){G=ds.map(d=>({d,E:[]}));G.v=(vd&&!xm)||vl;G.x=xm&&!vl;G.xl=xl&&!vl;G.vl=vl;const sk=plLater(ds[ds.length-1]);for(const e of PFS){if(sk.has(e))continue;let i=pfFull(e)?ds.indexOf(e.d):e.d>0?ds.findIndex(d=>d>=e.d):-1;if(i<0)i=ds.length-1;G[i].E.push(e)}
   let db=[];for(const g of G){g.E.sort((a,b)=>a.d-b.d||a.q-b.q);const ks=new Set(g.E.flatMap(e=>e.p.map(kindOfS)));db=db.filter(s=>!ks.has(kindOfS(s)));for(const e of g.E)db=pfPut(db,e.p);g.db=db}}
  PDC={sig,G};return G}
 function plSync(){const G=plDays(),W=G?G[G.length-1].d:plWork(),sk=plLater(W);if(G)DB=G[G.length-1].db;else{let db=[];for(const e of [...PFS].filter(e=>!sk.has(e)).sort((a,b)=>a.d-b.d||a.q-b.q))db=pfPut(db,e.p);DB=db}
- PLD=plDate();const live=new Set([...DB.map(s=>s.pf),...(G?PFS.map(e=>e.f):[])]);PLI=PFS.flatMap(e=>e.I||[]).filter(x=>live.has(x.f)&&!(sk.size&&[...sk].some(e=>e.f===x.f))).concat(plLaterMsg(sk,W))}
+ PLD=plDate();const live=new Set([...DB.map(s=>s.pf),...(G?PFS.map(e=>e.f):[])]);PLI=PFS.flatMap(e=>e.I||[]).filter(x=>live.has(x.f)&&!(sk.size&&[...sk].some(e=>e.f===x.f))).concat(plLaterMsg(sk,W),plAheadMsg(sk,W))}
 const THW=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
 const rngTxt=G=>{const a=new Date(G[0].d),b=new Date(G[G.length-1].d);return a.getUTCMonth()===b.getUTCMonth()&&a.getUTCFullYear()===b.getUTCFullYear()?`${a.getUTCDate()}–${thd(b)}`:`${thdS(a)} – ${thd(b)}`};
 /* 4.3: วันที่เติมล่าสุดของใบเช็คแต่ละชื่อ (จำไว้ในเครื่องนี้ ตอนบันทึก / ดาวน์โหลด) → เตือนถ้าข้ามวัน */
@@ -1269,7 +1272,7 @@ function layoutChk(sh,jobs,o,ST,W,wsv){
    const stl=CONTM&&dd>=+P2&&/ต่อสัญญา/.test(r.st||'')&&r.ed&&+r.ed===+P2-864e5&&!(r.sd&&+r.sd>=+P2);if(stl)g=+P2; /* ต่อสัญญาวันที่ 16 แต่ Playlist ยังลงวันที่สัญญาเดิม (หมด 15) → ถือเป็นสัญญาใหม่เริ่ม 16 */
    const mid=String(r.note||'').match(/(?:ออนแอร์|ขึ้น)ระหว่างวัน\s*(?:วันที่)?\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/),md=mid?+new Date(Date.UTC(yy(mid[3]),+mid[2]-1,+mid[1])):0;
    if(md>=+P&&md<=dd)g=CONTM&&dd>=+P2&&md<+P2&&!b.hist.some(h=>fam(h.nm)===fam(r.ad))?+P2:md; /* หมายเหตุ “ออนแอร์ระหว่างวันวันที่ …” → ลงใต้แถบวันนั้น — ครึ่งเดือนหลัง: หนังใหม่ที่หมายเหตุลงวันที่ 1–15 ลงใต้แถบ 16 (รอบ 1–15 ปิดแล้ว แบบที่ทีมทำ) */
-   else if(NEWST.test(r.st||'')&&g!==dd){if(g>dd)g=Math.max(dd,+P);else if(hb0&&g>+P&&!b.hist.some(h=>h.g===g&&fam(h.nm)===fam(r.ad)))g=dd;else if(!hb0&&dd>+P&&b.scr.pd&&+b.scr.pd===dd)g=dd} /* 5.5.13: เติมครั้งแรกหลังวันที่ 1 */ /* “ขึ้นใหม่” = ขึ้นวันนี้ */
+   else if(NEWST.test(r.st||'')&&g!==dd){if(g>dd)g=Math.max(dd,+P,b.scr.pd&&+b.scr.pd>dd?Math.min(g,+b.scr.pd):0);else if(hb0&&g>+P&&!b.hist.some(h=>h.g===g&&fam(h.nm)===fam(r.ad)))g=dd;else if(!hb0&&dd>+P&&b.scr.pd&&+b.scr.pd===dd)g=dd} /* 5.5.13: เติมครั้งแรกหลังวันที่ 1 */ /* “ขึ้นใหม่” = ขึ้นวันนี้ */
    if(r.bd)r.bdG=g>lim?0:g; /* 5.5.40: จำว่าวันที่ผิดแล้วใส่จริงไหม (ใส่ตามวันเริ่มออนแอร์ ถ้าถึงแล้ว) — ข้อความ “ต้องแก้” เดิมบอก “ยังไม่ใส่” ทั้งที่ใส่แล้ว */
    if(g>lim){if(!r.bd&&!b.hist.some(h=>fam(h.nm)===fam(r.ad)))b.later.push(r);continue} /* 5.5.28: วันที่ผิดบอกใน “ต้องแก้” แทน */
    const rnw=CONTM&&dd===+P2&&(NEWST.test(r.st||'')||CONT.test(r.st||''))&&(r.sd&&+r.sd===+P2||stl); /* วันที่ 16: ต่อสัญญา/ขึ้นใหม่ที่เริ่ม 16 → แถวใหม่ใต้ 16 แถวเดิมใส่ “ออก 16” */
@@ -4039,7 +4042,7 @@ async function addFiles(kind,files){const arr=[],rb=[];if(kind==='pl')for(const 
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(info.length?` • ข้ามไฟล์ที่ไม่ได้ใช้ ${info.length} ไฟล์`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.69 (20 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.70 (20 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
