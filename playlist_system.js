@@ -177,6 +177,7 @@
  *   เวอร์ชัน 5.5.72: ปุ่มส่งเข้าใบเช็ค MRT (Google Sheets) ในหน้าผลการเติม
  *   เวอร์ชัน 5.5.73: ใส่วันที่ถ่าย อ่านโฟลเดอร์ MRT ใน Gallary
  *   เวอร์ชัน 5.5.74: ใส่วันที่ถ่าย บอกความคืบหน้าตั้งแต่อ่านโฟลเดอร์
+ *   เวอร์ชัน 5.5.75: ใส่วันที่ถ่าย เลือกแบบอัปโหลดโฟลเดอร์ (ไดรฟ์เครือข่าย)
  * ======================================================================
  */
 
@@ -3770,6 +3771,107 @@ const shotOk = (ST, st) => {
   return fc === 'T0' || fc === 'T2' || (/^[0-9A-F]{6,8}$/.test(fc) && lum(fc) > 160);
 };
 const SHOTBW = { fill: 'FF000000', color: 'FFFFFFFF', fontName: 'Calibri', center: true };
+/* 5.5.75: ตัวเลือกโฟลเดอร์ที่จับเวลา — หน้าต่างเลือกปิดแล้ว (หน้าเว็บได้โฟกัสกลับ) แต่ Chrome ยังไม่ส่งโฟลเดอร์มาเกิน 6 วินาที → บอกให้ใช้แบบอัปโหลด */
+let SHOTPK = false,
+  SHOTSLOW = false;
+async function shotPick() {
+  let done = false,
+    tm = null;
+  const onF = () => {
+    if (done) return;
+    clearTimeout(tm);
+    tm = setTimeout(() => {
+      if (done) return;
+      SHOTSLOW = true;
+      MQN = 'warn';
+      note =
+        'Chrome ยังไม่ส่งโฟลเดอร์ที่เลือกมาให้ระบบ — ไดรฟ์เครือข่ายบางแห่งเปิดแบบนี้ไม่ได้ ใช้ปุ่ม “เลือกแบบอัปโหลดโฟลเดอร์” แทน';
+      view();
+    }, 6000);
+  };
+  SHOTPK = true;
+  addEventListener('focus', onF);
+  try {
+    return await showDirectoryPicker({ id: 'pic', mode: 'read' });
+  } finally {
+    done = true;
+    SHOTPK = false;
+    clearTimeout(tm);
+    removeEventListener('focus', onF);
+  }
+}
+/* รายการไฟล์จาก input webkitdirectory → โฟลเดอร์เสมือน (entries / getFile แบบเดียวกับ File System Access) — มีเฉพาะโฟลเดอร์ที่มีรูป */
+function vDir(files) {
+  let root = null;
+  const mk = (d, n) => {
+    let x = d.kids.get(n);
+    if (!x) {
+      x = { kind: 'directory', name: n, kids: new Map() };
+      d.kids.set(n, x);
+    }
+    return x;
+  };
+  for (const f of files) {
+    const p = String(f.webkitRelativePath || f.name)
+        .split('/')
+        .filter(Boolean),
+      nm = p[p.length - 1];
+    if (p.length < 2 || !IMGX.test(nm) || nm.startsWith('.')) continue;
+    if (!root) root = { kind: 'directory', name: p[0], kids: new Map() };
+    let d = root;
+    for (const q of p.slice(1, -1)) d = mk(d, q);
+    d.kids.set(nm, { kind: 'file', name: nm, getFile: async () => f });
+  }
+  if (!root) return null;
+  const wrap = d => {
+    d.entries = async function* () {
+      for (const kv of d.kids) yield kv;
+    };
+    d.queryPermission = d.requestPermission = async () => 'granted';
+    d.vdir = true;
+    for (const v of d.kids.values()) if (v.kind === 'directory') wrap(v);
+    return d;
+  };
+  return wrap(root);
+}
+async function shotRun(d) {
+  SHOTSLOW = false;
+  let wt = 0;
+  const wprog = async (cnt, nm) => {
+    const t = performance.now();
+    if (cnt > 1 && t - wt < 250) return;
+    wt = t;
+    BUSY = { t: `กำลังอ่านโฟลเดอร์ใน “${d.name}”`, i: 0, n: 0, f: nm, cnt };
+    busyPaint();
+    $('.wrap').inert = true;
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+  };
+  await wprog(0, d.name);
+  let R;
+  try {
+    R = await shotScan(
+      d,
+      TC,
+      async (i, n, nm) => {
+        if (typeof busyStep === 'function') await busyStep('กำลังดูรูปในโฟลเดอร์แยกรูป', i, n, nm);
+      },
+      wprog,
+    );
+  } catch (e) {
+    MQN = 'warn';
+    note = 'อ่านโฟลเดอร์ “' + d.name + '” ไม่ได้ (' + errN(e) + ') — ไดรฟ์เครือข่ายอาจหลุด ลองกดตรวจอีกครั้ง';
+    return;
+  } finally {
+    if (typeof busyDone === 'function') busyDone();
+  }
+  SHOT = { sig: ckSig(), d, R, done: null };
+  MQN = R.cells && !(R.has.length + R.diff.length + R.bad.length) ? 'done' : 'warn';
+  note = R.cells
+    ? R.n
+      ? `ตรวจแล้ว จะใส่วันที่ถ่าย ${R.n.toLocaleString()} ช่อง`
+      : 'ตรวจแล้ว ไม่มีช่องที่ต้องใส่'
+    : `ไม่พบจอในใบเช็คที่ตรงกับโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`;
+}
 async function shotScan(root, files, prog, wprog) {
   const { S, shut, RF } = await picScreens(root, wprog),
     same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -11679,7 +11781,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.74 (20 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.75 (20 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -13549,6 +13651,12 @@ const shotFill = () => {
       }),
   ];
 };
+const shotSlowH = () =>
+  alertHTML(
+    'wr',
+    'Chrome ยังไม่ส่งโฟลเดอร์ที่เลือกมาให้',
+    '<p>ไดรฟ์เครือข่ายบางแห่ง Chrome เปิดแบบเลือกโฟลเดอร์ไม่ได้ กด <b>เลือกแบบอัปโหลดโฟลเดอร์</b> แล้วเลือกโฟลเดอร์เดิม ตอน Chrome ถามให้กด “อัปโหลด” — ระบบอ่านรูปในเครื่องนี้ ไม่ได้ส่งไฟล์ไปไหน</p><p class="hint">แบบอัปโหลด Chrome ต้องนับไฟล์ทุกไฟล์ก่อน เลือกโฟลเดอร์ให้เล็ก เช่น โฟลเดอร์รอบ (11 Nov 2026 16-30) ใน Pic @ Digital MRT • โฟลเดอร์ที่ไม่มีรูปจะไม่เห็น</p>',
+  );
 const vShot = () => {
   if (!TC.length) return '';
   if (SHOT && SHOT.sig !== ckSig()) SHOT = null;
@@ -13579,7 +13687,7 @@ const vShot = () => {
       : '';
   let b = '';
   if (!R)
-    b = `<p class="hint">ระบบดูรูปในโฟลเดอร์แยกรูปของแต่ละจอ (เดือน → รอบ → ชื่อหนัง) แล้วใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง <b>ช่องที่มีเลขอยู่แล้วไม่เปลี่ยนเลข</b> (ถ้ายังไม่ใช่พื้นดำตัวเลขขาว ระบบแก้สีให้) และบอกเรื่องที่น่าจะลืมใส่หรือใส่ผิด ก่อนใส่จะให้ดูก่อน ระบบไม่แก้รูปหรือโฟลเดอร์</p><div><button class="btn secondary" data-a="shotscan">${IC.folder}ตรวจวันที่ถ่ายจากโฟลเดอร์แยกรูป</button></div>`;
+    b = `<p class="hint">ระบบดูรูปในโฟลเดอร์แยกรูปของแต่ละจอ (เดือน → รอบ → ชื่อหนัง) แล้วใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง <b>ช่องที่มีเลขอยู่แล้วไม่เปลี่ยนเลข</b> (ถ้ายังไม่ใช่พื้นดำตัวเลขขาว ระบบแก้สีให้) และบอกเรื่องที่น่าจะลืมใส่หรือใส่ผิด ก่อนใส่จะให้ดูก่อน ระบบไม่แก้รูปหรือโฟลเดอร์</p><div><button class="btn secondary" data-a="shotscan">${IC.folder}ตรวจวันที่ถ่ายจากโฟลเดอร์แยกรูป</button><button class="linkb" data-a="shotup">เลือกแบบอัปโหลดโฟลเดอร์</button></div>${SHOTSLOW ? shotSlowH() : '<p class="hint">ใช้ “เลือกแบบอัปโหลดโฟลเดอร์” เมื่อเลือกโฟลเดอร์บนไดรฟ์เครือข่าย (เช่น N:) แล้วไม่มีอะไรเกิดขึ้น</p>'}`;
   else {
     const nr = new Set(FL.map(x => x.scr + '|' + x.f)).size,
       n1 = R.none.filter(x => x.rnd === '1-15').length,
@@ -13623,7 +13731,7 @@ const vShot = () => {
  ${badH}
  ${grp('ยังไม่มีรูป (ช่องยังว่าง)', R.none, `รอบ 1–15: ${n1} ช่อง • รอบ 16–สิ้นเดือน: ${n2} ช่อง`, x => x.nm + (x.nornd ? ' (ยังไม่มีโฟลเดอร์รอบ ' + x.rnd + ')' : x.nofold ? ' (ไม่มีโฟลเดอร์)' : ''))}
  ${R.miss.length ? `<details class="picd"><summary><b>หาโฟลเดอร์จอไม่เจอ</b> ${R.miss.length} จอ</summary><ul>${R.miss.map(x => `<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>` : ''}</div>
- <div class="picb">${D ? `<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="shotsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}` : NF || NS ? `<button class="btn primary" data-a="shotapply">${NF && NS ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง + แก้สี ${NS.toLocaleString()} ช่อง` : NF ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค` : `แก้สีช่องวันที่ถ่าย ${NS.toLocaleString()} ช่อง`}</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
+ <div class="picb">${D ? `<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="shotsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}` : NF || NS ? `<button class="btn primary" data-a="shotapply">${NF && NS ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง + แก้สี ${NS.toLocaleString()} ช่อง` : NF ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค` : `แก้สีช่องวันที่ถ่าย ${NS.toLocaleString()} ช่อง`}</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button><button class="linkb" data-a="shotup">เลือกแบบอัปโหลดโฟลเดอร์</button></div>${SHOTSLOW ? shotSlowH() : ''}`;
   }
   return `<section class="pic" data-tour="tshot"><h3>${IC.folder}ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป</h3>${b}</section>`;
 };
@@ -17236,7 +17344,7 @@ const ACT = {
       : `ไม่พบโฟลเดอร์จอในโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`;
   },
   shotscan: async k => {
-    if (!TC.length || !FSA) return;
+    if (!TC.length || !FSA || SHOTPK) return;
     let d = k === 'again' && SHOT ? SHOT.d : null;
     try {
       if (!d && k !== 'pick') {
@@ -17250,7 +17358,7 @@ const ACT = {
       )
         d = null;
       if (!d) {
-        d = await showDirectoryPicker({ id: 'pic', mode: 'read' });
+        d = await shotPick();
         HDB.set('pic', d).catch(() => {});
       }
     } catch (e) {
@@ -17259,45 +17367,46 @@ const ACT = {
       note =
         e && e.name === 'AbortError'
           ? 'ยังไม่ได้เลือกโฟลเดอร์ — ถ้าเลือกแล้ว Chrome ถามว่าให้ดูไฟล์ได้ไหม ต้องกดอนุญาต (ถ้าไม่ขึ้นหน้าต่างเลือกโฟลเดอร์ กดปุ่มอีกครั้ง)'
-          : 'เลือกโฟลเดอร์ไม่ได้ (' + errN(e) + ') — ลองเลือกโฟลเดอร์ข้างใน เช่น Pic @ … แทนตัวไดรฟ์';
+          : 'เลือกโฟลเดอร์ไม่ได้ (' +
+            errN(e) +
+            ') — ลองเลือกโฟลเดอร์ข้างใน เช่น Pic @ … แทนตัวไดรฟ์ หรือใช้ “เลือกแบบอัปโหลดโฟลเดอร์”';
       return;
     }
-    let wt = 0;
-    const wprog = async (cnt, nm) => {
-      const t = performance.now();
-      if (cnt > 1 && t - wt < 250) return;
-      wt = t;
-      BUSY = { t: `กำลังอ่านโฟลเดอร์ใน “${d.name}”`, i: 0, n: 0, f: nm, cnt };
-      busyPaint();
-      $('.wrap').inert = true;
-      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
-    };
-    await wprog(0, d.name);
-    let R;
-    try {
-      R = await shotScan(
-        d,
-        TC,
-        async (i, n, nm) => {
-          if (typeof busyStep === 'function') await busyStep('กำลังดูรูปในโฟลเดอร์แยกรูป', i, n, nm);
-        },
-        wprog,
-      );
-    } catch (e) {
-      MQN = 'warn';
-      note =
-        'อ่านโฟลเดอร์ “' + d.name + '” ไม่ได้ (' + errN(e) + ') — ไดรฟ์เครือข่ายอาจหลุด ลองกดตรวจอีกครั้ง';
-      return;
-    } finally {
-      if (typeof busyDone === 'function') busyDone();
-    }
-    SHOT = { sig: ckSig(), d, R, done: null };
-    MQN = R.cells && !(R.has.length + R.diff.length + R.bad.length) ? 'done' : 'warn';
-    note = R.cells
-      ? R.n
-        ? `ตรวจแล้ว จะใส่วันที่ถ่าย ${R.n.toLocaleString()} ช่อง`
-        : 'ตรวจแล้ว ไม่มีช่องที่ต้องใส่'
-      : `ไม่พบจอในใบเช็คที่ตรงกับโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`;
+    await shotRun(d);
+  },
+  /* 5.5.75: ไดรฟ์เครือข่ายบางแห่ง (เช่น \\172.24.100.82) เลือกแล้ว Chrome ไม่ส่งโฟลเดอร์มา → เลือกแบบอัปโหลดโฟลเดอร์ (input webkitdirectory) อ่านในเบราว์เซอร์ ไม่ได้ส่งไปไหน */
+  shotup: () => {
+    if (!TC.length || BUSY || FILLING) return;
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.multiple = true;
+    inp.webkitdirectory = true;
+    inp.addEventListener(
+      'change',
+      async () => {
+        const fs = [...(inp.files || [])];
+        if (!fs.length) {
+          MQN = 'warn';
+          note = 'ยังไม่ได้เลือกโฟลเดอร์';
+          view();
+          return;
+        }
+        const d = vDir(fs);
+        if (!d) {
+          MQN = 'warn';
+          note = 'โฟลเดอร์ที่เลือกไม่มีไฟล์รูป';
+          view();
+          return;
+        }
+        await shotRun(d);
+        view();
+      },
+      { once: true },
+    );
+    inp.click();
+    say(
+      'เลือกโฟลเดอร์ แล้วกด “อัปโหลด” ตอน Chrome ถาม — ระบบอ่านรูปในเครื่องนี้ ไม่ได้ส่งไฟล์ไปไหน • โฟลเดอร์ใหญ่ Chrome จะนับไฟล์สักพัก',
+    );
   },
   shotapply: async () => {
     const FL = shotFill();
