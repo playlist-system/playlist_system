@@ -175,6 +175,7 @@
  *   เวอร์ชัน 5.5.70: ไฟล์ BKJ2 ลงวันที่ล่วงหน้าไม่ถูกทิ้งเพราะ BKJ1 / วันที่เติมไม่เลื่อนตามไฟล์ล่วงหน้า / หนังขึ้นใหม่ของวันถัดไปยังไม่ใส่
  *   เวอร์ชัน 5.5.71: จอปิดถาวร — ปุ่มที่ข้อความไม่พบจอ / เอาจอออกจากใบเช็คก่อนเติม / ใบเปล่าเดือนใหม่ไม่ใส่
  *   เวอร์ชัน 5.5.72: ปุ่มส่งเข้าใบเช็ค MRT (Google Sheets) ในหน้าผลการเติม
+ *   เวอร์ชัน 5.5.73: ใส่วันที่ถ่าย อ่านโฟลเดอร์ MRT ใน Gallary
  * ======================================================================
  */
 
@@ -3761,8 +3762,17 @@ const shotOk = (ST, st) => {
 };
 const SHOTBW = { fill: 'FF000000', color: 'FFFFFFFF', fontName: 'Calibri', center: true };
 async function shotScan(root, files, prog) {
-  const { S, shut } = await picScreens(root),
+  const { S, shut, RF } = await picScreens(root),
     same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  /* 5.5.73: แพคที่โครงใน Gallary ไม่เหมือน Plan B TV (Digital MRT / The 20 / Air Traveller / Gateway X / Rama 9 — ดู FXP) หาโฟลเดอร์แบบเดียวกับตอนสร้าง:
+    แพค → รอบ → (สถานี →) จอ → หนัง • MRT / Gateway X แต่ละคอลัมน์ในบล็อก = จอหนึ่งจอ • เดิมจับคู่ด้วยป้ายหัวบล็อก (เช่น ชื่อคน) จึงหาไม่เจอ */
+  const DC = new Map(),
+    dirs = async h => {
+      if (!DC.has(h)) DC.set(h, await picDirs(h));
+      return DC.get(h);
+    },
+    fxPk = (r, fk) => !r.pp.length || nrm(r.pp[r.pp.length - 1]) === nrm(FXP[fk]),
+    fxHas = fk => RF.some(r => fxPk(r, fk));
   const R = {
     fill: [],
     has: [],
@@ -3784,6 +3794,27 @@ async function shotScan(root, files, prog) {
     const k = s.path.join('/') + '|' + y + '|' + m + '|' + two;
     if (CM.has(k)) return CM.get(k);
     let v = null;
+    if (s.fx) {
+      for (const r of RF.filter(r => r.y === y && r.m === m && r.hf === (two ? 2 : 1) && fxPk(r, s.fx))) {
+        let h = r.h,
+          ok = true;
+        for (let j = 0; j < s.want.length; j++) {
+          const kids = await dirs(h),
+            n = fxPick(s.fx, j, kids, s.want[j]);
+          if (!n) {
+            ok = false;
+            break;
+          }
+          h = kids.find(q => q[0] === n)[1];
+        }
+        if (ok) {
+          if (!v) v = new Map();
+          for (const [f, zz] of await dirs(h)) if (!v.has(f.toLowerCase())) v.set(f.toLowerCase(), zz);
+        }
+      }
+      CM.set(k, v);
+      return v;
+    }
     for (const z of [s, ...S.filter(q => q !== s && (q.g || s.g) && sameK(q.k, s.k))]) {
       let rd = null;
       if (z.g) {
@@ -3917,27 +3948,45 @@ async function shotScan(root, files, prog) {
         } /* 5.5.19: วันที่ถ่ายที่ใส่ไว้แล้ว แต่ยังไม่ใช่พื้นดำตัวเลขขาว → แก้สี (ไม่แตะเลข) */
         const id = picId(x.ws, x.sn, b.lc),
           bb = { ...id, sn: x.sn };
-        const cols = [];
-        b.cs.forEach((c, i) => {
-          let tb;
-          if (bb.jam || bb.metro) {
-            const n = b.cn[i];
-            if (n == null) return;
-            tb = { ...bb, nums: [n] };
-          } else {
-            if (i) return;
-            tb = bb;
+        const cols = [],
+          fk = fxKind(bb);
+        if (fk) {
+          const per = fk === 'mrt' || fk === 'gwx';
+          b.cs.forEach((c, i) => {
+            if (!per && i) return;
+            const X0 = bb.px || {},
+              one = per ? { ...bb, px: { ...X0, r14: [(X0.r14 || [])[i]], r11: [(X0.r11 || [])[i]] } } : bb,
+              L = fxScr(one, fk, null)[0];
+            if (!L) return;
+            cols.push({ c: n2col(c), id: L[0], s: { fx: fk, want: L[2], path: ['FX', fk, ...L[2]] } });
+          });
+          for (const C of [...cols]) {
+            if (fxHas(fk) && ((await rdir(C.s, y, m, false)) || (await rdir(C.s, y, m, true)))) continue;
+            cols.splice(cols.indexOf(C), 1);
+            const z = { f: f.name, sn: x.sn, id: C.id };
+            if (!R.miss.some(q => q.f === z.f && q.sn === z.sn && q.id === z.id)) R.miss.push(z);
           }
-          const t = picTg(tb, S)[0];
-          if (!t) return;
-          if (!t[2]) {
-            const z = { f: f.name, sn: x.sn, id: t[0] };
-            if (!R.miss.concat(R.closed).some(q => q.f === z.f && q.sn === z.sn && q.id === z.id))
-              (t[1] && shut.some(q => same(q, t[1])) ? R.closed : R.miss).push(z);
-            return;
-          }
-          cols.push({ c: n2col(c), id: t[0], s: t[2] });
-        });
+        } else
+          b.cs.forEach((c, i) => {
+            let tb;
+            if (bb.jam || bb.metro) {
+              const n = b.cn[i];
+              if (n == null) return;
+              tb = { ...bb, nums: [n] };
+            } else {
+              if (i) return;
+              tb = bb;
+            }
+            const t = picTg(tb, S)[0];
+            if (!t) return;
+            if (!t[2]) {
+              const z = { f: f.name, sn: x.sn, id: t[0] };
+              if (!R.miss.concat(R.closed).some(q => q.f === z.f && q.sn === z.sn && q.id === z.id))
+                (t[1] && shut.some(q => same(q, t[1])) ? R.closed : R.miss).push(z);
+              return;
+            }
+            cols.push({ c: n2col(c), id: t[0], s: t[2] });
+          });
         for (const C of cols) {
           C.st = stOf(
             C.c,
@@ -11620,7 +11669,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.72 (20 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.73 (20 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
