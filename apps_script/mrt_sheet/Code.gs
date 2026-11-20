@@ -4,6 +4,7 @@
  * - เมนู "ใบเช็ครูป" ในชีต: นำเข้าใบเช็ค Excel (.xlsm) จากโฟลเดอร์ใน Drive → แท็บละสถานี
  * - คนคัดรูปพิมพ์เลขวันที่ถ่ายในช่องแบบใบเช็ค (ระบบจดว่าใครใส่ เมื่อไร ไว้ในโน้ตของช่อง)
  * - หน้าเว็บมือถือสำหรับคนถ่ายรูป (doGet) อ่านจากชีตนี้ ดูได้อย่างเดียว
+ * - หน้ารับใบเช็คจาก PHOTO CHECK STUDIO (doGet ?recv=studio) — ปุ่ม “ส่งเข้าใบเช็ค MRT” ในหน้าผลการเติม ส่งไฟล์มาให้ เก็บลง Drive แล้วนำเข้าเหมือนเมนู
  * ไม่มีการใช้ AI ในการทำงาน — เป็นสูตรและสคริปต์ธรรมดา
  */
 const CFG = {
@@ -14,6 +15,7 @@ const CFG = {
   firstCol: 3,          // คอลัมน์จอแรก (C)
   tz: 'Asia/Bangkok',
   none: 'ไม่ฉาย',
+  studioOrigin: 'https://playlist-system.github.io',   // เว็บ PHOTO CHECK STUDIO ที่ส่งใบเช็คมาได้
 };
 const TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const COLORS = { navy: '#022866', cyan: '#1BB8EF', head: '#EEF2F8', ok: '#E6F5EC', todo: '#FFF1C9', none: '#E6E8EC',
@@ -39,14 +41,33 @@ function showPhoneLink() {
 
 // ===================== นำเข้า =====================
 function importFromDrive() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = SpreadsheetApp.getActive(), ui = SpreadsheetApp.getUi();
+  // ขึ้นรอบใหม่: ถามก่อน → เก็บสำเนารอบเก่าไว้ แล้วเริ่มใหม่ (ไม่เอาวันที่ที่ใส่ในรอบก่อนมาปน)
+  const ask = (label, prev) => {
+    const a = ui.alert('ขึ้นรอบใหม่?', `ใบเช็คที่นำเข้าเป็นของ ${label}\nชีตตอนนี้เป็น ${prev}\n\nกด "ใช่" = เริ่ม ${label} (เก็บสำเนา ${prev} ไว้ใน Drive แล้วเริ่มใหม่)\nกด "ไม่" = นำเข้าใน ${prev} ต่อ`, ui.ButtonSet.YES_NO);
+    return a === ui.Button.YES ? 'new' : a === ui.Button.NO ? 'keep' : 'cancel';
+  };
+  const r = withLock_(() => importCore_(ss, ask));
+  if (r.none) { ui.alert('ยังไม่มีไฟล์', `วางไฟล์ใบเช็ค MRT (.xlsm) ในโฟลเดอร์ "${CFG.importFolderName}" ใน Google Drive แล้วกดใหม่อีกครั้ง\n\n${r.folderUrl}`, ui.ButtonSet.OK); return; }
+  if (r.cancel) { ss.toast('ยังไม่ได้นำเข้า', 'ใบเช็ครูป', 5); return; }
+  ss.toast(`นำเข้า ${r.files} ไฟล์ ${r.stations} สถานี เรียบร้อย${r.fresh ? ' (เริ่มรอบใหม่ — เก็บสำเนารอบก่อนไว้ใน Drive แล้ว)' : ` • หนังใหม่ ${r.newFilms} เรื่อง`}`, 'ใบเช็ครูป', 10);
+}
+
+/** กันนำเข้าซ้อนกัน (เมนู กับ ปุ่มส่งจาก PHOTO CHECK STUDIO พร้อมกัน) */
+function withLock_(fn) {
+  const L = LockService.getScriptLock();
+  if (!L.tryLock(30000)) throw new Error('มีการนำเข้าอื่นกำลังทำอยู่ — รอสักครู่แล้วลองใหม่');
+  try { return fn(); } finally { L.releaseLock(); }
+}
+
+/** นำเข้าใบเช็คทุกไฟล์ในโฟลเดอร์นำเข้า (คนละไฟล์ล่าสุด)
+ *  decide(label, prev) ตอนต้องขึ้นรอบใหม่: 'new' = เริ่มรอบใหม่ / 'keep' = นำเข้าในรอบเดิม / 'cancel' = ไม่นำเข้า / undefined = คืน {ask} ไปถาม (ยังไม่แก้ชีต)
+ *  คืน {none, folderUrl} | {ask, label, prev} | {cancel} | {ok, files, stations, fresh, label, prev, newFilms} */
+function importCore_(ss, decide) {
   const folder = importFolder_();
   const it = folder.getFiles(), files = [];
   while (it.hasNext()) { const f = it.next(); if (/\.xls[xm]$/i.test(f.getName()) && !f.isTrashed()) files.push(f); }
-  if (!files.length) {
-    SpreadsheetApp.getUi().alert('ยังไม่มีไฟล์', `วางไฟล์ใบเช็ค MRT (.xlsm) ในโฟลเดอร์ "${CFG.importFolderName}" ใน Google Drive แล้วกดใหม่อีกครั้ง\n\n${folder.getUrl()}`, SpreadsheetApp.getUi().ButtonSet.OK);
-    return;
-  }
+  if (!files.length) return { none: true, folderUrl: folder.getUrl() };
   // คนละ 1 ไฟล์: ถ้ามีหลายไฟล์ของคนเดียวกัน ใช้ไฟล์ที่แก้ล่าสุด
   const latest = {};
   for (const f of files) { const k = (f.getName().match(/คุณ\s*([^\s.]+)/) || [, f.getName()])[1]; if (!latest[k] || f.getLastUpdated() > latest[k].getLastUpdated()) latest[k] = f; }
@@ -65,24 +86,30 @@ function importFromDrive() {
   }
   const stations = [].concat(...books.map(b => b.stations));
   let round = roundOf_(stations, new Date());
-  // ขึ้นรอบใหม่: ถามก่อน → เก็บสำเนารอบเก่าไว้ แล้วเริ่มใหม่ (ไม่เอาวันที่ที่ใส่ในรอบก่อนมาปน)
   const props = PropertiesService.getScriptProperties(), prev = props.getProperty('ROUND');
   let fresh = !!prev && prev !== round.label;
   if (fresh) {
-    const ui = SpreadsheetApp.getUi();
-    const a = ui.alert('ขึ้นรอบใหม่?', `ใบเช็คที่นำเข้าเป็นของ ${round.label}\nชีตตอนนี้เป็น ${prev}\n\nกด "ใช่" = เริ่ม ${round.label} (เก็บสำเนา ${prev} ไว้ใน Drive แล้วเริ่มใหม่)\nกด "ไม่" = นำเข้าใน ${prev} ต่อ`, ui.ButtonSet.YES_NO);
-    if (a === ui.Button.CLOSE) { ss.toast('ยังไม่ได้นำเข้า', 'ใบเช็ครูป', 5); return; }
-    if (a !== ui.Button.YES) { fresh = false; round = Object.assign({}, round, { label: prev }); }
+    const a = decide ? decide(round.label, prev) : undefined;
+    if (a === undefined) return { ask: true, label: round.label, prev };
+    if (a === 'cancel') return { cancel: true };
+    if (a !== 'new') { fresh = false; round = Object.assign({}, round, { label: prev }); }
+  }
+  // หนังใหม่ = ชื่อที่ยังไม่มีในแท็บสถานีเดิม (บอกในผลนำเข้า)
+  let newFilms = 0;
+  if (!fresh) for (const st of stations) {
+    const sh = ss.getSheetByName(st.station), n = sh ? sh.getLastRow() - CFG.firstRow + 1 : 0;
+    const have = new Set(n > 0 ? sh.getRange(CFG.firstRow, 2, n, 1).getValues().map(r => String(r[0]).trim()).filter(String) : []);
+    newFilms += st.films.filter(f => !have.has(f.name)).length;
   }
   if (fresh) DriveApp.getFileById(ss.getId()).makeCopy(`ใบเช็ครูป MRT ${prev} (เก็บไว้)`);
   for (const st of stations) writeStation_(ss, st, round, fresh);
   props.setProperty('ROUND', round.label);
   writeUsers_(ss, stations);
   writeSummary_(ss, stations, round);
-  refreshTabColors();
+  refreshTabColors(ss);
   CacheService.getScriptCache().remove('mrt-all');
-  PropertiesService.getScriptProperties().setProperty('SHEET_ID', ss.getId());
-  ss.toast(`นำเข้า ${use.length} ไฟล์ ${stations.length} สถานี เรียบร้อย${fresh ? ' (เริ่มรอบใหม่ — เก็บสำเนารอบก่อนไว้ใน Drive แล้ว)' : ''}`, 'ใบเช็ครูป', 10);
+  props.setProperty('SHEET_ID', ss.getId());
+  return { ok: true, files: use.length, stations: stations.length, fresh, label: round.label, prev: prev || '', newFilms };
 }
 
 function importFolder_() {
@@ -298,8 +325,8 @@ function stationSheets_(ss) {
   return ss.getSheets().filter(sh => sh.getName() !== CFG.usersSheet && sh.getName() !== CFG.summarySheet && String(sh.getRange(3, 1).getValue()) === 'คะแนนจอ');
 }
 
-function refreshTabColors() {
-  for (const sh of stationSheets_(SpreadsheetApp.getActive())) tabColor_(sh);
+function refreshTabColors(ss) {
+  for (const sh of stationSheets_(ss && ss.getSheets ? ss : SpreadsheetApp.getActive())) tabColor_(sh);
 }
 function tabColor_(sh) {
   const v = sh.getRange(3, CFG.firstCol, 1, Math.max(sh.getLastColumn() - CFG.firstCol + 1, 1)).getValues()[0].filter(x => typeof x === 'number');
@@ -351,7 +378,8 @@ function applyPermissions() {
 }
 
 // ===================== หน้ามือถือ =====================
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.recv === 'studio') return recvPage_();
   const email = (Session.getActiveUser().getEmail() || '').toLowerCase();
   const t = HtmlService.createTemplateFromFile('Phone');
   t.data = JSON.stringify(Object.assign(phoneData_(email), { url: ScriptApp.getService().getUrl() })).replace(/</g, '\\u003c');
@@ -407,3 +435,121 @@ function phoneData_(email) {
     stations: mine.map(s => ({ name: s.station, owner: (all.users[s.station] || {}).owner || '', screens: s.screens })),
   };
 }
+
+// ===================== รับใบเช็คจาก PHOTO CHECK STUDIO =====================
+// ปุ่ม “ส่งเข้าใบเช็ค MRT” ในหน้าผลการเติม เปิดหน้านี้ (?recv=studio) → หน้านี้บอก ready → ระบบส่งไฟล์ .xlsm ที่ชื่อมี MRT มาทาง postMessage
+// → recvSave เก็บลงโฟลเดอร์นำเข้า (ทับไฟล์ชื่อเดิม) → recvImport นำเข้าเหมือนเมนู (ขึ้นรอบใหม่ถามในหน้านี้) → บอกผลกลับไปที่ระบบ
+// ส่งได้เฉพาะเจ้าของสคริปต์ และอีเมลในช่อง “ผู้ดูแลระบบ / หัวหน้า” ของแท็บผู้ใช้และสิทธิ์
+function ssOf_() {
+  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActive();
+}
+
+function recvAllowed_() {
+  const me = (Session.getActiveUser().getEmail() || '').toLowerCase(), owner = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  if (!me) return false;
+  if (me === owner) return true;
+  const us = ssOf_().getSheetByName(CFG.usersSheet);
+  const admins = us ? String(us.getRange(2, 2).getValue()).split(/[,\s]+/).map(x => x.trim().toLowerCase()).filter(x => /@/.test(x)) : [];
+  return admins.indexOf(me) >= 0;
+}
+
+function recvPage_() {
+  let ok = false, round = '';
+  try { ok = recvAllowed_(); round = PropertiesService.getScriptProperties().getProperty('ROUND') || ''; } catch (err) { ok = false; }
+  const d = JSON.stringify({ ok, round, studio: CFG.studioOrigin, me: Session.getActiveUser().getEmail() || '' }).replace(/</g, '\\u003c');
+  return HtmlService.createHtmlOutput(RECV_HTML.replace('__DATA__', () => d)).setTitle('รับใบเช็คจาก PHOTO CHECK STUDIO').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/** เก็บไฟล์ที่ส่งมาลงโฟลเดอร์นำเข้า [{name, b64}] → จำนวนไฟล์ */
+function recvSave(files) {
+  if (!recvAllowed_()) throw new Error('ส่งได้เฉพาะผู้ดูแลระบบ / หัวหน้า (ใส่อีเมลในแท็บผู้ใช้และสิทธิ์)');
+  const folder = importFolder_();
+  let n = 0;
+  for (const f of files || []) {
+    const name = String(f && f.name || '').replace(/[\\/]/g, '_').trim();
+    if (!/\.xls[xm]$/i.test(name) || !f.b64) continue;
+    const old = folder.getFilesByName(name);
+    while (old.hasNext()) old.next().setTrashed(true);   // ทับไฟล์ชื่อเดิม (ฉบับเก่าอยู่ในถังขยะของ Drive)
+    folder.createFile(Utilities.newBlob(Utilities.base64Decode(f.b64), /\.xlsm$/i.test(name) ? 'application/vnd.ms-excel.sheet.macroEnabled.12' : MimeType.MICROSOFT_EXCEL, name));
+    n++;
+  }
+  if (!n) throw new Error('ไม่ได้รับไฟล์ใบเช็ค (.xlsm)');
+  return n;
+}
+
+/** นำเข้าเหมือนเมนู • choice: ไม่ส่ง = ถ้าขึ้นรอบใหม่ คืน {ask} / 'new' / 'keep' / 'cancel' */
+function recvImport(choice) {
+  if (!recvAllowed_()) throw new Error('ส่งได้เฉพาะผู้ดูแลระบบ / หัวหน้า (ใส่อีเมลในแท็บผู้ใช้และสิทธิ์)');
+  const ss = ssOf_();
+  return withLock_(() => importCore_(ss, () => (choice === 'new' || choice === 'keep' || choice === 'cancel') ? choice : undefined));
+}
+
+const RECV_HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Prompt:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--f-ui:"IBM Plex Sans Thai",Tahoma,sans-serif;--f-hd:"Prompt","IBM Plex Sans Thai",sans-serif;--navy:#022866;--cyan:#1BB8EF;--bg:#F4F7FB;--sf:#fff;--ln:#D4DCE8;--tx:#0B1F45;--tx2:#34446A;--mu:#5A6987;--ok:#1B7646;--okb:#2FA866;--wr:#8F5C06;--wrs:#FFF2CC;--er:#B9312A;--ers:#FCE8E6}
+*{box-sizing:border-box;margin:0;padding:0}html,body{background:var(--bg);color:var(--tx);font:15px/1.5 var(--f-ui)}
+.app{background:var(--navy);color:#fff;padding:14px 18px 16px}.pb{font:600 15px/1 var(--f-hd)}.pb i{font-style:normal;color:var(--cyan)}
+.t{font:600 19px/1.35 var(--f-hd);margin-top:8px}.s{font-size:13px;color:#BFD0EE}
+.body{padding:14px}.step{display:flex;gap:10px;background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:10px 12px;margin-bottom:8px}
+.ck{width:22px;height:22px;border-radius:50%;background:var(--okb);color:#fff;font:600 13px/22px var(--f-ui);text-align:center;flex:none;margin-top:1px}
+.ck.w{background:var(--ln);color:var(--mu)}.ck.r{background:var(--er)}
+.step b{display:block;font-weight:600}.step span{font-size:13px;color:var(--tx2);display:block;line-height:1.45;overflow-wrap:anywhere}
+.done{background:#E1F3E8;border:1px solid #A9DDBE;border-radius:14px;padding:12px 14px;color:var(--ok);font-weight:600;margin-top:4px}.done small{display:block;font-weight:500;color:var(--tx2);font-size:13px;margin-top:2px}
+.bad{background:var(--ers);border:1px solid #F1C3BE;border-radius:14px;padding:12px 14px;color:var(--er);font-weight:600}.bad small{display:block;font-weight:500;color:var(--tx2);font-size:13px;margin-top:2px}
+.ask{background:var(--wrs);border:1px solid #F1D98A;border-radius:14px;padding:12px 14px}.ask b{display:block;font:600 16px var(--f-hd);color:var(--wr)}.ask p{font-size:13.5px;color:var(--tx2);margin:4px 0 10px;line-height:1.5}.ask p em{font-style:normal;font-weight:600;color:var(--tx)}
+.btns{display:grid;gap:8px}.btns button{font:600 14px var(--f-ui);padding:10px 12px;border-radius:12px;border:1px solid var(--ln);background:var(--sf);color:var(--tx);cursor:pointer}.btns .p{background:var(--navy);border-color:var(--navy);color:#fff}
+.btns small{display:block;font-weight:500;font-size:12px;opacity:.8}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--ln);border-top-color:var(--navy);animation:sp 0.9s linear infinite;flex:none;margin-top:1px}
+@keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style></head><body>
+<div class="app"><div class="pb">ใบเช็ครูป <i>MRT</i></div><div class="t">รับใบเช็คจาก PHOTO CHECK STUDIO</div><div class="s" id="rd"></div></div>
+<div class="body" id="b" aria-live="polite"></div>
+<script>
+var D = __DATA__, S = { files: null, saved: 0, step: 'wait', ask: null, res: null, err: '' };
+function op() { try { return window.top.opener || null; } catch (e) { return null; } }
+function tell(m) { var w = op(); if (!w) return; m.psMRT = 1; try { w.postMessage(m, D.studio); } catch (e) {} }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function step(st, t, sub) { var ic = st === 'ok' ? '<span class="ck">✓</span>' : st === 'run' ? '<span class="spin" role="img" aria-label="กำลังทำ"></span>' : st === 'bad' ? '<span class="ck r">!</span>' : '<span class="ck w">·</span>';
+  return '<div class="step">' + ic + '<div><b>' + t + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</div></div>'; }
+function draw() {
+  document.getElementById('rd').textContent = D.round ? 'ชีตตอนนี้: ' + D.round : '';
+  var h = '', n = S.files ? S.files.length : 0, at = ['wait', 'save', 'imp', 'ask', 'done', 'err'].indexOf(S.step);
+  h += step(n ? 'ok' : S.step === 'err' ? 'bad' : 'run', n ? 'รับไฟล์ ' + n + ' ไฟล์' : 'รอไฟล์จาก PHOTO CHECK STUDIO', n ? esc(S.files.map(function (f) { return f.name; }).join(', ')) : '');
+  if (n) h += step(S.saved ? 'ok' : S.step === 'save' ? 'run' : S.step === 'err' ? 'bad' : 'wait', 'เก็บลงโฟลเดอร์ “ใบเช็ค MRT นำเข้า”', 'ทับไฟล์ชื่อเดิม');
+  if (S.saved && S.step !== 'ask') h += step(S.res && S.res.ok ? 'ok' : S.step === 'imp' ? 'run' : S.step === 'err' ? 'bad' : 'wait', 'นำเข้าเข้าชีต',
+    S.res && S.res.ok ? S.res.stations + ' สถานี • ' + (S.res.fresh ? 'เริ่ม' + esc(S.res.label) : 'หนังใหม่ ' + S.res.newFilms + ' เรื่อง') : S.step === 'imp' ? 'อาจใช้เวลา 1–3 นาที อย่าเพิ่งปิดหน้านี้' : '');
+  if (S.step === 'ask') h += '<div class="ask"><b>ขึ้นรอบใหม่?</b><p>ใบเช็คที่ส่งมาเป็น <em>' + esc(S.ask.label) + '</em> • ชีตตอนนี้เป็น ' + esc(S.ask.prev) + '</p><div class="btns">' +
+    '<button class="p" data-c="new">ขึ้นรอบใหม่<small>เก็บสำเนา ' + esc(S.ask.prev) + ' ไว้ใน Drive แล้วเริ่มชีตใหม่</small></button>' +
+    '<button data-c="keep">นำเข้าในรอบเดิม<small>ยังเป็น ' + esc(S.ask.prev) + '</small></button><button data-c="cancel">ยังไม่นำเข้า</button></div></div>';
+  if (S.step === 'done') h += S.res && S.res.ok ? '<div class="done">เสร็จแล้ว<small>วันที่ที่คนคัดรูปพิมพ์ไว้ในชีตไม่หาย • หน้ามือถือของคนถ่ายรูปเห็นหนังใหม่แล้ว • หน้าต่างนี้ปิดเองใน 3 วินาที</small></div>'
+    : '<div class="bad">ยังไม่ได้นำเข้า<small>ไฟล์อยู่ในโฟลเดอร์ “ใบเช็ค MRT นำเข้า” แล้ว — นำเข้าทีหลังได้จากเมนู ใบเช็ครูป → นำเข้าใบเช็ค Excel จาก Drive • ปิดหน้านี้ได้</small></div>';
+  if (S.step === 'err') h += '<div class="bad">ทำไม่สำเร็จ<small>' + esc(S.err) + '</small></div>';
+  document.getElementById('b').innerHTML = h;
+}
+function fail(e) { S.step = 'err'; S.err = (e && e.message) || String(e || 'ไม่ทราบสาเหตุ'); draw(); tell({ t: 'done', ok: false, err: S.err }); }
+function b64(buf) { var u = new Uint8Array(buf), s = '', CH = 0x8000; for (var i = 0; i < u.length; i += CH) s += String.fromCharCode.apply(null, u.subarray(i, i + CH)); return btoa(s); }
+function imp(choice) {
+  S.step = 'imp'; S.ask = null; draw();
+  google.script.run.withFailureHandler(fail).withSuccessHandler(function (r) {
+    if (r && r.ask) { S.step = 'ask'; S.ask = r; draw(); tell({ t: 'ask', label: r.label, prev: r.prev }); return; }
+    if (r && r.cancel) { S.step = 'done'; S.res = r; draw(); tell({ t: 'done', ok: false, cancel: true }); return; }
+    if (!r || !r.ok) { fail({ message: r && r.none ? 'ไม่พบไฟล์ในโฟลเดอร์นำเข้า' : 'นำเข้าไม่ได้' }); return; }
+    S.step = 'done'; S.res = r; draw(); tell({ t: 'done', ok: true, files: r.files, stations: r.stations, newFilms: r.newFilms, fresh: r.fresh, label: r.label });
+  }).recvImport(choice || null);
+}
+window.addEventListener('message', function (e) {
+  if (e.origin !== D.studio || !e.data || !e.data.psMRT || e.data.t !== 'files' || S.files) return;
+  S.files = (e.data.files || []).filter(function (f) { return f && f.name && f.buf; });
+  if (!S.files.length) { fail({ message: 'ไม่ได้รับไฟล์ใบเช็ค MRT' }); return; }
+  S.step = 'save'; draw();
+  var pay; try { pay = S.files.map(function (f) { return { name: f.name, b64: b64(f.buf) }; }); } catch (x) { fail(x); return; }
+  google.script.run.withFailureHandler(fail).withSuccessHandler(function (n) { S.saved = n; imp(null); }).recvSave(pay);
+});
+document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-c]'); if (!b || S.step !== 'ask') return; var c = b.getAttribute('data-c');
+  if (c === 'cancel') { S.step = 'done'; S.res = { cancel: true }; draw(); tell({ t: 'done', ok: false, cancel: true }); return; } imp(c); });
+if (!D.ok) { S.step = 'err'; S.err = (D.me ? D.me + ' ' : '') + 'ส่งใบเช็คเข้าชีตนี้ไม่ได้ — ส่งได้เฉพาะเจ้าของชีต และอีเมลในช่อง “ผู้ดูแลระบบ / หัวหน้า” ของแท็บผู้ใช้และสิทธิ์'; draw(); tell({ t: 'done', ok: false, err: S.err }); }
+else if (!op()) { S.step = 'err'; S.err = 'เปิดหน้านี้จากปุ่ม “ส่งเข้าใบเช็ค MRT” ในหน้าผลการเติมของ PHOTO CHECK STUDIO'; draw(); }
+else { draw(); tell({ t: 'ready' }); }
+</script></body></html>`;
