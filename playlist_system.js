@@ -171,6 +171,7 @@
  *   เวอร์ชัน 5.5.66: ใบเปล่าที่มีแถบวันที่แล้ว อ่านจอได้
  *   เวอร์ชัน 5.5.67: อ่าน Playlist ทีละไฟล์ + เวลาที่เหลือ + ยกเลิก
  *   เวอร์ชัน 5.5.68: เส้นตารางใต้แถบวันที่สุดท้ายไม่หาย
+ *   เวอร์ชัน 5.5.69: Signature Max แบ่งช่วงเวลา
  * ======================================================================
  */
 
@@ -10775,9 +10776,11 @@ function parsePlaylist(f) {
       const p = parseMco(wb, f.name);
       if (p.length) return ret(p);
     }
-    if (isSplitWb(wb)) {
-      const m = splitMedia(wb);
-      if (!m) return null;
+    if (isSplitWb(wb) && splitMedia(wb)) {
+      const m =
+        splitMedia(
+          wb,
+        ); /* 5.5.69: Signature Max 20-11-26 ชีต “ข้อมูลสำหรับฟอร์ม Playlist” มีรหัส DGT265 เหนือคำว่า หนังโฆษณา → เคยถูกมองเป็นไฟล์แยกจอ แล้วไม่อ่าน • ไม่รู้สื่อ → อ่านแบบ Signature Max ต่อ */
       I.push({
         lv: 'info',
         t: `ชื่อไฟล์ไม่มีคำว่า “แยกจอ” แต่เนื้อในเป็นสรุปรายการหนังแยกจอ (${m}) ระบบอ่านให้แล้ว`,
@@ -11323,7 +11326,67 @@ async function addFiles(kind, files) {
   }
   /* 5.5.67: ยกเลิก → ไม่นำเข้าอะไรจากชุดนี้ */ if (kind === 'pl' && rb.length)
     say(`เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')}`);
-  got.sort((a, b) => a.d - b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
+  got.sort((a, b) => a.d - b.d);
+  /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */ {
+    const SLT = /(\d{1,2})[.:](\d{2})[\s_]*[-–][\s_]*(\d{1,2})[.:](\d{2})/,
+      slot = n => {
+        const m = String(n).match(SLT);
+        return m ? +m[1] * 60 + +m[2] : null;
+      },
+      ks = g => [...new Set(g.p.map(x => x.m + '|' + x.c))].sort().join('\n'),
+      G =
+        new Map(); /* 5.5.69: Playlist แบ่งช่วงเวลาของวันเดียวกัน (เช่น Signature Max 06.00-17.59 / 18.00-23.59) = รายการเดียวกัน → รวมหนังทุกช่วง (ออนช่วงไหนก็นับว่าออน) ไม่ใช่ฉบับแก้ไข */
+    for (const g of got) {
+      const t = slot(g.f.name);
+      if (t == null || !g.d) continue;
+      const k = g.d + '\n' + ks(g);
+      (G.get(k) || G.set(k, []).get(k)).push([t, g]);
+    }
+    for (const L of G.values()) {
+      if (L.length < 2) continue;
+      L.sort((a, b) => a[0] - b[0]);
+      const M = new Map();
+      for (const [, g] of L)
+        for (const s of g.p) {
+          const k = s.m + '|' + s.c;
+          let t = M.get(k);
+          if (!t) {
+            t = { ...s, rows: [] };
+            M.set(k, t);
+          }
+          const by = new Map(t.rows.map((r, i) => [r.ad, i]));
+          for (const r of s.rows) {
+            const i = by.get(r.ad);
+            if (i == null) {
+              by.set(r.ad, t.rows.length);
+              t.rows.push({ ...r });
+            } else if (t.rows[i].off && !r.off) t.rows[i] = { ...r };
+          }
+        }
+      const sl = L.map(([, g]) => (g.f.name.match(SLT) || [''])[0]).join(' + ');
+      for (const [, g] of L) {
+        const dt = g.p.dt,
+          iss = g.p.iss;
+        g.p.splice(
+          0,
+          g.p.length,
+          ...[...M.values()].map(s => ({ ...s, pf: g.f.name, rows: stable(s.rows.map(r => ({ ...r }))) })),
+        );
+        g.p.dt = dt;
+        g.p.iss = iss;
+        g.slot = 1;
+        const x = {
+          f: g.f.name,
+          lv: 'info',
+          t: `Playlist แบ่งช่วงเวลา ${L.length} ไฟล์ของวันเดียวกัน (${sl}) — ระบบรวมหนังทุกช่วงเวลาเป็นรายการเดียว`,
+        };
+        if (!g.I.some(y => y.t === x.t)) {
+          g.I.push(x);
+          PLI.push(x);
+        }
+      }
+    }
+  }
   {
     const kk = g => new Set(g.p.map(x => x.m + '|' + x.c)),
       rv = g => g.f.name.replace(/\.[^.]+$/, '').length,
@@ -11334,7 +11397,12 @@ async function addFiles(kind, files) {
       }; /* จอชุดเดียวกันทั้งไฟล์เท่านั้น (ไฟล์ NTW แต่ละแพ็กที่มีจอบางจอซ้ำกันไม่นับ) */
     for (let i = 0; i < got.length; i++)
       for (let j = i + 1; j < got.length && got[j].d === got[i].d; j++)
-        if (got[i].d && got[i].f.name !== got[j].f.name && ov(got[i], got[j])) {
+        if (
+          got[i].d &&
+          got[i].f.name !== got[j].f.name &&
+          !(got[i].slot && got[j].slot) &&
+          ov(got[i], got[j])
+        ) {
           if (rv(got[i]) > rv(got[j])) [got[i], got[j]] = [got[j], got[i]];
           const w = got[j],
             x = {
@@ -11413,7 +11481,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.68 (20 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.69 (20 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
