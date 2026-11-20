@@ -29,6 +29,7 @@ function onOpen() {
     .addItem('อัปเดตสีแท็บ', 'refreshTabColors')
     .addSeparator()
     .addItem('ลิงก์หน้ามือถือคนถ่ายรูป', 'showPhoneLink')
+    .addItem('อัปเดตข้อมูลหน้ามือถือ', 'refreshPhone')
     .addToUi();
 }
 
@@ -107,8 +108,8 @@ function importCore_(ss, decide) {
   writeUsers_(ss, stations);
   writeSummary_(ss, stations, round);
   refreshTabColors(ss);
-  CacheService.getScriptCache().remove('mrt-all');
   props.setProperty('SHEET_ID', ss.getId());
+  try { snapBuild_(ss); } catch (err) { /* เตรียมไม่ได้ → หน้ามือถือเตรียมเองตอนเปิดครั้งแรก */ }   // เตรียมข้อมูลหน้ามือถือใหม่ (เปิดลิงก์แล้วไม่ต้องอ่านทุกแท็บ)
   return { ok: true, files: use.length, stations: stations.length, fresh, label: round.label, prev: prev || '', newFilms };
 }
 
@@ -337,6 +338,7 @@ function tabColor_(sh) {
 // ===================== จดว่าใครใส่ เมื่อไร =====================
 function onEdit(e) {
   const sh = e.range.getSheet();
+  if (sh.getName() === CFG.usersSheet) { try { snapUsers_(sh.getParent()); } catch (err) { /* อัปเดตตอนนำเข้า / เมนู */ } return; }
   if (e.range.getRow() < CFG.firstRow || e.range.getColumn() < CFG.firstCol) return;
   if (String(sh.getRange(3, 1).getValue()) !== 'คะแนนจอ') return;
   const vals = e.range.getValues(), now = Utilities.formatDate(new Date(), CFG.tz, 'd/M/yyyy HH:mm');
@@ -345,6 +347,7 @@ function onEdit(e) {
   const notes = vals.map(r => r.map(x => x === '' || x === false || x == null ? '' : `ใส่ ${x === true ? '✓' : x} เมื่อ ${now}${who ? ' โดย ' + who : ''}`));
   e.range.setNotes(notes);
   tabColor_(sh);
+  try { snapStation_(sh); } catch (err) { /* หน้ามือถืออัปเดตตอนนำเข้า / เมนู “อัปเดตข้อมูลหน้ามือถือ” */ }
 }
 
 // ===================== สิทธิ์ =====================
@@ -386,22 +389,70 @@ function doGet(e) {
   return t.evaluate().setTitle('ใบงานถ่ายรูป MRT').addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/** อ่านทุกแท็บสถานี (แคช 60 วินาที) — ข้อมูลทั้ง MRT ใหญ่เกิน 100 KB ที่แคชของ Google รับได้ จึงบีบอัด (gzip) ก่อนเก็บ */
-function readAll_() {
+// ===================== ข้อมูลหน้ามือถือ (เตรียมไว้ล่วงหน้า) =====================
+// เดิมเปิดลิงก์ทีไรอ่านทุกแท็บใหม่ (39 สถานี ≈ 80 ครั้ง) จึงช้า → เตรียมข้อมูลไว้ตอนนำเข้า และอัปเดตทีละสถานีตอนคนคัดรูปพิมพ์วันที่ (onEdit)
+// เก็บแบบบีบอัดใน Script Properties (ทนถาวร แบ่งชิ้นละไม่เกิน 9 KB) + แคช 6 ชั่วโมงให้อ่านเร็ว • เปิดลิงก์ = อ่านข้อมูลที่เตรียมไว้อย่างเดียว
+const SNAP_CH = 8500;
+const unz_ = z => JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(z), 'application/x-gzip')).getDataAsString('UTF-8'));
+function snapLoad_() {
   const cache = CacheService.getScriptCache(), hit = cache.get('mrt-all');
-  if (hit) { try { return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(hit), 'application/x-gzip')).getDataAsString('UTF-8')); } catch (err) { /* แคชเสีย → อ่านใหม่ */ } }
-  const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID') || SpreadsheetApp.getActive().getId());
-  const out = { stations: [], users: {}, round: '' };
-  for (const sh of stationSheets_(ss)) {
-    const v = sh.getDataRange().getValues();
-    out.stations.push(sheetModel_(sh.getName(), v));
-  }
-  const us = ss.getSheetByName(CFG.usersSheet);
-  if (us) us.getDataRange().getValues().slice(4).forEach(r => { if (r[0]) out.users[String(r[0]).trim()] = { owner: String(r[1] || ''), photo: String(r[3] || '').toLowerCase() }; });
-  const sm = ss.getSheetByName(CFG.summarySheet);
-  if (sm) out.round = String(sm.getRange(1, 1).getValue()).replace(/^สรุปคะแนน MRT\s*/, '');
-  try { const z = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(out), 'application/json')).getBytes()); if (z.length < 100000) cache.put('mrt-all', z, 60); } catch (err) { /* ใหญ่เกินแคช */ }
+  if (hit) { try { return unz_(hit); } catch (err) { /* แคชเสีย → อ่านจาก Properties */ } }
+  const P = PropertiesService.getScriptProperties().getProperties(), n = +P.SNAP_N || 0;
+  if (!n) return null;
+  let z = '';
+  for (let i = 0; i < n; i++) { const c = P['SNAP_' + i]; if (c == null) return null; z += c; }
+  try { const out = unz_(z); if (z.length < 100000) cache.put('mrt-all', z, 21600); return out; } catch (err) { return null; }
+}
+function snapSave_(out) {
+  out.at = Date.now();
+  const z = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(out), 'application/json')).getBytes());
+  const props = PropertiesService.getScriptProperties(), old = +props.getProperty('SNAP_N') || 0, n = Math.ceil(z.length / SNAP_CH), kv = { SNAP_N: String(n) };
+  for (let i = 0; i < n; i++) kv['SNAP_' + i] = z.slice(i * SNAP_CH, (i + 1) * SNAP_CH);
+  try { props.setProperties(kv, false); for (let i = n; i < old; i++) props.deleteProperty('SNAP_' + i); }
+  catch (err) { props.deleteProperty('SNAP_N'); }   // ใหญ่เกินที่เก็บได้ (500 KB) → ใช้แคชอย่างเดียว
+  const cache = CacheService.getScriptCache();
+  if (z.length < 100000) cache.put('mrt-all', z, 21600); else cache.remove('mrt-all');
   return out;
+}
+function usersOf_(ss) {
+  const us = ss.getSheetByName(CFG.usersSheet), o = {};
+  if (us) us.getDataRange().getValues().slice(4).forEach(r => { if (r[0]) o[String(r[0]).trim()] = { owner: String(r[1] || ''), photo: String(r[3] || '').toLowerCase() }; });
+  return o;
+}
+/** อ่านทุกแท็บใหม่ทั้งหมด (ตอนนำเข้า / เมนู / ยังไม่เคยเตรียม) — อ่านแท็บละครั้งเดียว */
+function snapBuild_(ss) {
+  const sm = ss.getSheetByName(CFG.summarySheet), out = { stations: [], users: usersOf_(ss), round: sm ? String(sm.getRange(1, 1).getValue()).replace(/^สรุปคะแนน MRT\s*/, '') : '' };
+  for (const sh of ss.getSheets()) {
+    const nm = sh.getName();
+    if (nm === CFG.usersSheet || nm === CFG.summarySheet) continue;
+    const v = sh.getDataRange().getValues();
+    if (v.length > 2 && String(v[2][0]) === 'คะแนนจอ') out.stations.push(sheetModel_(nm, v));
+  }
+  return snapSave_(out);
+}
+/** คนคัดรูปพิมพ์วันที่ → อ่านแท็บนั้นแท็บเดียว แล้วแทนข้อมูลของสถานีนั้น */
+function snapStation_(sh) {
+  const L = LockService.getScriptLock();
+  if (!L.tryLock(10000)) return;
+  try {
+    const out = snapLoad_();
+    if (!out) return;   // ยังไม่เคยเตรียม → เตรียมตอนเปิดลิงก์ครั้งแรก
+    const m = sheetModel_(sh.getName(), sh.getDataRange().getValues()), i = out.stations.findIndex(x => x.station === m.station);
+    if (i >= 0) out.stations[i] = m; else out.stations.push(m);
+    snapSave_(out);
+  } finally { L.releaseLock(); }
+}
+function snapUsers_(ss) {
+  const L = LockService.getScriptLock();
+  if (!L.tryLock(10000)) return;
+  try { const out = snapLoad_(); if (out) { out.users = usersOf_(ss); snapSave_(out); } } finally { L.releaseLock(); }
+}
+function refreshPhone() {
+  const ss = SpreadsheetApp.getActive(), out = snapBuild_(ss);
+  ss.toast(`อัปเดตข้อมูลหน้ามือถือแล้ว (${out.stations.length} สถานี)`, 'ใบเช็ครูป', 6);
+}
+function readAll_() {
+  return snapLoad_() || snapBuild_(ssOf_());
 }
 
 /** แปลงค่าทั้งแท็บ → {station, screens:[{code, type, n, done, miss:[[ชื่อหนัง, วันขึ้น]]}], newest, films} */
@@ -429,7 +480,7 @@ function phoneData_(email) {
   const newFilms = []; mine.forEach(s => s.films.forEach(([nm, d]) => { if (d === newest && newFilms.indexOf(nm) < 0) newFilms.push(nm); }));
   return {
     email, assigned, round: all.round,
-    updated: Utilities.formatDate(new Date(), CFG.tz, 'HH:mm'),
+    updated: (() => { const d = new Date(all.at || Date.now()), f = p => Utilities.formatDate(d, CFG.tz, p); return f('yyyyMMdd') === Utilities.formatDate(new Date(), CFG.tz, 'yyyyMMdd') ? f('HH:mm') : `${f('d')} ${TH_MON[+f('M') - 1]} ${f('HH:mm')}`; })(),
     mrt: avg(allScr.map(pct)), mrtScreens: allScr.length,
     newest, newFilms: newest > first ? newFilms : [],
     stations: mine.map(s => ({ name: s.station, owner: (all.users[s.station] || {}).owner || '', screens: s.screens })),
