@@ -174,6 +174,7 @@
  *   เวอร์ชัน 5.5.69: Signature Max แบ่งช่วงเวลา
  *   เวอร์ชัน 5.5.70: ไฟล์ BKJ2 ลงวันที่ล่วงหน้าไม่ถูกทิ้งเพราะ BKJ1 / วันที่เติมไม่เลื่อนตามไฟล์ล่วงหน้า / หนังขึ้นใหม่ของวันถัดไปยังไม่ใส่
  *   เวอร์ชัน 5.5.71: จอปิดถาวร — ปุ่มที่ข้อความไม่พบจอ / เอาจอออกจากใบเช็คก่อนเติม / ใบเปล่าเดือนใหม่ไม่ใส่
+ *   เวอร์ชัน 5.5.72: ปุ่มส่งเข้าใบเช็ค MRT (Google Sheets) ในหน้าผลการเติม
  * ======================================================================
  */
 
@@ -11619,7 +11620,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.71 (20 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.72 (20 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -14794,7 +14795,7 @@ function vRes() {
   }
   ${nn ? `<div class="r5sec"><h2><i class="h5d nt" aria-hidden="true"></i>แจ้งให้ทราบ ${nn} เรื่อง<small>· ไม่ต้องแก้</small></h2><div class="r5ng">${NG.map(([t, v]) => `<span class="r5nc">${t}<b>${v}</b></span>`).join('')}</div><p class="hint">ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น — ดูทีละจอได้ในแต่ละไฟล์ด้านล่าง</p></div>` : ''}</article>
  <aside class="r5side"><section class="hcard r5do"><h2>${last.days ? 'เติมทีละวัน' : 'เติมแต่ละไฟล์'}</h2><small class="h5lt">${last.sec ? 'รวม ' + last.sec + ' วินาที' : ''}</small><ol class="r5bars">${bars.map(([q, b, w]) => `<li><span class="r5bl"><b title="${esc(q)}">${esc(q)}</b><small>${b}</small></span><span class="r5bt"><i style="width:${Math.max(3, Math.round(w * 100))}%"></i></span></li>`).join('')}</ol></section>
-  <section class="hcard r5next"><h2>ทำต่อ</h2><div class="r5nx"><button class="h5s" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button>${FSA ? '<button class="h5s" data-a="tools" data-k="last" data-tour="tlink">งานโฟลเดอร์และรูป</button>' : ''}<button class="h5s" data-a="tab" data-k="fl">กลับไปเติมใหม่</button></div></section></aside></div>
+  <section class="hcard r5next"><h2>ทำต่อ</h2>${mrtCard()}<div class="r5nx"><button class="h5s" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button>${FSA ? '<button class="h5s" data-a="tools" data-k="last" data-tour="tlink">งานโฟลเดอร์และรูป</button>' : ''}<button class="h5s" data-a="tab" data-k="fl">กลับไปเติมใหม่</button></div></section></aside></div>
  ${vArr()}<h2 class="r5lh">ไฟล์ทั้งหมด<small>${last.res.length} ไฟล์</small></h2><div class="rlist" data-tour="rlist">${last.res
    .map((r, i) => {
      const o = R[i],
@@ -15504,6 +15505,95 @@ const PLW_URL =
       ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย — วันจันทร์ / หลังวันหยุด เลือกดึงวันที่ยังไม่ได้ดึงมาพร้อมกันได้ (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP ? ' disabled' : ''}>${IC.up}${PLP ? 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</button>`
       : '';
 let PLP = null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
+/* 5.5.72: ส่งใบเช็ค MRT ที่เติมแล้วเข้า Google Sheets “ใบเช็ครูป MRT (ทดลอง)” — เปิดหน้ารับของเว็บแอปใบเช็ค MRT (?recv=studio) หน้านั้นบอก ready แล้วระบบส่งไฟล์ให้ทาง postMessage
+   (แบบเดียวกับ “ดึง Playlist วันนี้” แต่กลับทาง) • หน้ารับเก็บไฟล์ลงโฟลเดอร์นำเข้าใน Drive แล้วนำเข้าเหมือนเมนู ขึ้นรอบใหม่ถามในหน้านั้น • ลิงก์เว็บแอปจำไว้ในเครื่องนี้ */
+let MRTW = null,
+  MRTSET = false; /* MRTW = {w, t, stage: open / send / ask, iv} */
+const mrtUrl = () => store.get('ps_mrturl') || '',
+  mrtFiles = () => (last && last.res ? last.res.filter(r => r.blob && /MRT/i.test(r.name)) : []),
+  mrtOrg = o => /(^https:\/\/script\.google\.com$)|(\.googleusercontent\.com$)/.test(o || '');
+function mrtEnd(msg) {
+  if (!MRTW) return;
+  clearInterval(MRTW.iv);
+  MRTW = null;
+  if (msg) {
+    MQN = 'warn';
+    note = msg;
+  }
+  view();
+}
+addEventListener('message', e => {
+  const d = e.data;
+  if (!d || !d.psMRT || !MRTW || !mrtOrg(e.origin)) return;
+  if (d.t === 'ready') {
+    if (MRTW.stage !== 'open') return;
+    const files = mrtFiles().map(r => ({
+      name: r.name,
+      buf: r.blob.buffer.slice(r.blob.byteOffset, r.blob.byteOffset + r.blob.byteLength),
+    }));
+    try {
+      e.source.postMessage({ psMRT: 1, t: 'files', files }, e.origin);
+    } catch (x) {
+      mrtEnd('ส่งไฟล์ให้หน้าใบเช็ค MRT ไม่ได้ (' + ((x && x.message) || x) + ') — กดส่งอีกครั้ง');
+      return;
+    }
+    MRTW.stage = 'send';
+    MRTW.t = Date.now();
+    view();
+    return;
+  }
+  if (d.t === 'ask') {
+    MRTW.stage = 'ask';
+    MRTW.t = Date.now();
+    say('ใบเช็คที่ส่งไปเป็นรอบใหม่ — ตอบในหน้าใบเช็ค MRT ว่าจะขึ้นรอบใหม่ไหม');
+    view();
+    return;
+  }
+  if (d.t === 'done') {
+    const w = MRTW.w;
+    clearInterval(MRTW.iv);
+    MRTW = null;
+    if (last)
+      last.mrt = d.ok
+        ? {
+            at: Date.now(),
+            files: +d.files || 0,
+            stations: +d.stations || 0,
+            newFilms: +d.newFilms || 0,
+            fresh: !!d.fresh,
+            label: String(d.label || ''),
+          }
+        : { at: Date.now(), cancel: !!d.cancel, err: d.cancel ? '' : String(d.err || 'ไม่ทราบสาเหตุ') };
+    if (d.ok) {
+      MQN = 'party';
+      note =
+        `ส่งเข้าใบเช็ค MRT แล้ว — นำเข้า ${+d.files || 0} ไฟล์ ${+d.stations || 0} สถานี` +
+        (d.fresh ? ` • เริ่ม${d.label || 'รอบใหม่'}` : ` • หนังใหม่ ${+d.newFilms || 0} เรื่อง`);
+      setTimeout(() => {
+        try {
+          w && !w.closed && w.close();
+        } catch (_) {}
+      }, 3000);
+    } else {
+      MQN = 'warn';
+      note = d.cancel
+        ? 'ยังไม่ได้นำเข้าใบเช็ค MRT (เลือก “ยังไม่นำเข้า”)'
+        : 'ส่งเข้าใบเช็ค MRT ไม่สำเร็จ — ' + (d.err || 'ดูรายละเอียดในหน้าใบเช็ค MRT');
+    }
+    view();
+  }
+});
+const mrtCard = () => {
+  const fs = mrtFiles();
+  if (!fs.length) return '';
+  const u = mrtUrl(),
+    m = last.mrt,
+    busy = !!MRTW;
+  if (!u || MRTSET)
+    return `<div class="mrtc"><b>ส่งเข้าใบเช็ค MRT (Google Sheets)</b><small>วางลิงก์หน้ามือถือ MRT ครั้งเดียว — ในชีตใบเช็ค MRT กดเมนู ใบเช็ครูป → ลิงก์หน้ามือถือคนถ่ายรูป แล้วคัดลอกมาวาง</small><label class="fld"><input id="mrturl" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/…/exec" value="${esc(u)}" aria-label="ลิงก์หน้ามือถือ MRT"></label><div class="mrtb"><button class="btn primary" data-a="mrtsave">บันทึกลิงก์</button>${u ? '<button class="btn secondary" data-a="mrtset">ยกเลิก</button>' : ''}</div></div>`;
+  const ok = m && !m.err && !m.cancel;
+  return `<div class="mrtc"><button class="btn ${ok ? 'secondary' : 'primary'}" data-a="mrtsend" ${busy ? 'disabled' : ''}>${busy ? (MRTW.stage === 'ask' ? 'รอตอบในหน้าใบเช็ค MRT…' : 'กำลังส่ง…') : ok ? 'ส่งเข้าใบเช็ค MRT อีกครั้ง' : 'ส่งเข้าใบเช็ค MRT'}</button>${ok ? `<p class="mrtok"><b aria-hidden="true">✓</b><span><b>ส่งแล้ว ${new Date(m.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</b> — นำเข้า ${m.files} ไฟล์ ${m.stations} สถานี${m.fresh ? ' • เริ่ม' + esc(m.label || 'รอบใหม่') : ' • หนังใหม่ ' + m.newFilms + ' เรื่อง'}</span></p>` : m && m.err ? `<p class="mrter">ส่งไม่สำเร็จ — ${esc(m.err)}</p><button class="mrtl" data-a="mrtset">เปลี่ยนลิงก์ใบเช็ค MRT</button>` : `<small>ส่งใบเช็ค MRT ที่เติมแล้ว ${fs.length} ไฟล์ เข้า Google Sheets “ใบเช็ครูป MRT (ทดลอง)” • วันที่ที่คนคัดรูปพิมพ์ไว้ไม่หาย</small>`}</div>`;
+};
 function plpEnd(msg) {
   if (!PLP) return;
   clearInterval(PLP.iv);
@@ -16728,6 +16818,63 @@ const ACT = {
         );
     }, 1000);
     say('กำลังดึง Playlist วันนี้จาก Google Drive … หน้าใหม่จะเปิดแล้วปิดเอง');
+  },
+  mrtsend: () => {
+    if (MRTW || FILLING || BUSY) return;
+    const u = mrtUrl();
+    if (!u) {
+      MRTSET = true;
+      return;
+    }
+    const fs = mrtFiles();
+    if (!fs.length) return;
+    const w = window.open(
+      u + (u.includes('?') ? '&' : '?') + 'recv=studio',
+      'psmrt',
+      'popup,width=480,height=760',
+    );
+    if (!w) {
+      say(
+        'เบราว์เซอร์บล็อกหน้าต่างใหม่ — กดอนุญาตป๊อปอัปของหน้านี้ (ไอคอนที่ช่องที่อยู่เว็บ) แล้วกดอีกครั้ง',
+      );
+      return;
+    }
+    MRTW = { w, t: Date.now(), stage: 'open' };
+    if (last) last.mrt = null;
+    MRTW.iv = setInterval(() => {
+      if (!MRTW) return;
+      const s = (Date.now() - MRTW.t) / 1000;
+      if (MRTW.w.closed)
+        mrtEnd(
+          MRTW.stage === 'open'
+            ? 'หน้าใบเช็ค MRT ปิดก่อนรับไฟล์ — กดส่งอีกครั้ง'
+            : 'หน้าใบเช็ค MRT ปิดก่อนเสร็จ — เปิดชีตดูว่านำเข้าแล้วหรือยัง ถ้ายัง กดส่งอีกครั้ง',
+        );
+      else if (MRTW.stage === 'open' && s > 180)
+        mrtEnd(
+          'รอนานเกิน 3 นาที — ถ้าหน้าใบเช็ค MRT ขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดส่งอีกครั้ง หรือลิงก์อาจผิด (กด “เปลี่ยนลิงก์”)',
+        );
+      else if (MRTW.stage === 'send' && s > 480) mrtEnd('รอนานเกิน 8 นาที — เปิดชีตดูว่านำเข้าแล้วหรือยัง');
+    }, 1000);
+    say(`กำลังส่งใบเช็ค MRT ${fs.length} ไฟล์เข้า Google Sheets … หน้าต่างใหม่จะเปิดแล้วปิดเอง`);
+  },
+  mrtset: () => {
+    MRTSET = !MRTSET;
+    if (MRTSET) FOCUSSEL = '#mrturl';
+  },
+  mrtsave: () => {
+    const v = (($('#mrturl') || {}).value || '').trim();
+    if (!/^https:\/\/script\.google\.com\/\S+\/exec$/.test(v)) {
+      MQN = 'warn';
+      note =
+        'ลิงก์ไม่ถูกต้อง — ใช้ลิงก์หน้ามือถือ MRT ที่ขึ้นต้นด้วย https://script.google.com และลงท้ายด้วย /exec';
+      FOCUSSEL = '#mrturl';
+      return;
+    }
+    store.set('ps_mrturl', v);
+    MRTSET = false;
+    MQN = 'done';
+    note = 'จำลิงก์ใบเช็ค MRT แล้ว — กด “ส่งเข้าใบเช็ค MRT” ได้เลย';
   },
   pick: k => {
     if (!BUSY && !FILLING) openPicker(k);
