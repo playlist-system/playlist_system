@@ -173,6 +173,7 @@
  *   เวอร์ชัน 5.5.68: เส้นตารางใต้แถบวันที่สุดท้ายไม่หาย
  *   เวอร์ชัน 5.5.69: Signature Max แบ่งช่วงเวลา
  *   เวอร์ชัน 5.5.70: ไฟล์ BKJ2 ลงวันที่ล่วงหน้าไม่ถูกทิ้งเพราะ BKJ1 / วันที่เติมไม่เลื่อนตามไฟล์ล่วงหน้า / หนังขึ้นใหม่ของวันถัดไปยังไม่ใส่
+ *   เวอร์ชัน 5.5.71: จอปิดถาวร — ปุ่มที่ข้อความไม่พบจอ / เอาจอออกจากใบเช็คก่อนเติม / ใบเปล่าเดือนใหม่ไม่ใส่
  * ======================================================================
  */
 
@@ -5998,6 +5999,10 @@ async function fillWb(f, on, metro, o) {
                 ' — โปรดตรวจ)';
         }
       }
+      if (!ads && shutHas(code)) {
+        rep.push([sn, code, 'ข้อมูล: จอปิดถาวร (จดไว้ในเครื่องนี้) — ไม่เติม', 0]);
+        continue;
+      }
       if (!ads) {
         const hit = [...on.keys()].filter(k => k.split('|')[1] === code);
         rep.push([
@@ -9324,6 +9329,121 @@ const sdbW = w =>
     .trim()
     .replace(/^คุณ\s*/, ''); /* 5.5.28: ชื่อในฐานข้อมูลมีคำว่า คุณ อยู่แล้ว ไม่ใส่ซ้ำ */
 const ndCodes = nd => ((nd && nd.S) || []).flatMap(x => (x.codes || []).map(c => [x.sn, c]));
+/* 5.5.71: จอปิดถาวร — จดไว้ในเครื่องนี้ (กดจากข้อความ “ไม่พบจอนี้ใน Playlist”) → เติมครั้งต่อไปเอาจอออกจากใบเช็คทั้งช่อง • ทำใบเปล่าเดือนใหม่ไม่ใส่ • ไม่นับเป็นจอที่ขาดตามฐานข้อมูล • เฉพาะจอ DGT / ID */
+let SHUT = null,
+  SHX0 = null;
+const shutL = () => {
+  if (!SHUT) {
+    try {
+      SHUT = JSON.parse(store.get('ps_shut') || '[]');
+    } catch (_) {
+      SHUT = [];
+    }
+    if (!Array.isArray(SHUT)) SHUT = [];
+  }
+  return SHUT;
+};
+const shutOk = c => /^(DGT|ID)/.test(sdbK(c) || ''),
+  shutHas = c => {
+    const k = sdbK(c);
+    return !!k && shutOk(c) && shutL().some(x => x.k === k);
+  };
+const shutSet = (c, on) => {
+  const k = sdbK(c);
+  SHUT = shutL().filter(x => x.k !== k);
+  if (on) SHUT.push({ k, c: String(c).trim(), at: Date.now() });
+  store.set('ps_shut', JSON.stringify(SHUT));
+};
+async function shutCut(f) {
+  let nd = f.nd;
+  if (!nd) {
+    try {
+      nd = sheetNeeds(f.buf, f.name);
+    } catch (_) {
+      nd = { S: [] };
+    }
+  }
+  const dels = ndCodesX(nd)
+    .filter(([, c]) => shutHas(c))
+    .map(([sn, c]) => ({ sn, code: c }));
+  if (!dels.length) return null;
+  let A = null;
+  try {
+    A = await arrX(f.buf, {
+      mk: false,
+      sort: false,
+      adds: [],
+      dels,
+      empty: true,
+      r10: true,
+      ins: true,
+      filled: true,
+    });
+  } catch (_) {
+    A = null;
+  }
+  const ok = new Set(((A && A.removed) || []).map(d => sdbK(d.code))),
+    go = dels.filter(d => ok.has(sdbK(d.code))),
+    why = c => {
+      const t = ((A && A.notes) || []).find(t => sdbK(String(t[1]).split(' — ')[0]) === sdbK(c));
+      return t
+        ? String(t[1])
+            .split(' — ')
+            .slice(1)
+            .join(' — ')
+            .replace(/\s*(เอาออก|ใส่)เองในใบเช็ค$/, '')
+        : 'เอาออกไม่ได้';
+    };
+  const no = dels.filter(d => !ok.has(sdbK(d.code))).map(d => ({ ...d, why: why(d.code) }));
+  if (!go.length) return { f, go, no };
+  let P2 = { buf: A.buf };
+  try {
+    P2 = await wbPost(A.buf, { hide: A.emptied || [], rm: go.map(d => d.code) });
+  } catch (_) {}
+  return { f: { ...f, buf: P2.buf, nd: null }, go, no };
+}
+async function shutRun(list) {
+  const R = { go: [], no: [] };
+  if (!shutL().length) return R;
+  for (let i = 0; i < list.length; i++) {
+    const x = await shutCut(list[i]);
+    if (!x) continue;
+    list[i] = x.f;
+    for (const d of x.go) R.go.push({ name: list[i].name, ...d });
+    for (const d of x.no) R.no.push({ name: list[i].name, ...d });
+  }
+  return R;
+}
+const shutTxt = S =>
+  !S || !(S.go.length + S.no.length)
+    ? []
+    : [
+        '',
+        `จอปิดถาวร (จดไว้ในเครื่องนี้) — เอาออกจากใบเช็คก่อนเติม ${S.go.length} จอ${S.no.length ? ` • เอาออกไม่ได้ ${S.no.length} จอ` : ''}`,
+        ...S.go.map(d => `  เอาออก ${d.code}: ${amvNm(d.name)} › ${d.sn}`),
+        ...S.no.map(
+          d => `  เอาออกไม่ได้ ${d.code}: ${amvNm(d.name)} › ${d.sn} — ${d.why} (เอาออกเองในใบเช็ค)`,
+        ),
+        '',
+      ];
+const shutHTML = S => {
+  if (!S || !(S.go.length + S.no.length)) return '';
+  const li = (d, t) =>
+    `<li><b>${esc(d.code)}</b> ใบ${esc(amvNm(d.name))} · ชีต ${esc(d.sn)}${t ? ' — ' + esc(t) : ''}</li>`;
+  return alertHTML(
+    S.go.length ? 'ok' : 'wr',
+    S.go.length
+      ? `เอาจอปิดถาวรออกจากใบเช็คแล้ว ${S.go.length} จอ` +
+          (S.no.length ? ` • เอาออกไม่ได้ ${S.no.length} จอ` : '')
+      : `เอาจอปิดถาวรออกไม่ได้ ${S.no.length} จอ`,
+    `${S.go.length ? `<ul>${S.go.map(d => li(d)).join('')}</ul>` : ''}${S.no.length ? `<p><b>เอาออกไม่ได้ — เอาออกเองในใบเช็ค</b></p><ul>${S.no.map(d => li(d, d.why)).join('')}</ul>` : ''}<p class="hint">เอาออกทั้งช่อง รวมหนังที่ถ่ายแล้ว และแก้ชีต Analysis ให้ • ไฟล์ก่อนเติมอยู่ในโฟลเดอร์สำรองก่อนเติม • จอที่จดไว้: ${shutL()
+      .map(
+        x =>
+          `<button class="r5go" data-a="shutmk" data-k="${esc(x.c)}" title="ยกเลิกจอปิดถาวร">${esc(x.c)} ✕</button>`,
+      )
+      .join(' ')}</p>`,
+  );
+};
 let SDB,
   SDQ = null,
   SDA = null,
@@ -9476,7 +9596,7 @@ function sdbCheck(files) {
       who: sdbW(mine[0].w),
       n: have.size,
       miss: mine
-        .filter(r => !have.has(r.k) && !/s[ai]gnature/i.test(r.pk))
+        .filter(r => !have.has(r.k) && !/s[ai]gnature/i.test(r.pk) && !shutHas(r.c || r.k))
         .map(r => ({ ...r, pl: plk.has(r.k), at: at.get(r.k) || '' })),
       moved,
       unk,
@@ -11499,7 +11619,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.70 (20 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.71 (20 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -14654,7 +14774,7 @@ function vRes() {
   return `<section class="r5hero" data-tour="sum"><div class="r5h"><span class="r5ring${allBad ? ' er' : nb ? ' wr' : ''}" aria-hidden="true"><span>${allBad ? IC.warn : IC.check}</span></span><div><small>ผลการเติม${dtx ? ' · ' + dtx : ''}${last.days ? ` · ${last.days.length} วัน` : ''}</small><h1>${allBad ? 'เติมไม่ได้' : `เติมเสร็จ ${g(tot.toLocaleString() + ' จอ')}`}</h1></div></div>
  <div class="r5act"><span class="r5sv ${last.saved ? 'ok' : 'wr'}">${last.saved ? 'บันทึก / ดาวน์โหลดแล้ว' : 'ยังไม่ได้บันทึก'}</span>${btns}</div></section>
  <div class="stack">${last.sv ? (last.sv.bad.length ? alertHTML('er', `บันทึกไม่ได้ ${last.sv.bad.length} ไฟล์`, `<p>${esc(last.sv.bad.join(', '))} อาจเปิดอยู่ใน Excel ปิดไฟล์ก่อน แล้วกด “บันทึกทับไฟล์เดิม” อีกครั้ง ไฟล์อื่นบันทึกแล้ว ${last.sv.ok} ไฟล์</p>`) : alertHTML('ok', `บันทึกทับ ${last.sv.ok} ไฟล์ในโฟลเดอร์ “${esc(last.sv.dir)}” แล้ว`, `<p>ไฟล์ก่อนเติมเก็บไว้ที่โฟลเดอร์ สำรองก่อนเติม/${last.sv.day} พร้อม รายงาน.txt${last.sv.neu ? ` • ${last.sv.neu} ไฟล์ไม่มีในโฟลเดอร์เดิม จึงสร้างใหม่` : ''} <button class="linkb" data-a="savedir" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button></p>`)) : ''}
- ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}${amvHTML(last.amv)}</div>
+ ${ne ? alertHTML('er', `${ne} ไฟล์ไม่ได้เติม`, '<p>ไฟล์เหล่านี้เสีย หรือไม่ใช่ใบเช็ครูป และไม่อยู่ในไฟล์ zip ไฟล์อื่นเติมตามปกติ ดูเหตุผลในรายการของไฟล์นั้น แล้วใส่ไฟล์ที่ถูกต้องและเติมใหม่</p>') : ''}${amvHTML(last.amv)}${shutHTML(last.shx)}</div>
  <div class="r5grid"><article class="r5rep" aria-label="สรุปผลการเติม"><div class="r5top"><p class="r5s">เติมรายชื่อหนังลงใบเช็ค <b>${nf} ไฟล์</b>${last.days ? ` (${last.days.length} วัน)` : ''} รวม <b>${tot.toLocaleString()} จอ</b>${last.sec ? ` ใช้เวลา ${last.sec} วินาที` : ''} ${nb ? `มี <b class="wr">${nb} เรื่องที่ต้องแก้</b>` : '<b class="ok">ไม่มีเรื่องต้องแก้</b>'}${nn ? ` และ ${nn} เรื่องแจ้งให้ทราบ` : ''}${ne ? ` • ${ne} ไฟล์ไม่ได้เติม` : ''}</p>
   <div class="r5ps">${pill('', 'ไฟล์', nf)}${pill('', 'จอ', tot.toLocaleString())}${pill(nb ? 'wr' : '', 'ต้องแก้', nb)}${pill(nn ? 'nt' : '', 'แจ้งให้ทราบ', nn)}${last.sec ? pill('', 'เวลา', last.sec + ' วินาที') : ''}</div></div>
   ${
@@ -14684,7 +14804,7 @@ function vRes() {
  <button class="ib" data-a="dlf" data-k="${i}" aria-label="ดาวน์โหลด ${esc(r.name)}" title="ดาวน์โหลดไฟล์นี้" ${r.blob ? '' : 'disabled'}>${IC.dl}</button><button class="ib tog" data-a="rx" data-k="${i}" aria-expanded="${open}" aria-label="ดูรายละเอียด ${esc(r.name)}" title="ดูรายละเอียด">${IC.chev}</button></div>
  ${
    open
-     ? `<div class="issues">${o.bad.map(x => `<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}${o.nts.length ? `<details class="isn"><summary>แจ้งให้ทราบ ${o.nts.length} รายการ <small>ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น — ไม่ต้องแก้</small></summary>${o.nts.map(x => `<div class="iss nt"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}</details>` : ''}${
+     ? `<div class="issues">${o.bad.map(x => (/^ไม่พบจอนี้ใน Playlist/.test(x[2]) && shutOk(x[1]) ? (shutHas(x[1]) ? `<div class="iss shx"><b>${esc(x[1])}</b><span>${esc(x[0])}: จดเป็นจอปิดถาวรแล้ว — กด “กลับไปเติมใหม่” แล้วเติมอีกครั้ง ระบบจะเอาจอนี้ออกจากใบเช็คทั้งช่อง</span><button class="r5go" data-a="shutmk" data-k="${esc(x[1])}">ยกเลิก</button></div>` : `<div class="iss shx"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span><button class="r5go" data-a="shutmk" data-k="${esc(x[1])}" title="จอนี้ปิดถาวรแล้ว — เติมครั้งต่อไปเอาออกจากใบเช็ค">จอนี้ปิดถาวร</button></div>`) : `<div class="iss"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`)).join('')}${o.nts.length ? `<details class="isn"><summary>แจ้งให้ทราบ ${o.nts.length} รายการ <small>ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น — ไม่ต้องแก้</small></summary>${o.nts.map(x => `<div class="iss nt"><b>${esc(x[1])}</b><span>${esc(x[0])}: ${esc(x[2])}</span></div>`).join('')}</details>` : ''}${
          o.scr.length
            ? `<p class="ish">สรุปการจัดแต่ละชีต</p>${[...new Set(o.scr.map(x => x[0]))]
                .map(sn => {
@@ -16227,6 +16347,7 @@ async function fillDays(G, list) {
     'รายงานการเติมใบเช็ครูป',
     ...ohTxt(),
     ...amvTxt(AMV0),
+    ...shutTxt(SHX0),
     `เติมต่อกัน ${nD} วัน: ${G.map(g => thd(new Date(g.d))).join(', ')} — ใบเช็คที่ได้ของแต่ละวันเป็นไฟล์ตั้งต้นของวันถัดไป`,
   ];
   try {
@@ -17185,18 +17306,39 @@ const ACT = {
   },
   blkmake: async () => {
     if (!TC.length || BUSY || FILLING) return;
-    const res = [];
+    const res = [],
+      SC = [];
     let i = 0;
-    for (const f of TC) {
+    for (const f0 of TC) {
       i++;
-      note = `กำลังทำใบเปล่า ${i} / ${TC.length} — ${f.name}`;
+      note = `กำลังทำใบเปล่า ${i} / ${TC.length} — ${f0.name}`;
       view();
       await new Promise(r => setTimeout(r, 30));
+      let sc = null;
+      try {
+        sc = await shutCut(f0);
+      } catch (_) {
+        sc = null;
+      }
+      const f = sc ? sc.f : f0;
+      SC.push(sc); /* 5.5.71: จอปิดถาวร ไม่ใส่ในใบเดือนใหม่ */
       let x;
       try {
         x = await blankWb(f);
       } catch (e) {
         x = { rep: [['ทั้งไฟล์', 'ทำไม่ได้ (ไฟล์เสีย หรือไม่ใช่ใบเช็ครูป)']], n: 0, mx: 0, blob: null };
+      }
+      if (sc) {
+        for (const d of sc.go)
+          (x.rep = x.rep || []).push([
+            d.sn,
+            `${d.code} — จอปิดถาวร (จดไว้ในเครื่องนี้) เอาออกแล้ว ไม่ใส่ในใบเดือนใหม่`,
+          ]);
+        for (const d of sc.no)
+          (x.rep = x.rep || []).push([
+            d.sn,
+            `${d.code} — จอปิดถาวร แต่เอาออกไม่ได้ (${d.why}) เอาออกเองในใบเช็ค`,
+          ]);
       }
       res.push({ name: f.name, ...x });
     }
@@ -17213,8 +17355,13 @@ const ACT = {
     for (let j = 0; j < res.length; j++)
       if (res[j].blob && d1g && res[j].d1 !== d1g) {
         try {
-          const x = await blankWb(TC[j], d1g);
-          if (x.blob) res[j] = { name: TC[j].name, ...x };
+          const x = await blankWb(SC[j] ? SC[j].f : TC[j], d1g);
+          if (x.blob)
+            res[j] = {
+              name: TC[j].name,
+              ...x,
+              rep: [...(x.rep || []), ...(res[j].rep || []).filter(z => /จอปิดถาวร/.test(z[1]))],
+            };
         } catch (_) {}
       }
     for (const r of res)
@@ -17244,6 +17391,24 @@ const ACT = {
     note = BLK.ok
       ? `ทำใบเปล่าแล้ว ${BLK.ok} ไฟล์ — ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใหม่`
       : 'ทำใบเปล่าไม่ได้ — ดูรายละเอียดด้านล่าง';
+  },
+  shutmk: k => {
+    if (!k || !shutOk(k)) return;
+    if (shutHas(k)) {
+      shutSet(k, false);
+      MQN = 'done';
+      note = `ยกเลิกจอปิดถาวร ${k} แล้ว — เติมครั้งต่อไประบบไม่เอาจอนี้ออก (ถ้าบันทึกใบที่เอาจอออกไปแล้ว ไฟล์เดิมอยู่ในโฟลเดอร์สำรองก่อนเติม)`;
+      return;
+    }
+    if (
+      !confirm(
+        `จอ ${k} ปิดถาวรแล้วใช่ไหม?\n\nเติมใบเช็คครั้งต่อไป ระบบจะเอาจอนี้ออกจากใบเช็คทั้งช่อง (รวมหนังที่ถ่ายแล้ว) และไม่ใส่ในใบเปล่าเดือนใหม่\nระบบจำไว้ในเครื่องนี้ — ยกเลิกได้ที่ปุ่มเดิม`,
+      )
+    )
+      return;
+    shutSet(k, true);
+    MQN = 'done';
+    note = `จด ${k} เป็นจอปิดถาวรแล้ว — กด “กลับไปเติมใหม่” แล้วเติมอีกครั้ง ระบบจะเอาจอนี้ออกจากใบเช็ค`;
   },
   ckx: k => {
     CKX.has(k) ? CKX.delete(k) : CKX.add(k);
@@ -18220,6 +18385,7 @@ const ACT = {
     FILLING = true;
     try {
       AMV0 = null;
+      SHX0 = null;
       OHX = [];
       for (let i = 0; i < list.length; i++) {
         const f = list[i];
@@ -18239,13 +18405,24 @@ const ACT = {
         if (AM.names.length) list.splice(0, list.length, ...AM.list);
         AMV0 = AM;
       } /* 5.5.21 */
+      SHX0 = await shutRun(list); /* 5.5.71 */
       if (MD) {
         await fillDays(MD, list);
-        if (last) last.amv = AMV0;
+        if (last) {
+          last.amv = AMV0;
+          last.shx = SHX0;
+        }
         return;
       } /* 4.3: Playlist หลายวัน → เติมต่อกันทีละวัน */
       const out = new JSZip(),
-        L = ['รายงานการเติมใบเช็ครูป', ...plRep(), ...frzRep(), ...ohTxt(), ...amvTxt(AMV0)],
+        L = [
+          'รายงานการเติมใบเช็ครูป',
+          ...plRep(),
+          ...frzRep(),
+          ...ohTxt(),
+          ...amvTxt(AMV0),
+          ...shutTxt(SHX0),
+        ],
         T0 = performance.now();
       const res = await fillRun(list, o, L, out, 'กำลังเติมใบเช็ครูป');
 
@@ -18260,6 +18437,7 @@ const ACT = {
         txt: L.join('\n'),
         sec: SEC,
         amv: AMV0,
+        shx: SHX0,
       };
       {
         const _w = res.reduce((t, r) => t + r.rep.filter(isMust).length, 0),
