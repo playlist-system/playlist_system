@@ -176,6 +176,7 @@
  *   เวอร์ชัน 5.5.71: จอปิดถาวร — ปุ่มที่ข้อความไม่พบจอ / เอาจอออกจากใบเช็คก่อนเติม / ใบเปล่าเดือนใหม่ไม่ใส่
  *   เวอร์ชัน 5.5.72: ปุ่มส่งเข้าใบเช็ค MRT (Google Sheets) ในหน้าผลการเติม
  *   เวอร์ชัน 5.5.73: ใส่วันที่ถ่าย อ่านโฟลเดอร์ MRT ใน Gallary
+ *   เวอร์ชัน 5.5.74: ใส่วันที่ถ่าย บอกความคืบหน้าตั้งแต่อ่านโฟลเดอร์
  * ======================================================================
  */
 
@@ -2610,13 +2611,21 @@ const reTag = (name, pk) => {
 const sameK = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /* โฟลเดอร์จอในโฟลเดอร์แยกรูป (ลึกไม่เกิน 3 ชั้น) จอปิดถาวร และโฟลเดอร์รอบแบบ Gallary
    S = จอ: แบบเดิม {path, h, k, hm, kids, ph, pp} • แบบ Gallary {g: true, path, k, ph, pp, rounds: รอบ → โฟลเดอร์จอในรอบนั้น, name = ชื่อล่าสุด} */
-async function picScreens(root) {
+async function picScreens(root, onDir) {
+  /* 5.5.74: onDir(จำนวนโฟลเดอร์ที่อ่านแล้ว, ชื่อ) — บอกความคืบหน้า (ไดรฟ์เครือข่ายอ่านช้า) */
+  let nd = 0;
+  const ls = async h => {
+    const o = await picDirs(h);
+    nd++;
+    if (onDir) await onDir(nd, h.name);
+    return o;
+  };
   const S = [],
     shut = [],
     RF = [],
     tops = [];
   const walk = async (h, path, dep) => {
-    for (const [n, x] of await picDirs(h)) {
+    for (const [n, x] of await ls(h)) {
       if (dep === 0) tops.push([n, x]);
       const rf = rndF(n);
       if (rf) {
@@ -2625,11 +2634,11 @@ async function picScreens(root) {
       }
       if (isMonD(n)) continue;
       if (dep === 0 && /ปิดถาวร/.test(n)) {
-        for (const [c] of await picDirs(x)) shut.push(picKey(c));
+        for (const [c] of await ls(x)) shut.push(picKey(c));
         continue;
       }
       const k = picKey(n),
-        kids = await picDirs(x),
+        kids = await ls(x),
         hm = kids.some(([c]) => isMonD(c));
       if (k.code || k.jam || k.metro != null || hm)
         S.push({ path: [...path, n], h: x, k, hm, kids, ph: h, pp: path });
@@ -2641,12 +2650,12 @@ async function picScreens(root) {
   else await walk(root, [], 0);
   const G = new Map();
   for (const r of RF)
-    for (const [n, x] of await picDirs(r.h)) {
+    for (const [n, x] of await ls(r.h)) {
       if (/^#/.test(n) || isMonD(n) || rndF(n)) continue;
       /* 5.5.20: โฟลเดอร์ “Pic @ …” ที่ข้างในเป็นจอย่อย (ไม่มี #Fast Ads / #Module / โฟลเดอร์หนัง) เช่น Pic @ BASE → 1. SCREEN A - B • จอย่อย = จอ */
       let subs = null;
       if (/^Pic\s*@/i.test(n)) {
-        const ks = await picDirs(x);
+        const ks = await ls(x);
         if (ks.length && !ks.some(([c]) => /^#/.test(c) || /_/.test(c))) subs = ks;
       }
       for (const [nn, xx, mid, mh] of subs ? subs.map(([c, h]) => [c, h, n, x]) : [[n, x, '', null]]) {
@@ -3761,8 +3770,8 @@ const shotOk = (ST, st) => {
   return fc === 'T0' || fc === 'T2' || (/^[0-9A-F]{6,8}$/.test(fc) && lum(fc) > 160);
 };
 const SHOTBW = { fill: 'FF000000', color: 'FFFFFFFF', fontName: 'Calibri', center: true };
-async function shotScan(root, files, prog) {
-  const { S, shut, RF } = await picScreens(root),
+async function shotScan(root, files, prog, wprog) {
+  const { S, shut, RF } = await picScreens(root, wprog),
     same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   /* 5.5.73: แพคที่โครงใน Gallary ไม่เหมือน Plan B TV (Digital MRT / The 20 / Air Traveller / Gateway X / Rama 9 — ดู FXP) หาโฟลเดอร์แบบเดียวกับตอนสร้าง:
     แพค → รอบ → (สถานี →) จอ → หนัง • MRT / Gateway X แต่ละคอลัมน์ในบล็อก = จอหนึ่งจอ • เดิมจับคู่ด้วยป้ายหัวบล็อก (เช่น ชื่อคน) จึงหาไม่เจอ */
@@ -3892,7 +3901,8 @@ async function shotScan(root, files, prog) {
     bi++;
     if (prog) await prog(bi, tot, f.name);
     for (const x of X.sheets) {
-      const stOf = (col, rows) => {
+      if (prog) await prog(bi, tot, f.name + ' • ชีต ' + x.sn);
+      /* 5.5.74: บอกทีละชีต (ใบ MRT ไฟล์หนึ่งอาจใช้หลายนาทีบนไดรฟ์เครือข่าย) */ const stOf = (col, rows) => {
         const m = new Map();
         for (const r of rows) {
           const xv = x.ws[col + r];
@@ -11669,7 +11679,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.73 (20 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.74 (20 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -13909,7 +13919,9 @@ const busyLeft = () => {
   return s < 5 ? '' : s < 90 ? `เหลือประมาณ ${s} วินาที` : `เหลือประมาณ ${Math.round(s / 60)} นาที`;
 };
 /* 5.5.67 */ const vBusyIn = () =>
-  `<b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft() ? `<small><b>${busyLeft()}</b></small>` : ''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop ? '<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>' : ''}`;
+  BUSY.cnt != null
+    ? `<b>${esc2(BUSY.t)}</b><small>อ่านแล้ว ${BUSY.cnt.toLocaleString()} โฟลเดอร์ — ${esc2(BUSY.f)}</small><small>ไดรฟ์เครือข่ายอาจใช้เวลาหลายนาที ไม่ต้องกดซ้ำ • เลือกโฟลเดอร์ให้เล็กลงจะเร็วขึ้น เช่น Pic @ Digital MRT</small>`
+    : `<b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft() ? `<small><b>${busyLeft()}</b></small>` : ''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop ? '<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>' : ''}`;
 /* วาดกล่องรอ: ถ้ามีกล่องอยู่แล้วเปลี่ยนเฉพาะข้อความ น้องโฟกัสจะได้ขยับต่อเนื่อง ไม่เริ่มใหม่ทุกไฟล์ */
 function busyPaint() {
   const b = $('#busy');
@@ -17238,21 +17250,44 @@ const ACT = {
       )
         d = null;
       if (!d) {
-        d = await showDirectoryPicker({ id: 'pic', mode: 'readwrite' });
+        d = await showDirectoryPicker({ id: 'pic', mode: 'read' });
         HDB.set('pic', d).catch(() => {});
       }
     } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      note = 'เลือกโฟลเดอร์ไม่ได้';
+      /* 5.5.74: งานนี้อ่านรูปอย่างเดียว — ขอสิทธิ์ดูไฟล์ ไม่ขอสิทธิ์แก้ */
+      MQN = 'warn';
+      note =
+        e && e.name === 'AbortError'
+          ? 'ยังไม่ได้เลือกโฟลเดอร์ — ถ้าเลือกแล้ว Chrome ถามว่าให้ดูไฟล์ได้ไหม ต้องกดอนุญาต (ถ้าไม่ขึ้นหน้าต่างเลือกโฟลเดอร์ กดปุ่มอีกครั้ง)'
+          : 'เลือกโฟลเดอร์ไม่ได้ (' + errN(e) + ') — ลองเลือกโฟลเดอร์ข้างใน เช่น Pic @ … แทนตัวไดรฟ์';
       return;
     }
-    note = 'กำลังตรวจรูปในโฟลเดอร์แยกรูป …';
-    view();
+    let wt = 0;
+    const wprog = async (cnt, nm) => {
+      const t = performance.now();
+      if (cnt > 1 && t - wt < 250) return;
+      wt = t;
+      BUSY = { t: `กำลังอ่านโฟลเดอร์ใน “${d.name}”`, i: 0, n: 0, f: nm, cnt };
+      busyPaint();
+      $('.wrap').inert = true;
+      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+    };
+    await wprog(0, d.name);
     let R;
     try {
-      R = await shotScan(d, TC, async (i, n, nm) => {
-        if (typeof busyStep === 'function') await busyStep('กำลังดูรูปในโฟลเดอร์แยกรูป', i, n, nm);
-      });
+      R = await shotScan(
+        d,
+        TC,
+        async (i, n, nm) => {
+          if (typeof busyStep === 'function') await busyStep('กำลังดูรูปในโฟลเดอร์แยกรูป', i, n, nm);
+        },
+        wprog,
+      );
+    } catch (e) {
+      MQN = 'warn';
+      note =
+        'อ่านโฟลเดอร์ “' + d.name + '” ไม่ได้ (' + errN(e) + ') — ไดรฟ์เครือข่ายอาจหลุด ลองกดตรวจอีกครั้ง';
+      return;
     } finally {
       if (typeof busyDone === 'function') busyDone();
     }
