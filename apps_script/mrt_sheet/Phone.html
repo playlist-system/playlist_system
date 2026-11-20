@@ -1,151 +1,260 @@
 <!doctype html>
-<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ใบงานถ่ายรูป MRT</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Prompt:wght@600&display=swap" rel="stylesheet">
 <style>
-:root{--f-ui:"IBM Plex Sans Thai",Tahoma,sans-serif;--f-hd:"Prompt","IBM Plex Sans Thai",sans-serif;
- --navy:#022866;--navy2:#0B3478;--cyan:#1BB8EF;--cyt:#0072A8;--cys:#E2F4FC;--bg:#F4F7FB;--sf:#fff;--sf3:#E6EBF3;--ln:#D4DCE8;
- --tx:#0B1F45;--tx2:#34446A;--mu:#5A6987;--ok:#1B7646;--okb:#2FA866;--wr:#8F5C06;--wrb:#E5A321;--wrs:#FFF2CC;--er:#B9312A;--erb:#DC4F43;--ers:#FCE8E6}
+/* ใบงานถ่ายรูป MRT — ฟอนต์ของเครื่อง (ไม่โหลดจากเน็ต เปิดเร็ว) • สายรถไฟ = เส้นนำสายตาของรายการสถานี
+   สีบอกสถานะ: ฟ้า = สินค้าใหม่ • แดง = ยังไม่ได้เก็บ • เทา = ออกไปแล้ว • เขียว = เก็บครบ */
+:root{--f:"Noto Sans Thai","Leelawadee UI","Sukhumvit Set",Thonburi,"Segoe UI",system-ui,sans-serif;
+ --ink:#10213F;--ink2:#3C4A66;--mu:#6A7690;--bg:#F2F4F7;--sf:#fff;--ln:#DCE1EA;--ln2:#EBEEF3;
+ --line:#1F4DB8;--need:#C93B28;--needb:#FCEBE8;--part:#9A6200;--partd:#E39B1B;--partb:#FFF3DC;--done:#1C7F4E;--doneb:#E3F4EA;--new:#0B6FA8;--newb:#E1F1FB;--out:#5F6B84;--outb:#ECEFF4}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);color:var(--tx);font:15px/1.5 var(--f-ui);-webkit-text-size-adjust:100%}
-.g{color:var(--ok)}.a{color:var(--wr)}.r{color:var(--er)}
-.app{background:var(--navy);color:#fff;padding:14px 18px 16px}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:8px}.pb{font:600 17px/1 var(--f-hd);color:#fff;letter-spacing:.2px}.pb i{font-style:normal;color:var(--cyan)}
-.brand span{font:500 13px var(--f-ui);color:#BFD0EE;border-left:1px solid rgba(255,255,255,.25);padding-left:10px}
-.t{font:600 21px/1.3 var(--f-hd)}.s{font-size:13px;color:#BFD0EE;display:flex;gap:12px;flex-wrap:wrap}
-.back{font-size:14px;color:#9FE0F8;margin-bottom:2px;display:inline-block;text-decoration:none}
-.hero{display:flex;align-items:center;gap:16px;margin-top:12px}.hero svg{flex:none}
-.k{font-size:13px;color:#BFD0EE}.v{font:600 16px/1.4 var(--f-ui)}.v small{font:500 13px var(--f-ui);color:#BFD0EE}
-.mrt{margin-top:6px;display:inline-flex;gap:8px;align-items:baseline;background:var(--navy2);border-radius:10px;padding:4px 10px;font-size:12.5px;color:#BFD0EE}
-.mrt b{font:600 15px var(--f-hd);color:#fff}
-.body{padding:12px 14px 90px}
-.note{background:#FFF8E1;border:1px solid #F1D98A;border-radius:12px;padding:8px 12px;font-size:13px;color:var(--tx2);margin-bottom:10px}
-.newb{display:flex;gap:10px;background:var(--cys);border:1px solid #B8E4F7;border-radius:14px;padding:10px 12px;margin-bottom:10px}
-.newb .dot{width:10px;height:10px;border-radius:50%;background:var(--cyan);margin-top:6px;flex:none}
-.newb b{display:block;font:600 14px var(--f-ui);color:var(--cyt)}.newb span{font-size:13px;color:var(--tx2);display:block;overflow-wrap:anywhere;line-height:1.4}
-.sec{display:flex;align-items:center;gap:8px;margin:12px 2px 7px;font:600 15px var(--f-hd)}
-.sec .n{font:500 12.5px var(--f-ui);color:var(--mu);margin-left:auto}.sec .d{width:9px;height:9px;border-radius:50%}
-.card{display:block;text-decoration:none;color:inherit;background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:11px 14px;margin-bottom:8px}
-.h{display:flex;align-items:baseline;gap:8px}.h b{font:600 17px var(--f-hd)}.h span{font-size:13px;color:var(--mu)}
-.h .sc{margin-left:auto;font:600 19px var(--f-hd)}
-.bar{height:8px;border-radius:8px;background:var(--sf3);margin:8px 0 6px;overflow:hidden}.bar i{display:block;height:100%;border-radius:8px}
-.bg-g{background:var(--okb)}.bg-a{background:var(--wrb)}.bg-r{background:var(--erb)}
-.m{display:flex;justify-content:space-between;gap:6px;font-size:13px;color:var(--tx2);flex-wrap:wrap}.m b{font-weight:600}
-.flag{display:inline-block;font:600 12px var(--f-ui);border-radius:8px;padding:0 8px;background:var(--ers);color:var(--er);margin-left:6px}
-.chips{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
-.chips button{font:600 13px var(--f-ui);padding:6px 12px;border-radius:99px;background:var(--sf);border:1px solid var(--ln);color:var(--tx2)}
-.chips .on{background:var(--navy);border-color:var(--navy);color:#fff}
-.zero{display:flex;align-items:center;gap:10px;background:var(--sf);border:1px solid #F1C3BE;border-left:5px solid var(--erb);border-radius:14px;padding:9px 12px;margin-bottom:7px}
-.zero b{font:600 16px var(--f-hd)}.zero span{font-size:13px;color:var(--tx2)}
-.zero button{margin-left:auto;font:600 13px var(--f-ui);color:var(--cyt);background:none;border:0;white-space:nowrap}
-.scard{background:var(--sf);border:1px solid var(--ln);border-radius:16px;overflow:hidden;margin-bottom:8px}
-.sh{display:flex;align-items:baseline;gap:8px;padding:10px 14px 8px}.sh b{font:600 17px var(--f-hd)}.sh span{font-size:13px;color:var(--mu)}.sh .sc{margin-left:auto;font:600 15px var(--f-hd)}
-.it{display:grid;grid-template-columns:18px 1fr;gap:9px;padding:8px 14px;border-top:1px solid var(--sf3)}
-.bx{width:16px;height:16px;border:2px solid #A3ACBB;border-radius:4px;margin-top:3px}
-.nm{font:500 14.5px/1.35 var(--f-ui);overflow-wrap:anywhere}
-.tag{display:inline-block;font:600 11.5px/1.5 var(--f-ui);border-radius:7px;padding:0 7px;margin-top:3px}
-.tag.new{background:var(--cys);color:var(--cyt)}.tag.old{background:var(--wrs);color:var(--wr)}
-.okrow{display:flex;justify-content:space-between;background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:8px 14px;margin-bottom:6px;font-size:14px}
-.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
-.tile{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:10px 12px}.tile.dk{background:var(--navy);border-color:var(--navy);color:#fff}
-.tile b{display:block;font:600 27px/1.15 var(--f-hd)}.tile span{font-size:12.5px;color:var(--mu);display:block;line-height:1.35}.tile.dk span{color:#BFD0EE}
-.box{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:6px 14px;margin-bottom:10px}
-.pr{display:grid;grid-template-columns:96px 1fr 46px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--sf3);font-size:13.5px}
-.pr:first-child{border-top:0}.pr .bb{height:9px;border-radius:9px;background:var(--sf3);overflow:hidden}.pr .bb i{display:block;height:100%}
-.pr b{font:600 14px var(--f-hd);text-align:right}.pr .nn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pr .nn small{color:var(--mu);font-size:12px;margin-left:4px}
-.wide{grid-template-columns:1fr 60px 46px}
-.nav{position:fixed;left:0;right:0;bottom:0;height:62px;background:#fff;border-top:1px solid var(--ln);display:flex;justify-content:space-around;align-items:center;padding-bottom:env(safe-area-inset-bottom)}
-.nav a{display:flex;flex-direction:column;align-items:center;gap:2px;font:600 12px var(--f-ui);color:var(--mu);text-decoration:none}
-.nav a.on{color:var(--navy)}.nav svg{stroke:currentColor}
-.app{position:relative}.rf{position:absolute;right:14px;top:12px;background:var(--navy2);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:4px 12px;font:600 12.5px var(--f-ui)}
-.empty{text-align:center;color:var(--mu);padding:40px 10px}
+html,body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f);-webkit-text-size-adjust:100%}
+a{color:inherit;text-decoration:none}button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.num{font-variant-numeric:tabular-nums}
+.top{background:var(--ink);color:#fff;padding:12px 16px 18px;padding-top:max(12px,env(safe-area-inset-top))}
+.bar1{display:flex;align-items:center;gap:10px;min-height:36px}
+.mark{font-weight:700;font-size:15px;white-space:nowrap}.mark i{font-style:normal;color:#8FB0F5}
+.bar1 .rd{font-size:13px;color:#B9C4DA;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rf{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:20px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-weight:600}
+.rf svg{width:16px;height:16px}
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding-right:12px;font-size:14px;color:#B9C4DA}
+.big{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;margin-top:10px}
+.big b{font-size:42px;line-height:1.05;font-weight:700}.big span{font-size:15px;color:#D5DCEA}
+.sub{margin-top:6px;font-size:13.5px;color:#B9C4DA;display:flex;flex-wrap:wrap;gap:4px 12px}.sub b{color:#fff;font-weight:600}
+.meter{height:6px;border-radius:6px;background:rgba(255,255,255,.14);margin-top:12px;overflow:hidden}.meter i{display:block;height:100%;background:#8FB0F5;border-radius:6px}
+.wrap{padding:14px 12px 96px;max-width:640px;margin:0 auto}
+.note{background:var(--partb);color:var(--part);border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
+/* 3 รายการ: สินค้าใหม่ / ยังไม่ได้เก็บ / ออกไปแล้ว (หน้าแรก = การ์ด, หน้ารายการ/สถานี = แท็บ) */
+.k3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kc{display:flex;flex-direction:column;align-items:flex-start;text-align:left;background:var(--sf);border-radius:14px;padding:10px 11px 9px;border:2px solid transparent;min-height:92px;position:relative}
+.kc::before{content:"";position:absolute;left:11px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--c)}
+.kc b{font-size:28px;line-height:1.1;font-weight:700;color:var(--c);margin-top:12px}
+.kc .kl{font-size:13.5px;font-weight:700;line-height:1.25;color:var(--ink)}
+.kc small{font-size:11.5px;color:var(--mu);line-height:1.3;margin-top:1px}
+.kc.new{--c:var(--new)}.kc.todo{--c:var(--need)}.kc.out{--c:var(--out)}
+.k3.tabs .kc{min-height:0;padding:8px 10px}.k3.tabs .kc b{font-size:22px;margin-top:10px}.k3.tabs .kc small{display:none}
+.k3.tabs .kc.on{border-color:var(--c)}.k3.tabs .kc:not(.on){background:#E8EBF1}
+.ex{display:flex;gap:10px;align-items:flex-start;margin:10px 0 12px;padding:10px 12px;border-radius:12px;background:var(--b);color:var(--ink2);font-size:13.5px;line-height:1.45}
+.ex i{flex:none;width:4px;align-self:stretch;border-radius:4px;background:var(--c)}.ex b{color:var(--ink)}
+.ex.new{--c:var(--new);--b:var(--newb)}.ex.todo{--c:var(--need);--b:var(--needb)}.ex.out{--c:var(--out);--b:var(--outb)}
+.seg{display:flex;background:#E4E8EF;border-radius:12px;padding:3px;margin-bottom:10px}
+.seg button{flex:1;min-height:38px;border-radius:9px;font-size:14px;font-weight:600;color:var(--ink2)}
+.seg .on{background:var(--sf);color:var(--ink);box-shadow:0 1px 2px rgba(16,33,63,.12)}
+.lh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:18px 4px 6px;font-size:13px;color:var(--mu)}.lh b{font-size:15px;color:var(--ink);font-weight:700}
+/* รายการสถานีแบบแผนที่สายรถไฟ */
+.route{background:var(--sf);border-radius:16px;padding:4px 0}
+.stn{display:grid;grid-template-columns:44px 1fr auto;align-items:center;min-height:62px;padding:8px 14px 8px 0;position:relative}
+.stn::before{content:"";position:absolute;left:21px;top:0;bottom:0;width:4px;background:var(--line)}
+.route .stn:first-child::before{top:50%}.route .stn:last-child::before{bottom:50%}.route .stn:only-child::before{display:none}
+.dot{grid-column:1;justify-self:center;width:18px;height:18px;border-radius:50%;background:var(--sf);border:4px solid var(--line);position:relative;z-index:1}
+.dot.need{border-color:var(--need)}.dot.part{border-color:var(--partd)}.dot.done{background:var(--done);border-color:var(--done)}
+.sn{min-width:0;padding-right:8px}.sn b{display:block;font-size:16.5px;font-weight:700;line-height:1.3}
+.sn small{display:block;font-size:12.5px;color:var(--mu)}.sn small em{font-style:normal;font-weight:600}
+.sn .e-n{color:var(--new)}.sn .e-z{color:var(--need)}
+.left{text-align:right;line-height:1.1}.left b{display:block;font-size:22px;font-weight:700}.left small{font-size:11.5px;color:var(--mu)}
+.left.need b{color:var(--need)}.left.part b{color:var(--part)}.left.done b{color:var(--done);font-size:15px}
+.stn .pg{grid-column:2/4;height:4px;border-radius:4px;background:var(--ln2);margin-top:6px;overflow:hidden}.stn .pg i{display:block;height:100%;border-radius:4px}
+.bg-need{background:var(--need)}.bg-part{background:var(--partd)}.bg-done{background:var(--done)}
+.more{display:block;width:100%;min-height:44px;margin-top:8px;border-radius:12px;background:var(--sf);font-size:14px;font-weight:600;color:var(--line)}
+/* รายการสินค้า */
+.scr{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;margin:0 -2px;scrollbar-width:none}.scr::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;flex-direction:column;align-items:flex-start;min-width:84px;min-height:50px;padding:5px 12px;border-radius:12px;background:var(--sf);border:2px solid transparent;text-align:left}
+.chip b{font-size:15px;font-weight:700}.chip small{font-size:11.5px;color:var(--mu);white-space:nowrap}
+.chip.on{border-color:var(--ink)}.chip.z small{color:var(--need);font-weight:600}.chip.ok small{color:var(--done);font-weight:600}
+.list{background:var(--sf);border-radius:16px;overflow:hidden}
+.it{padding:12px 14px;border-top:1px solid var(--ln2)}.it:first-child{border-top:0}
+.fn{font-size:15px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.mt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:4px;font-size:13px}
+.tg{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px}
+.tg.n{background:var(--newb);color:var(--new)}.tg.d{background:var(--outb);color:var(--out)}.tg.o{background:var(--outb);color:var(--out)}
+.s-need{color:var(--need);font-weight:600}.s-done{color:var(--done);font-weight:600}.s-out{color:var(--out);font-weight:600}
+.ps{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.p{font-size:12.5px;font-weight:700;border-radius:7px;padding:2px 8px;background:var(--needb);color:var(--need)}
+.p.g{background:var(--sf);color:var(--out);box-shadow:inset 0 0 0 1.5px #C3CAD7}
+a.p{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;font-size:13px}
+.ps:has(a.p){gap:6px}
+.donel{background:var(--sf);border-radius:14px;padding:4px 14px}
+.donel div{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--ln2);font-size:14px}.donel div:first-child{border-top:0}
+.donel span:last-child{color:var(--done);font-weight:600}
+.empty{text-align:center;color:var(--mu);background:var(--sf);border-radius:16px;padding:28px 14px;font-size:14px}
+.okall{text-align:center;background:var(--doneb);color:var(--done);border-radius:16px;padding:22px 14px;font-weight:700;font-size:15.5px}
+/* คะแนน */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--sf);border-radius:16px;padding:12px 14px}.tile b{display:block;font-size:30px;font-weight:700;line-height:1.15}.tile span{font-size:12.5px;color:var(--mu);display:block}
+.tile.k{background:var(--ink);color:#fff}.tile.k span{color:#B9C4DA}
+.rows{background:var(--sf);border-radius:16px;padding:2px 14px}
+.rw{display:grid;grid-template-columns:minmax(0,1fr) 92px 44px;gap:10px;align-items:center;min-height:44px;border-top:1px solid var(--ln2);font-size:14px}.rw:first-child{border-top:0}
+.rw .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rw .nm small{color:var(--mu);font-size:12px;margin-left:4px}
+.rw .bb{height:8px;border-radius:8px;background:var(--ln2);overflow:hidden}.rw .bb i{display:block;height:100%;border-radius:8px}
+.rw b{text-align:right;font-weight:700}
+.c-need{color:var(--need)}.c-part{color:var(--part)}.c-done{color:var(--done)}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--sf);border-top:1px solid var(--ln);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;font-size:12px;font-weight:600;color:var(--mu)}
+.nav a.on{color:var(--line)}.nav svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:3px solid #8FB0F5;outline-offset:2px}
 </style></head><body>
 <div id="v"></div>
-<nav class="nav"><a href="#" id="n0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" stroke-width="2" stroke-linejoin="round"/></svg>งานของฉัน</a>
-<a href="#scores" id="n1"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 20V11M12 20V5M19 20v-7" stroke-width="2.4" stroke-linecap="round"/></svg>คะแนน</a></nav>
+<nav class="nav" aria-label="เมนู">
+<a href="#" id="n0"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M6 8.5v7M11 6h9M11 18h9"/></svg>สถานีของฉัน</a>
+<a href="#todo" id="n1"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>รายการสินค้า</a>
+<a href="#scores" id="n2"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>คะแนน</a></nav>
 <script>
 const D = <?!= data ?>;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const wb = s => esc(s).replace(/_/g, '_<wbr>');
-const col = p => p >= .9 ? 'g' : p >= .5 ? 'a' : 'r';
+const st3 = p => p >= .9 ? 'done' : p >= .5 ? 'part' : 'need';
 const pc = p => Math.round(p * 100) + '%';
 const MON = (String(D.round).match(/\d+\s*[–-]\s*\d+\s+(\S+)/) || [, ''])[1];
+const day = d => d ? d + ' ' + MON : '';
 const scrP = s => s.n ? s.done / s.n : 0;
 const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
-const ST = D.stations.map((s, i) => { const n = s.screens.reduce((a, x) => a + x.n, 0), d = s.screens.reduce((a, x) => a + x.done, 0);
-  return Object.assign({}, s, { i, n, d, z: s.screens.filter(x => x.n && !x.done).length, p: avg(s.screens.map(scrP)) }); });
+const sum = (a, f) => a.reduce((t, x) => t + f(x), 0);
+const NEWD = D.newFilms.length ? D.newest : 0, NEWSET = new Set(D.newFilms);
+// แยกสินค้าของแต่ละสถานีเป็น 3 รายการ • ช่องที่ยังไม่มีรูปของสินค้าที่ออกไปแล้ว ไม่นับเป็นงานที่ต้องถ่าย (คะแนนยังคิดแบบเดียวกับในชีต)
+const ST = D.stations.map((s, i) => {
+  const gone = new Map(s.gone || []);
+  const scr = s.screens.map(x => Object.assign({}, x, { live: x.miss.filter(m => !gone.has(m[0])) }));
+  const missOf = nm => scr.filter(x => x.miss.some(m => m[0] === nm)).map(x => x.code);
+  const todo = new Map();
+  scr.forEach(x => x.live.forEach(([nm, a]) => { if (!todo.has(nm)) todo.set(nm, { nm, d: a, sc: [] }); todo.get(nm).sc.push(x.code); }));
+  return { i, name: s.name, owner: s.owner, screens: scr, n: sum(scr, x => x.n), d: sum(scr, x => x.done), left: sum(scr, x => x.live.length),
+    z: scr.filter(x => x.n && !x.done).length, p: avg(scr.map(scrP)), nsc: scr.filter(x => x.n).length,
+    todo: [...todo.values()], NEW: (s.nw || []).map(nm => ({ nm, d: NEWD, sc: missOf(nm) })), OUT: [...gone].map(([nm, ex]) => ({ nm, ex, sc: missOf(nm) })) };
+});
 const MY = [].concat(...ST.map(s => s.screens.map(x => Object.assign({ st: s.name }, x))));
-const myP = avg(MY.map(scrP)), myN = ST.reduce((a, s) => a + s.n, 0), myD = ST.reduce((a, s) => a + s.d, 0);
+const myP = avg(MY.map(scrP)), myLeft = sum(ST, s => s.left);
 const who = D.email ? D.email.split('@')[0] : '';
-function ring(p) { const r = 43, C = 2 * Math.PI * r, L = C * p;
-  return `<svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="${r}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="10"/>` +
-    `<circle cx="48" cy="48" r="${r}" fill="none" stroke="#1BB8EF" stroke-width="10" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 48 48)"/>` +
-    `<text x="48" y="54" text-anchor="middle" fill="#fff" font-family="Prompt,sans-serif" font-weight="600" font-size="25">${Math.round(p * 100)}<tspan font-size="14">%</tspan></text></svg>`; }
+// รวมทุกสถานีของฉัน: สินค้า 1 รายการ = 1 แถว บอกว่ายังขาดที่สถานีไหนกี่จอ
+function agg(k) {
+  const M = new Map();
+  ST.forEach(s => (k === 'new' ? s.NEW : k === 'out' ? s.OUT : s.todo).forEach(f => {
+    if (!M.has(f.nm)) M.set(f.nm, { nm: f.nm, d: f.d || 0, ex: 0, at: [], miss: 0, nst: 0 });
+    const o = M.get(f.nm); o.nst++; o.ex = Math.max(o.ex, f.ex || 0); if (f.d && (!o.d || f.d < o.d)) o.d = f.d;
+    if (f.sc.length) { o.at.push({ s, k: f.sc.length }); o.miss += f.sc.length; }
+  }));
+  const L = [...M.values()];
+  return k === 'out' ? L.sort((a, b) => b.ex - a.ex || b.miss - a.miss || a.nm.localeCompare(b.nm))
+    : L.sort((a, b) => (NEWSET.has(b.nm) - NEWSET.has(a.nm)) || b.miss - a.miss || a.nm.localeCompare(b.nm));
+}
+const AG = { new: agg('new'), todo: agg('todo'), out: agg('out') };
+const KL = { new: 'สินค้าใหม่', todo: 'ยังไม่ได้เก็บ', out: 'ออกไปแล้ว' };
+const EX = {
+  new: () => NEWD ? `<b>สินค้าที่เพิ่งขึ้น Playlist วันที่ ${day(NEWD)}</b> ต้องเก็บรูปทุกจอที่ฉาย ตัวเลขสีแดงคือจอที่ยังไม่มีรูป` : '<b>รอบนี้ยังไม่มีสินค้าขึ้นใหม่</b> สินค้าที่ขึ้นตั้งแต่ต้นรอบอยู่ในรายการ "ยังไม่ได้เก็บ"',
+  todo: () => '<b>สินค้าที่ยังฉายอยู่ แต่บางจอยังไม่มีรูป</b> ตัวเลขสีแดงคือจอที่ต้องไปถ่าย (รวมสินค้าใหม่ที่ยังไม่ได้ถ่ายด้วย)',
+  out: () => '<b>สินค้าที่ถูกถอดออกจาก Playlist แล้ว ไม่ต้องถ่ายต่อ</b> กรอบสีเทาคือจอที่เก็บรูปไม่ทันก่อนออก',
+};
+const IC = { rf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>' };
 // หน้านี้อยู่ในกรอบ (iframe) ของ Apps Script: ย้ายหน้าด้วย google.script.history (ปุ่มย้อนกลับของมือถือใช้ได้) • อัปเดต = เปิดลิงก์เว็บแอปใหม่ทั้งหน้า
-const RF = '<button class="rf" onclick="refresh()">อัปเดต</button>';
-let R = '';
+let R = '', SORT = 'line', DONEOPEN = false, SCR = -1, TAB = 'todo';
 const GS = (window.google && google.script && google.script.history) ? google.script : null;
 function refresh() { if (D.url) window.open(D.url + (R ? '#' + R : ''), '_top'); else location.reload(); }
-const head = (title, sub, extra = '') => `<div class="app">${RF}<div class="brand"><b class="pb">Plan<i>·B</i></b><span>ใบงานถ่ายรูป MRT</span></div><div class="t">${title}</div><div class="s">${sub.map(x => `<span>${esc(x)}</span>`).join('')}</div>${extra}</div>`;
-const bar = p => `<div class="bar"><i class="bg-${col(p)}" style="width:${Math.max(p * 100, 1.5).toFixed(1)}%"></i></div>`;
-function home() {
-  const sub = [who ? 'คุณ ' + who : '', D.round, 'อัปเดต ' + D.updated].filter(Boolean);
-  const hero = `<div class="hero">${ring(myP)}<div><div class="k">${D.assigned ? 'คะแนนของฉัน' : 'คะแนนทุกสถานี'}</div><div class="v">ได้รูปแล้ว ${myD.toLocaleString()} จาก ${myN.toLocaleString()}<br><small>ยังเหลือ ${(myN - myD).toLocaleString()} รูป ใน ${ST.length} สถานี</small></div><div class="mrt">คะแนนรวมทั้ง MRT <b>${(D.mrt * 100).toFixed(1)}%</b></div></div></div>`;
-  let h = head(D.assigned ? 'งานของฉัน' : 'งานทั้งหมด', sub, hero) + '<div class="body">';
-  if (!D.assigned) h += `<div class="note">อีเมลนี้ยังไม่ได้ผูกกับสถานีในแท็บ "ผู้ใช้และสิทธิ์" เลยแสดงทุกสถานีไปก่อน</div>`;
-  if (D.newFilms.length) h += `<div class="newb"><div class="dot"></div><div><b>หนังขึ้นใหม่ ${D.newest} ${MON}</b>${D.newFilms.map(f => `<span>${wb(f)}</span>`).join('')}<span>ต้องถ่ายทุกจอที่ฉายเรื่องนี้</span></div></div>`;
-  const list = ST.slice().sort((a, b) => (b.n - b.d) - (a.n - a.d));
-  h += `<div class="sec">สถานีที่ยังเหลือ<span class="n">เรียงจากเหลือมากสุด</span></div>`;
-  if (!list.length) h += `<div class="empty">ยังไม่มีข้อมูลใบเช็ค</div>`;
-  for (const s of list) {
-    const fl = s.z ? `<span class="flag">${s.z === s.screens.length ? 'ยังไม่มีรูปเลย' : s.z + ' จอยังไม่มีรูป'}</span>` : '';
-    h += `<a class="card" href="#s${s.i}"><div class="h"><b>${esc(s.name)}</b><span>${s.screens.length} จอ</span><span class="sc ${col(s.p)}">${pc(s.p)}</span></div>${bar(s.p)}<div class="m"><span>เหลือ <b class="${col(s.p)}">${s.n - s.d}</b> รูป${fl}</span><span>ได้แล้ว ${s.d}/${s.n}</span></div></a>`;
-  }
-  return h + '</div>';
+const top1 = left => `<div class="bar1">${left}<button class="rf" onclick="refresh()" aria-label="โหลดข้อมูลใหม่">${IC.rf}อัปเดต ${esc(D.updated)}</button></div>`;
+const brand = `<span class="mark">ใบงานถ่ายรูป <i>MRT</i></span><span class="rd">${esc(D.round)}</span>`;
+const subOf = { new: () => NEWD ? 'ขึ้น ' + day(NEWD) : 'ยังไม่มี', todo: () => myLeft.toLocaleString() + ' รูปที่ต้องถ่าย', out: () => 'ไม่ต้องถ่ายแล้ว' };
+// 3 รายการ • link = ไปหน้ารายการรวม (#new/#todo/#out) • ไม่มี link = แท็บในหน้าสถานี
+function k3(cnt, cur, link) {
+  return `<div class="k3${cur ? ' tabs' : ''}"${cur ? ' role="tablist"' : ''}>` + ['new', 'todo', 'out'].map(k => {
+    const a = cur ? ` role="tab" aria-selected="${cur === k}"` : '', body = `<b class="num">${cnt[k]}</b><span class="kl">${KL[k]}</span><small>${subOf[k]()}</small>`;
+    return link ? `<a href="#${k}" class="kc ${k}${cur === k ? ' on' : ''}"${a}>${body}</a>` : `<button onclick="TAB='${k}';SCR=-1;draw()" class="kc ${k}${cur === k ? ' on' : ''}"${a}>${body}</button>`;
+  }).join('') + '</div>';
 }
-let showAll = false;
+const exBox = k => `<div class="ex ${k}"><i></i><span>${EX[k]()}</span></div>`;
+const cnt3 = (a, b, c) => ({ new: a.length, todo: b.length, out: c.length });
+function stnRow(s) {
+  const k = s.left ? st3(s.p) : 'done', nNew = s.NEW.filter(f => f.sc.length).length;
+  const z = s.z ? `<em class="e-z">${s.z === s.nsc ? 'ยังไม่มีรูปเลย' : s.z + ' จอยังไม่มีรูป'}</em> · ` : nNew ? `<em class="e-n">สินค้าใหม่ ${nNew}</em> · ` : '';
+  return `<a class="stn" href="#s${s.i}"><span class="dot ${k}"></span><span class="sn"><b>${esc(s.name)}</b><small>${z}${s.nsc} จอ · คะแนน ${pc(s.p)}</small></span>` +
+    `<span class="left ${k}">${s.left ? `<b class="num">${s.left}</b><small>รูปที่เหลือ</small>` : '<b>ครบ</b>'}</span>` +
+    `<span class="pg"><i class="bg-${k}" style="width:${Math.max(s.p * 100, 2).toFixed(1)}%"></i></span></a>`;
+}
+function home() {
+  let h = `<header class="top">${top1(brand)}<div class="big"><b class="num">${myLeft.toLocaleString()}</b><span>รูปที่ยังต้องถ่าย</span></div>` +
+    `<div class="sub"><span>${who ? 'คุณ ' + esc(who) + ' · ' : ''}${ST.length} สถานี</span><span>คะแนนของฉัน <b class="num">${pc(myP)}</b></span><span>ทั้ง MRT <b class="num">${(D.mrt * 100).toFixed(1)}%</b></span></div>` +
+    `<div class="meter" role="img" aria-label="คะแนน ${pc(myP)}"><i style="width:${(myP * 100).toFixed(1)}%"></i></div></header><main class="wrap">`;
+  if (!D.assigned) h += `<div class="note">อีเมลนี้ยังไม่ได้ผูกกับสถานีในแท็บ "ผู้ใช้และสิทธิ์" เลยแสดงทุกสถานีไปก่อน</div>`;
+  if (!ST.length) return h + `<div class="empty">ยังไม่มีข้อมูลใบเช็ค</div></main>`;
+  h += `<div class="lh" style="margin-top:4px"><b>รายการสินค้า</b><span>แตะเพื่อดูรายละเอียด</span></div>` + k3(cnt3(AG.new, AG.todo, AG.out), '', true);
+  const todo = ST.filter(s => s.left), done = ST.filter(s => !s.left);
+  const list = SORT === 'line' ? todo : todo.slice().sort((a, b) => b.left - a.left);
+  h += `<div class="lh"><b>สถานีของฉัน</b><span>แตะสถานีเพื่อดูว่าต้องถ่ายอะไร</span></div>`;
+  h += `<div class="seg" role="group" aria-label="เรียงสถานี"><button class="${SORT === 'line' ? 'on' : ''}" onclick="SORT='line';draw()">ตามสาย</button><button class="${SORT === 'most' ? 'on' : ''}" onclick="SORT='most';draw()">เหลือมากสุด</button></div>`;
+  h += todo.length ? `<div class="route">${list.map(stnRow).join('')}</div>` : `<div class="okall">ได้รูปครบทุกสถานีแล้ว</div>`;
+  if (done.length) h += `<button class="more" onclick="DONEOPEN=!DONEOPEN;draw()">${DONEOPEN ? 'ซ่อน' : 'ดู'}สถานีที่ครบแล้ว ${done.length} สถานี</button>` + (DONEOPEN ? `<div class="route" style="margin-top:8px">${done.map(stnRow).join('')}</div>` : '');
+  return h + '</main>';
+}
+const tagOf = (k, f) => k === 'out' ? `<span class="tg o">ออก ${day(f.ex)}</span>` : NEWSET.has(f.nm) ? `<span class="tg n">ใหม่ ขึ้น ${day(NEWD)}</span>` : f.d ? `<span class="tg d">ขึ้น ${day(f.d)}</span>` : '';
+// แถวสินค้าในหน้ารวม (ทุกสถานี) • ปุ่มสถานี = ชื่อสถานี + จำนวนจอที่ยังขาด
+function aggRow(k, f) {
+  const nS = f.at.length, st = k === 'out'
+    ? (f.miss ? `<span class="s-out">เก็บไม่ทัน ${f.miss} จอ ใน ${nS} สถานี</span>` : '<span class="s-done">เก็บรูปครบก่อนออก</span>')
+    : (f.miss ? `<span class="s-need">ยังไม่ได้เก็บ ${f.miss} จอ ใน ${nS} สถานี</span>` : `<span class="s-done">เก็บครบทุกสถานีแล้ว</span>`);
+  return `<div class="it"><div class="fn">${wb(f.nm)}</div><div class="mt">${tagOf(k, f)}${st}</div>` +
+    (f.miss ? `<div class="ps">${f.at.map(a => `<a class="p${k === 'out' ? ' g' : ''}" href="#s${a.s.i}">${esc(a.s.name)} ${a.k} จอ</a>`).join('')}</div>` : '') + '</div>';
+}
+function lists(k) {
+  let h = `<header class="top">${top1(brand)}<div class="big"><b>รายการสินค้า</b></div><div class="sub"><span>รวมทุกสถานีของฉัน (${ST.length} สถานี)</span></div></header><main class="wrap">`;
+  h += k3(cnt3(AG.new, AG.todo, AG.out), k, true) + exBox(k);
+  const L = AG[k];
+  if (!L.length) h += k === 'todo' ? '<div class="okall">เก็บรูปครบทุกสินค้าแล้ว</div>' : `<div class="empty">ไม่มี${KL[k]}</div>`;
+  else h += `<div class="lh"><b>${L.length} รายการ</b><span>${k === 'out' ? 'ออกล่าสุดขึ้นก่อน' : 'แตะชื่อสถานีเพื่อไปดูจอ'}</span></div><div class="list">${L.map(f => aggRow(k, f)).join('')}</div>`;
+  return h + '</main>';
+}
+// หน้าสถานี: 3 แท็บ (ค่าเริ่มต้น = ยังไม่ได้เก็บ)
 function station(i) {
   const s = ST[i]; if (!s) return home();
-  const extra = '';
-  let h = `<div class="app">${RF}<a class="back" href="#">‹ งานของฉัน</a><div class="t">สถานี${esc(s.name)}</div><div class="s"><span>${s.screens.length} จอ</span><span>ได้แล้ว ${s.d}/${s.n}</span><span>เหลือ ${s.n - s.d} รูป</span><span>คะแนน ${pc(s.p)}</span></div></div><div class="body">`;
-  const zero = s.screens.filter(x => x.n && !x.done), part = s.screens.filter(x => x.done && x.done < x.n).sort((a, b) => b.miss.length - a.miss.length), full = s.screens.filter(x => x.n && x.done >= x.n);
-  h += `<div class="chips"><button class="${showAll ? '' : 'on'}" onclick="showAll=false;draw()">ยังไม่ครบ ${zero.length + part.length} จอ</button><button class="${showAll ? 'on' : ''}" onclick="showAll=true;draw()">ทั้งหมด ${s.screens.length}</button></div>`;
-  const items = x => x.miss.map(([nm, d]) => `<div class="it"><div class="bx"></div><div><div class="nm">${wb(nm)}</div>${d === D.newest && D.newFilms.length ? `<span class="tag new">ขึ้นใหม่ ${d} ${MON}</span>` : `<span class="tag old">ค้างตั้งแต่ ${d} ${MON}</span>`}</div></div>`).join('');
-  if (zero.length) { h += `<div class="sec"><span class="d" style="background:#DC4F43"></span>ยังไม่มีรูปเลย<span class="n">${zero.length} จอ</span></div>`;
-    zero.forEach((x, k) => { h += `<div class="zero"><div><b>${esc(x.code)}</b> <span>${esc(x.type)}</span><br><span>ยังไม่มีรูปเลย ต้องถ่าย ${x.n} เรื่อง</span></div><button onclick="this.parentNode.nextElementSibling.hidden=!this.parentNode.nextElementSibling.hidden">ดูรายการ ›</button></div><div class="scard" hidden>${items(x)}</div>`; }); }
-  if (part.length) { h += `<div class="sec"><span class="d" style="background:#E5A321"></span>ขาดบางเรื่อง<span class="n">${part.length} จอ</span></div>`;
-    part.forEach(x => { h += `<div class="scard"><div class="sh"><b>${esc(x.code)}</b><span>${esc(x.type)}</span><span class="sc ${col(scrP(x))}">เหลือ ${x.miss.length}</span></div>${items(x)}</div>`; }); }
-  if (!zero.length && !part.length) h += `<div class="empty">ได้รูปครบทุกจอแล้ว</div>`;
-  if (showAll && full.length) { h += `<div class="sec"><span class="d" style="background:#2FA866"></span>ครบแล้ว<span class="n">${full.length} จอ</span></div>`;
-    full.forEach(x => { h += `<div class="okrow"><span><b>${esc(x.code)}</b> ${esc(x.type)}</span><span class="g">ครบ ${x.n}/${x.n}</span></div>`; }); }
-  return h + '</div>';
+  let h = `<header class="top">${top1('<a class="back" href="#">‹ สถานีของฉัน</a>')}<div class="big"><b>${esc(s.name)}</b></div>` +
+    `<div class="sub"><span>${s.nsc} จอ</span><span>เหลือ <b class="num">${s.left}</b> รูป</span><span>คะแนน <b class="num">${pc(s.p)}</b></span>${s.owner ? `<span>ใบเช็ค${esc(s.owner)}</span>` : ''}</div>` +
+    `<div class="meter"><i style="width:${(s.p * 100).toFixed(1)}%"></i></div></header><main class="wrap">`;
+  h += k3(cnt3(s.NEW, s.todo, s.OUT), TAB, false) + exBox(TAB);
+  const pills = (sc, cls) => sc.map(c => `<span class="p${cls}">${esc(c)}</span>`).join('');
+  const howMany = f => f.sc.length === s.nsc && s.nsc > 1 ? 'ทุกจอ' : f.sc.length + ' จอ';
+  if (TAB === 'todo') {
+    const scrs = s.screens.map((x, j) => ({ x, j })).filter(o => o.x.n);
+    if (scrs.length > 1) h += `<div class="scr" role="group" aria-label="เลือกจอ"><button class="chip${SCR < 0 ? ' on' : ''}" onclick="SCR=-1;draw()"><b>ทุกจอ</b><small>เหลือ ${s.left} รูป</small></button>` +
+      scrs.map(({ x, j }) => `<button class="chip${SCR === j ? ' on' : ''}${!x.done ? ' z' : !x.live.length ? ' ok' : ''}" onclick="SCR=${j};draw()"><b>${esc(x.code)}</b><small>${!x.done ? 'ยังไม่มีรูป' : !x.live.length ? 'ครบแล้ว' : 'เหลือ ' + x.live.length}</small></button>`).join('') + '</div>';
+    const one = SCR >= 0 && s.screens[SCR], L = (one ? s.todo.filter(f => f.sc.indexOf(one.code) >= 0) : s.todo.slice())
+      .sort((a, b) => (NEWSET.has(b.nm) - NEWSET.has(a.nm)) || b.sc.length - a.sc.length || a.d - b.d || a.nm.localeCompare(b.nm));
+    h += `<div class="lh"><b>${L.length} รายการ</b><span>${one ? 'จอ ' + esc(one.code) + ' ' + esc(one.type) : 'สินค้าใหม่ขึ้นก่อน'}</span></div>`;
+    if (!L.length) h += `<div class="okall">${one ? 'จอนี้เก็บรูปครบแล้ว' : 'เก็บรูปครบทุกจอแล้ว'}</div>`;
+    else h += `<div class="list">${L.map(f => `<div class="it"><div class="fn">${wb(f.nm)}</div><div class="mt">${tagOf('todo', f)}` +
+      `${one ? '' : `<span class="s-need">ยังไม่ได้เก็บ ${howMany(f)}</span>`}</div>${one ? '' : `<div class="ps">${pills(f.sc, '')}</div>`}</div>`).join('')}</div>`;
+    const full = s.screens.filter(x => x.n && !x.live.length);
+    if (!one && full.length) h += `<div class="lh"><b>จอที่เก็บครบแล้ว</b><span>${full.length} จอ</span></div><div class="donel">${full.map(x => `<div><span><b>${esc(x.code)}</b> ${esc(x.type)}</span><span>ครบ</span></div>`).join('')}</div>`;
+  } else if (TAB === 'new') {
+    if (!s.NEW.length) h += `<div class="empty">สถานีนี้ไม่มีสินค้าใหม่</div>`;
+    else h += `<div class="list">${s.NEW.slice().sort((a, b) => b.sc.length - a.sc.length || a.nm.localeCompare(b.nm)).map(f => `<div class="it"><div class="fn">${wb(f.nm)}</div><div class="mt"><span class="tg n">ขึ้น ${day(NEWD)}</span>` +
+      (f.sc.length ? `<span class="s-need">ยังไม่ได้เก็บ ${howMany(f)}</span></div><div class="ps">${pills(f.sc, '')}</div>` : '<span class="s-done">เก็บครบแล้ว</span></div>') + '</div>').join('')}</div>`;
+  } else {
+    if (!s.OUT.length) h += `<div class="empty">สถานีนี้ไม่มีสินค้าที่ออกไปแล้ว</div>`;
+    else h += `<div class="list">${s.OUT.slice().sort((a, b) => b.ex - a.ex || a.nm.localeCompare(b.nm)).map(f => `<div class="it"><div class="fn">${wb(f.nm)}</div><div class="mt"><span class="tg o">ออก ${day(f.ex)}</span>` +
+      (f.sc.length ? `<span class="s-out">เก็บไม่ทัน ${f.sc.length} จอ</span></div><div class="ps">${pills(f.sc, ' g')}</div>` : '<span class="s-done">เก็บรูปครบก่อนออก</span></div>') + '</div>').join('')}</div>`;
+  }
+  return h + '</main>';
 }
 function scores() {
-  let h = head('คะแนน', [D.round, 'อัปเดต ' + D.updated]) + '<div class="body">';
-  h += `<div class="tiles"><div class="tile dk"><b>${(D.mrt * 100).toFixed(1)}%</b><span>คะแนนรวมทั้ง MRT<br>${D.mrtScreens} จอ</span></div><div class="tile"><b class="${col(myP)}">${(myP * 100).toFixed(1)}%</b><span>${D.assigned ? 'คะแนนของฉัน' : 'สถานีที่แสดง'}<br>${MY.length} จอ ได้ 90% ขึ้นไป ${MY.filter(x => scrP(x) >= .9).length} จอ</span></div></div>`;
-  h += `<div class="sec">แยกตามสถานี</div><div class="box">` + ST.slice().sort((a, b) => a.p - b.p).map(s => `<a class="pr" href="#s${s.i}" style="color:inherit;text-decoration:none"><span class="nn">${esc(s.name)}</span><div class="bb"><i class="bg-${col(s.p)}" style="width:${Math.max(s.p * 100, 1.5)}%"></i></div><b class="${col(s.p)}">${pc(s.p)}</b></a>`).join('') + '</div>';
-  h += `<div class="sec">คะแนนแต่ละจอ<span class="n">น้อยสุดขึ้นก่อน</span></div><div class="box">` + MY.slice().sort((a, b) => scrP(a) - scrP(b)).map(x => `<div class="pr wide"><span class="nn">${esc(x.code)} ${esc(x.type)}<small>${esc(x.st)}</small></span><div class="bb"><i class="bg-${col(scrP(x))}" style="width:${Math.max(scrP(x) * 100, 2)}%"></i></div><b class="${col(scrP(x))}">${pc(scrP(x))}</b></div>`).join('') + '</div>';
-  return h + '</div>';
+  let h = `<header class="top">${top1(brand)}<div class="big"><b>คะแนน</b></div><div class="sub"><span>คิดแบบเดียวกับในชีต</span></div></header><main class="wrap">`;
+  h += `<div class="tiles"><div class="tile k"><b class="num">${(D.mrt * 100).toFixed(1)}%</b><span>คะแนนรวมทั้ง MRT · ${D.mrtScreens} จอ</span></div><div class="tile"><b class="num c-${st3(myP)}">${(myP * 100).toFixed(1)}%</b><span>${D.assigned ? 'คะแนนของฉัน' : 'สถานีที่แสดง'} · ${MY.length} จอ</span></div></div>`;
+  h += `<div class="lh"><b>แยกตามสถานี</b><span>น้อยสุดขึ้นก่อน</span></div><div class="rows">` + ST.slice().sort((a, b) => a.p - b.p).map(s => `<a class="rw" href="#s${s.i}"><span class="nm">${esc(s.name)}</span><span class="bb"><i class="bg-${st3(s.p)}" style="width:${Math.max(s.p * 100, 2)}%"></i></span><b class="num c-${st3(s.p)}">${pc(s.p)}</b></a>`).join('') + '</div>';
+  h += `<div class="lh"><b>แยกตามจอ</b><span>น้อยสุดขึ้นก่อน</span></div><div class="rows">` + MY.slice().sort((a, b) => scrP(a) - scrP(b)).map(x => `<div class="rw"><span class="nm">${esc(x.code)} ${esc(x.type)}<small>${esc(x.st)}</small></span><span class="bb"><i class="bg-${st3(scrP(x))}" style="width:${Math.max(scrP(x) * 100, 2)}%"></i></span><b class="num c-${st3(scrP(x))}">${pc(scrP(x))}</b></div>`).join('') + '</div>';
+  return h + '</main>';
 }
 function go(h) {
-  if (GS) { R = h; showAll = false; GS.history.push({ r: h }, {}, h); draw(); window.scrollTo(0, 0); }
+  if (GS) { GS.history.push({ r: h }, {}, h); moved(h); }
   else if (location.hash.slice(1) !== h) location.hash = h;
 }
 document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); go(a.getAttribute('href').slice(1)); });
 function draw() {
-  const hsh = R, v = document.getElementById('v');
-  const m = hsh.match(/^s(\d+)$/);
-  v.innerHTML = hsh === 'scores' ? scores() : m ? station(+m[1]) : home();
-  document.getElementById('n0').className = hsh === 'scores' ? '' : 'on';
-  document.getElementById('n1').className = hsh === 'scores' ? 'on' : '';
+  const v = document.getElementById('v'), m = R.match(/^s(\d+)$/), L = /^(new|todo|out)$/.test(R);
+  v.innerHTML = R === 'scores' ? scores() : L ? lists(R) : m ? station(+m[1]) : home();
+  ['n0', 'n1', 'n2'].forEach((id, j) => { document.getElementById(id).className = j === (R === 'scores' ? 2 : L ? 1 : 0) ? 'on' : ''; });
 }
+function moved(h) { const tabSwap = /^(new|todo|out)$/.test(h) && /^(new|todo|out)$/.test(R); R = h; SCR = -1; TAB = 'todo'; draw(); if (!tabSwap) window.scrollTo(0, 0); }
 if (GS) {
-  GS.history.setChangeHandler(e => { R = (e.location && e.location.hash) || ''; showAll = false; draw(); window.scrollTo(0, 0); });
-  GS.url.getLocation(l => { const h = (l && l.hash) || ''; if (h !== R) { R = h; draw(); } });
+  GS.history.setChangeHandler(e => moved((e.location && e.location.hash) || ''));
+  GS.url.getLocation(l => { const h = (l && l.hash) || ''; if (h !== R) moved(h); });
 } else {
   R = location.hash.slice(1);
-  window.addEventListener('hashchange', () => { R = location.hash.slice(1); showAll = false; draw(); window.scrollTo(0, 0); });
+  window.addEventListener('hashchange', () => moved(location.hash.slice(1)));
 }
 draw();
 </script></body></html>
