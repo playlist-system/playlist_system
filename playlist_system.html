@@ -1844,6 +1844,22 @@ const shotOk=(ST,st)=>{if(!ST||st==null)return false;const d=ST.doc,g=n=>d.getEl
  const dk=th!=null?(th==='1'||th==='3')&&tn<0.35:rgb?lum(rgb)<100:ix==='8';if(!dk)return false;
  const fc=ST.fcOf(st);return fc==='T0'||fc==='T2'||(/^[0-9A-F]{6,8}$/.test(fc)&&lum(fc)>160)};
 const SHOTBW={fill:'FF000000',color:'FFFFFFFF',fontName:'Calibri',center:true};
+/* 5.5.75: ตัวเลือกโฟลเดอร์ที่จับเวลา — หน้าต่างเลือกปิดแล้ว (หน้าเว็บได้โฟกัสกลับ) แต่ Chrome ยังไม่ส่งโฟลเดอร์มาเกิน 6 วินาที → บอกให้ใช้แบบอัปโหลด */
+let SHOTPK=false,SHOTSLOW=false;
+async function shotPick(){let done=false,tm=null;const onF=()=>{if(done)return;clearTimeout(tm);tm=setTimeout(()=>{if(done)return;SHOTSLOW=true;MQN='warn';note='Chrome ยังไม่ส่งโฟลเดอร์ที่เลือกมาให้ระบบ — ไดรฟ์เครือข่ายบางแห่งเปิดแบบนี้ไม่ได้ ใช้ปุ่ม “เลือกแบบอัปโหลดโฟลเดอร์” แทน';view()},6000)};
+ SHOTPK=true;addEventListener('focus',onF);try{return await showDirectoryPicker({id:'pic',mode:'read'})}finally{done=true;SHOTPK=false;clearTimeout(tm);removeEventListener('focus',onF)}}
+/* รายการไฟล์จาก input webkitdirectory → โฟลเดอร์เสมือน (entries / getFile แบบเดียวกับ File System Access) — มีเฉพาะโฟลเดอร์ที่มีรูป */
+function vDir(files){let root=null;const mk=(d,n)=>{let x=d.kids.get(n);if(!x){x={kind:'directory',name:n,kids:new Map()};d.kids.set(n,x)}return x};
+ for(const f of files){const p=String(f.webkitRelativePath||f.name).split('/').filter(Boolean),nm=p[p.length-1];if(p.length<2||!IMGX.test(nm)||nm.startsWith('.'))continue;
+  if(!root)root={kind:'directory',name:p[0],kids:new Map()};let d=root;for(const q of p.slice(1,-1))d=mk(d,q);d.kids.set(nm,{kind:'file',name:nm,getFile:async()=>f})}
+ if(!root)return null;const wrap=d=>{d.entries=async function*(){for(const kv of d.kids)yield kv};d.queryPermission=d.requestPermission=async()=>'granted';d.vdir=true;for(const v of d.kids.values())if(v.kind==='directory')wrap(v);return d};
+ return wrap(root)}
+async function shotRun(d){SHOTSLOW=false;
+  let wt=0;const wprog=async(cnt,nm)=>{const t=performance.now();if(cnt>1&&t-wt<250)return;wt=t;BUSY={t:`กำลังอ่านโฟลเดอร์ใน “${d.name}”`,i:0,n:0,f:nm,cnt};busyPaint();$('.wrap').inert=true;await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)))};
+  await wprog(0,d.name);
+  let R;try{R=await shotScan(d,TC,async(i,n,nm)=>{if(typeof busyStep==='function')await busyStep('กำลังดูรูปในโฟลเดอร์แยกรูป',i,n,nm)},wprog)}catch(e){MQN='warn';note='อ่านโฟลเดอร์ “'+d.name+'” ไม่ได้ ('+errN(e)+') — ไดรฟ์เครือข่ายอาจหลุด ลองกดตรวจอีกครั้ง';return}finally{if(typeof busyDone==='function')busyDone()}
+  SHOT={sig:ckSig(),d,R,done:null};
+  MQN=R.cells&&!(R.has.length+R.diff.length+R.bad.length)?'done':'warn';note=R.cells?(R.n?`ตรวจแล้ว จะใส่วันที่ถ่าย ${R.n.toLocaleString()} ช่อง`:'ตรวจแล้ว ไม่มีช่องที่ต้องใส่'):`ไม่พบจอในใบเช็คที่ตรงกับโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`}
 async function shotScan(root,files,prog,wprog){
  const{S,shut,RF}=await picScreens(root,wprog),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  /* 5.5.73: แพคที่โครงใน Gallary ไม่เหมือน Plan B TV (Digital MRT / The 20 / Air Traveller / Gateway X / Rama 9 — ดู FXP) หาโฟลเดอร์แบบเดียวกับตอนสร้าง:
@@ -4078,7 +4094,7 @@ async function addFiles(kind,files){const arr=[],rb=[];if(kind==='pl')for(const 
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(info.length?` • ข้ามไฟล์ที่ไม่ได้ใช้ ${info.length} ไฟล์`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.74 (20 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.75 (20 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4554,12 +4570,13 @@ const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))retu
  return`<section class="pic" data-tour="tpic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูป รอบ ${rn}</h3>${srcL}${b}</section>`};
 let SHOT=null; /* ใส่วันที่ถ่าย (3.12): {sig, d = โฟลเดอร์แยกรูป, R = ผลตรวจ, done = ไฟล์ที่ใส่แล้ว} */
 const shotFill=()=>{if(!SHOT||!SHOT.R)return[];const M=SHOT.man||{};return[...SHOT.R.fill,...SHOT.R.bad.filter(x=>{const v=M[x.scr+'|'+x.f+'|'+x.rnd];return v==='f'?x.fday>0:v}).map(x=>{const v=M[x.scr+'|'+x.f+'|'+x.rnd];return{...x,day:v==='f'?x.fday:v,man:v==='f'?2:1}})]};
+const shotSlowH=()=>alertHTML('wr','Chrome ยังไม่ส่งโฟลเดอร์ที่เลือกมาให้','<p>ไดรฟ์เครือข่ายบางแห่ง Chrome เปิดแบบเลือกโฟลเดอร์ไม่ได้ กด <b>เลือกแบบอัปโหลดโฟลเดอร์</b> แล้วเลือกโฟลเดอร์เดิม ตอน Chrome ถามให้กด “อัปโหลด” — ระบบอ่านรูปในเครื่องนี้ ไม่ได้ส่งไฟล์ไปไหน</p><p class="hint">แบบอัปโหลด Chrome ต้องนับไฟล์ทุกไฟล์ก่อน เลือกโฟลเดอร์ให้เล็ก เช่น โฟลเดอร์รอบ (11 Nov 2026 16-30) ใน Pic @ Digital MRT • โฟลเดอร์ที่ไม่มีรูปจะไม่เห็น</p>');
 const vShot=()=>{if(!TC.length)return'';if(SHOT&&SHOT.sig!==ckSig())SHOT=null;const R=SHOT&&SHOT.R,D=SHOT&&SHOT.done,FL=shotFill(),NF=FL.length,NS=R&&R.sty?R.sty.length:0,M=(SHOT&&SHOT.man)||{};
  const lst=(A,fx,open)=>{const by=new Map();for(const x of A){const k=x.scr+'|'+x.f;if(!by.has(k))by.set(k,[]);by.get(k).push(x)}
   return`<ul>${[...by.values()].slice(0,150).map(L=>`<li><b>${esc(L[0].scr)}</b> <span class="shm">${esc(L[0].f)}</span> — ${L.length} ช่อง<small>${esc(L.slice(0,8).map(fx).join(' • '))}${L.length>8?' …':''}</small></li>`).join('')}${by.size>150?`<li>… และอีก ${by.size-150} จอ</li>`:''}</ul>`};
  const grp=(t,A,note,fx)=>A.length?`<details class="picd"><summary><b>${t}</b> ${A.length} ช่อง</summary>${note?`<p class="shm">${note}</p>`:''}${lst(A,fx)}</details>`:'';
  let b='';
- if(!R)b=`<p class="hint">ระบบดูรูปในโฟลเดอร์แยกรูปของแต่ละจอ (เดือน → รอบ → ชื่อหนัง) แล้วใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง <b>ช่องที่มีเลขอยู่แล้วไม่เปลี่ยนเลข</b> (ถ้ายังไม่ใช่พื้นดำตัวเลขขาว ระบบแก้สีให้) และบอกเรื่องที่น่าจะลืมใส่หรือใส่ผิด ก่อนใส่จะให้ดูก่อน ระบบไม่แก้รูปหรือโฟลเดอร์</p><div><button class="btn secondary" data-a="shotscan">${IC.folder}ตรวจวันที่ถ่ายจากโฟลเดอร์แยกรูป</button></div>`;
+ if(!R)b=`<p class="hint">ระบบดูรูปในโฟลเดอร์แยกรูปของแต่ละจอ (เดือน → รอบ → ชื่อหนัง) แล้วใส่วันที่ถ่ายจากไฟล์รูปลงช่องหลังชื่อหนังที่ยังว่าง <b>ช่องที่มีเลขอยู่แล้วไม่เปลี่ยนเลข</b> (ถ้ายังไม่ใช่พื้นดำตัวเลขขาว ระบบแก้สีให้) และบอกเรื่องที่น่าจะลืมใส่หรือใส่ผิด ก่อนใส่จะให้ดูก่อน ระบบไม่แก้รูปหรือโฟลเดอร์</p><div><button class="btn secondary" data-a="shotscan">${IC.folder}ตรวจวันที่ถ่ายจากโฟลเดอร์แยกรูป</button><button class="linkb" data-a="shotup">เลือกแบบอัปโหลดโฟลเดอร์</button></div>${SHOTSLOW?shotSlowH():'<p class="hint">ใช้ “เลือกแบบอัปโหลดโฟลเดอร์” เมื่อเลือกโฟลเดอร์บนไดรฟ์เครือข่าย (เช่น N:) แล้วไม่มีอะไรเกิดขึ้น</p>'}`;
  else{const nr=new Set(FL.map(x=>x.scr+'|'+x.f)).size,n1=R.none.filter(x=>x.rnd==='1-15').length,n2=R.none.length-n1;
   const bg=new Map();for(const x of R.bad){const k=x.scr+'|'+x.f+'|'+x.rnd;if(!bg.has(k))bg.set(k,[]);bg.get(k).push(x)}
   const badH=R.bad.length?`<details class="picd" ${Object.keys(M).length?'open':''}><summary><b>มีรูป แต่ใส่วันที่ให้ไม่ได้</b> ${R.bad.length} ช่อง — เลือกวันที่ถ่ายเองได้</summary><p class="shm">เช่น รูปที่ส่งต่อทาง LINE (วันที่ถ่ายหายไป) หรือวันที่ในกล้องผิด เลือกวันที่ถ่ายของจอนั้น แล้วระบบใส่ให้ทุกเรื่องในรายการของจอนั้น • ถ่ายหลายวัน (เช่น บางเรื่องรูปวันที่ 3 บางเรื่องวันที่ 11) เลือก “ตามวันที่ของไฟล์รูป” ระบบใส่วันที่ของไฟล์รูปของแต่ละเรื่อง (เรื่องที่มีรูปหลายวัน ใช้วันล่าสุด)</p><ul>${[...bg].slice(0,150).map(([k,L])=>{const q=L[0],a=q.rnd==='1-15'?1:16,z=q.rnd==='1-15'?q.ld||31:+q.rnd.split('-')[1];return`<li><b>${esc(q.scr)}</b> <span class="shm">${esc(q.f)} • รอบ ${esc(q.rnd)}</span> — ${L.length} ช่อง <label class="picr" style="display:inline-flex;margin-left:6px"><span>วันที่ถ่าย</span><select data-shotman="${esc(k)}" aria-label="วันที่ถ่ายของ ${esc(q.scr)} รอบ ${esc(q.rnd)}"><option value="">— เลือก —</option>${(()=>{const fd=[...new Set(L.map(x=>x.fday).filter(Boolean))].sort((p,q)=>p-q);return fd.length?`<option value="f" ${M[k]==='f'?'selected':''}>ตามวันที่ของไฟล์รูป (${fd.join(' / ')})</option>`:''})()}${Array.from({length:z-a+1},(_,i)=>a+i).map(d=>`<option value="${d}" ${M[k]===d?'selected':''}>${d}</option>`).join('')}</select></label><small>${esc(L.slice(0,6).map(x=>x.nm+': '+x.why).join(' • '))}${L.length>6?' …':''}</small></li>`}).join('')}</ul></details>`:'';
@@ -4572,7 +4589,7 @@ const vShot=()=>{if(!TC.length)return'';if(SHOT&&SHOT.sig!==ckSig())SHOT=null;co
  ${badH}
  ${grp('ยังไม่มีรูป (ช่องยังว่าง)',R.none,`รอบ 1–15: ${n1} ช่อง • รอบ 16–สิ้นเดือน: ${n2} ช่อง`,x=>x.nm+(x.nornd?' (ยังไม่มีโฟลเดอร์รอบ '+x.rnd+')':x.nofold?' (ไม่มีโฟลเดอร์)':''))}
  ${R.miss.length?`<details class="picd"><summary><b>หาโฟลเดอร์จอไม่เจอ</b> ${R.miss.length} จอ</summary><ul>${R.miss.map(x=>`<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>`:''}</div>
- <div class="picb">${D?`<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved?'':CKDIR?`<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>`:`<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved||CKDIR?`<button class="linkb" data-a="shotsave" data-k="pick">${D.saved?'บันทึกไปโฟลเดอร์อื่นด้วย…':'บันทึกลงโฟลเดอร์อื่น…'}</button>`:''}`:NF||NS?`<button class="btn primary" data-a="shotapply">${NF&&NS?`ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง + แก้สี ${NS.toLocaleString()} ช่อง`:NF?`ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค`:`แก้สีช่องวันที่ถ่าย ${NS.toLocaleString()} ช่อง`}</button>`:''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`}
+ <div class="picb">${D?`<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved?'':CKDIR?`<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>`:`<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved||CKDIR?`<button class="linkb" data-a="shotsave" data-k="pick">${D.saved?'บันทึกไปโฟลเดอร์อื่นด้วย…':'บันทึกลงโฟลเดอร์อื่น…'}</button>`:''}`:NF||NS?`<button class="btn primary" data-a="shotapply">${NF&&NS?`ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง + แก้สี ${NS.toLocaleString()} ช่อง`:NF?`ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค`:`แก้สีช่องวันที่ถ่าย ${NS.toLocaleString()} ช่อง`}</button>`:''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button><button class="linkb" data-a="shotup">เลือกแบบอัปโหลดโฟลเดอร์</button></div>${SHOTSLOW?shotSlowH():''}`}
  return`<section class="pic" data-tour="tshot"><h3>${IC.folder}ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป</h3>${b}</section>`};
 const vPicCk=()=>{if(!TC.length)return'';if(PICX&&PICX.sig!==ckSig())PICX=null;if(PICX&&PICX.res.some(r=>r.fold.length))return vPic();
  return`<section class="pic" data-tour="tpic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูปจากใบเช็คนี้</h3><p class="hint">ไม่ต้องใส่ Playlist — ระบบอ่านรายชื่อหนังที่อยู่ในใบเช็คที่ใส่ไว้ (ใบที่เติมแล้ว • ใบเปล่าสร้างได้เฉพาะโฟลเดอร์จอ) แล้วสร้างโฟลเดอร์ที่ยังไม่มีในโฟลเดอร์แยกรูป เลือกรอบและวันที่ได้หลังอ่าน ระบบไม่แก้ใบเช็ค</p>${PICX?alertHTML('wr','ไม่พบรายชื่อหนังในใบเช็คที่ใส่',`<p>${esc(PICX.bad.join(', ')||'ตรวจว่าเป็นใบเช็ครูปที่มีแถบวันที่และรายชื่อหนัง')}</p>`):''}<div><button class="btn secondary" data-a="picck">${IC.folder}อ่านรายชื่อหนังจากใบเช็ค</button></div></section>`};
@@ -5340,16 +5357,17 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   HDB.set('pic',d).catch(()=>{});PICD=d;note='กำลังตรวจโฟลเดอร์แยกรูป …';view();
   const P=await picPlan(d,L.W,L.res,PICR,picUp());L.pic={d,P,made:k==='again'&&L.pic?L.pic.made:null};
   note=P.plan.length?(P.n?`ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์`:'โฟลเดอร์แยกรูปครบแล้ว'):`ไม่พบโฟลเดอร์จอในโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`},
- shotscan:async k=>{if(!TC.length||!FSA)return;let d=k==='again'&&SHOT?SHOT.d:null;
+ shotscan:async k=>{if(!TC.length||!FSA||SHOTPK)return;let d=k==='again'&&SHOT?SHOT.d:null;
   try{if(!d&&k!=='pick'){const x=await HDB.get('pic').catch(()=>null);if(x)d=x}
    if(d&&(await d.queryPermission({mode:'read'}))!=='granted'&&(await d.requestPermission({mode:'read'}))!=='granted')d=null;
-   if(!d){d=await showDirectoryPicker({id:'pic',mode:'read'});HDB.set('pic',d).catch(()=>{})}} /* 5.5.74: งานนี้อ่านรูปอย่างเดียว — ขอสิทธิ์ดูไฟล์ ไม่ขอสิทธิ์แก้ */
-  catch(e){MQN='warn';note=e&&e.name==='AbortError'?'ยังไม่ได้เลือกโฟลเดอร์ — ถ้าเลือกแล้ว Chrome ถามว่าให้ดูไฟล์ได้ไหม ต้องกดอนุญาต (ถ้าไม่ขึ้นหน้าต่างเลือกโฟลเดอร์ กดปุ่มอีกครั้ง)':'เลือกโฟลเดอร์ไม่ได้ ('+errN(e)+') — ลองเลือกโฟลเดอร์ข้างใน เช่น Pic @ … แทนตัวไดรฟ์';return}
-  let wt=0;const wprog=async(cnt,nm)=>{const t=performance.now();if(cnt>1&&t-wt<250)return;wt=t;BUSY={t:`กำลังอ่านโฟลเดอร์ใน “${d.name}”`,i:0,n:0,f:nm,cnt};busyPaint();$('.wrap').inert=true;await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)))};
-  await wprog(0,d.name);
-  let R;try{R=await shotScan(d,TC,async(i,n,nm)=>{if(typeof busyStep==='function')await busyStep('กำลังดูรูปในโฟลเดอร์แยกรูป',i,n,nm)},wprog)}catch(e){MQN='warn';note='อ่านโฟลเดอร์ “'+d.name+'” ไม่ได้ ('+errN(e)+') — ไดรฟ์เครือข่ายอาจหลุด ลองกดตรวจอีกครั้ง';return}finally{if(typeof busyDone==='function')busyDone()}
-  SHOT={sig:ckSig(),d,R,done:null};
-  MQN=R.cells&&!(R.has.length+R.diff.length+R.bad.length)?'done':'warn';note=R.cells?(R.n?`ตรวจแล้ว จะใส่วันที่ถ่าย ${R.n.toLocaleString()} ช่อง`:'ตรวจแล้ว ไม่มีช่องที่ต้องใส่'):`ไม่พบจอในใบเช็คที่ตรงกับโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`},
+   if(!d){d=await shotPick();HDB.set('pic',d).catch(()=>{})}} /* 5.5.74: งานนี้อ่านรูปอย่างเดียว — ขอสิทธิ์ดูไฟล์ ไม่ขอสิทธิ์แก้ */
+  catch(e){MQN='warn';note=e&&e.name==='AbortError'?'ยังไม่ได้เลือกโฟลเดอร์ — ถ้าเลือกแล้ว Chrome ถามว่าให้ดูไฟล์ได้ไหม ต้องกดอนุญาต (ถ้าไม่ขึ้นหน้าต่างเลือกโฟลเดอร์ กดปุ่มอีกครั้ง)':'เลือกโฟลเดอร์ไม่ได้ ('+errN(e)+') — ลองเลือกโฟลเดอร์ข้างใน เช่น Pic @ … แทนตัวไดรฟ์ หรือใช้ “เลือกแบบอัปโหลดโฟลเดอร์”';return}
+  await shotRun(d)},
+ /* 5.5.75: ไดรฟ์เครือข่ายบางแห่ง (เช่น \\172.24.100.82) เลือกแล้ว Chrome ไม่ส่งโฟลเดอร์มา → เลือกแบบอัปโหลดโฟลเดอร์ (input webkitdirectory) อ่านในเบราว์เซอร์ ไม่ได้ส่งไปไหน */
+ shotup:()=>{if(!TC.length||BUSY||FILLING)return;const inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.webkitdirectory=true;
+  inp.addEventListener('change',async()=>{const fs=[...(inp.files||[])];if(!fs.length){MQN='warn';note='ยังไม่ได้เลือกโฟลเดอร์';view();return}
+   const d=vDir(fs);if(!d){MQN='warn';note='โฟลเดอร์ที่เลือกไม่มีไฟล์รูป';view();return}await shotRun(d);view()},{once:true});
+  inp.click();say('เลือกโฟลเดอร์ แล้วกด “อัปโหลด” ตอน Chrome ถาม — ระบบอ่านรูปในเครื่องนี้ ไม่ได้ส่งไฟล์ไปไหน • โฟลเดอร์ใหญ่ Chrome จะนับไฟล์สักพัก')},
  shotapply:async()=>{const FL=shotFill();if(!FL.length&&!(SHOT&&SHOT.R&&SHOT.R.sty&&SHOT.R.sty.length))return;note='กำลังใส่วันที่ถ่าย …';view();const RR={...SHOT.R,fill:FL};
   const out=await shotApply(RR,TC),by=new Map(out.map(x=>[x.name,x]));
   const orig=new Map(TC.filter(f=>by.has(f.name)).map(f=>[f.name,f.buf])),upd=A=>A.map(f=>{const x=by.get(f.name);return x?{...f,buf:x.blob.buffer.slice(x.blob.byteOffset,x.blob.byteOffset+x.blob.byteLength)}:f});
