@@ -455,7 +455,8 @@ function readAll_() {
   return snapLoad_() || snapBuild_(ssOf_());
 }
 
-/** แปลงค่าทั้งแท็บ → {station, screens:[{code, type, n, done, miss:[[ชื่อหนัง, วันขึ้น]]}], newest, films} */
+/** แปลงค่าทั้งแท็บ → {station, screens:[{code, type, n, done, miss:[[ชื่อหนัง, วันขึ้น]]}], newest, films:[[ชื่อหนัง, วันขึ้น, วันออก]]}
+ *  วันออก = เลขในช่อง "ออก …" ของคอลัมน์ A (ระบบลงไว้เมื่อหนังถูกถอดจาก Playlist แล้ว) • 0 = ยังฉายอยู่ */
 function sheetModel_(name, v) {
   const fr = CFG.firstRow - 1, fc = CFG.firstCol - 1, hdr = v[1].slice(fc).filter(x => String(x).trim());
   const screens = hdr.map(h => { const p = String(h).split('\n'); return { code: p[0], type: p[1] || '', n: 0, done: 0, miss: [] }; });
@@ -463,7 +464,8 @@ function sheetModel_(name, v) {
   for (let r = fr; r < v.length; r++) {
     const row = v[r], nm = String(row[1] || '').trim();
     if (!nm) { const m = String(row[0] || '').match(/ขึ้น(?:ใหม่)?\s*(\d+)/); if (m) { add = +m[1]; newest = Math.max(newest, add); if (!first) first = add; } continue; }
-    films.push([nm, add]);
+    const ex = +((String(row[0] || '').match(/ออก\s*(\d+)/) || [])[1] || 0);
+    films.push([nm, add, ex]);
     screens.forEach((s, i) => { const x = row[fc + i]; s.n++; if (isDone_(x)) s.done++; else s.miss.push([nm, add]); });
   }
   return { station: name, screens, newest, first, films };
@@ -483,7 +485,9 @@ function phoneData_(email) {
     updated: (() => { const d = new Date(all.at || Date.now()), f = p => Utilities.formatDate(d, CFG.tz, p); return f('yyyyMMdd') === Utilities.formatDate(new Date(), CFG.tz, 'yyyyMMdd') ? f('HH:mm') : `${f('d')} ${TH_MON[+f('M') - 1]} ${f('HH:mm')}`; })(),
     mrt: avg(allScr.map(pct)), mrtScreens: allScr.length,
     newest, newFilms: newest > first ? newFilms : [],
-    stations: mine.map(s => ({ name: s.station, owner: (all.users[s.station] || {}).owner || '', screens: s.screens })),
+    // nw = สินค้าใหม่ของสถานี (ขึ้นวันล่าสุด) • gone = สินค้าที่ออกไปแล้ว [ชื่อ, วันออก]
+    stations: mine.map(s => ({ name: s.station, owner: (all.users[s.station] || {}).owner || '', screens: s.screens,
+      nw: newest > first ? s.films.filter(f => f[1] === newest).map(f => f[0]) : [], gone: s.films.filter(f => f[2]).map(f => [f[0], f[2]]) })),
   };
 }
 
