@@ -504,7 +504,7 @@ p.hint.tsafe{margin:18px 0 0}
 #tour:not(:empty)~#msg{top:16px;bottom:auto;transform:translate(-50%,-16px)}#tour:not(:empty)~#msg.show{transform:translate(-50%,0)}
 .busy{position:fixed;inset:0;z-index:75;display:grid;place-items:center;padding:16px;background:var(--scrim)}
 .bbox{width:min(460px,100%);display:grid;gap:10px;padding:22px 24px;border-radius:18px;background:var(--sf);color:var(--tx);border:1px solid var(--ln);box-shadow:var(--shadow2)}
-.bbox b{font:600 18px/1.4 var(--f-hd)}.bbox small{color:var(--mu);font-size:13px;overflow-wrap:anywhere}
+.bbox b{font:600 18px/1.4 var(--f-hd)}.bbox small{color:var(--mu);font-size:13px;overflow-wrap:anywhere} .bbox .bxstop{margin-top:4px;justify-self:start;min-width:120px} .bbox small b{font:inherit;font-weight:700;color:var(--tx)}
 .bar{height:8px;border-radius:999px;background:var(--sf3);overflow:hidden}.bar i{display:block;height:100%;border-radius:999px;background:var(--ac);transition:width .2s}
 .pastebox{width:100%;min-height:220px;padding:12px;border:1.5px solid var(--ln2);border-radius:12px;background:var(--sf2);color:var(--tx);font:15px/1.6 var(--f-ui);resize:vertical}
 .pastebox:focus{outline:none;border-color:var(--focus)}
@@ -1368,7 +1368,7 @@ function screen10(ws,sn,cn){const b=nrm(txt10(ws,cn).join(' ')),k=kind10(ws,sn,c
    ช่วงวันที่ 16 ขึ้นไปเลือกได้ (3.10): rs = 'cur' รอบ 16–สิ้นเดือน (ค่าเริ่มต้น) / '1' รอบ 1–15 / 'both' ทั้ง 2 รอบ — รอบ 1–15 ข้ามจอที่ไม่มีหนังรอบนั้น
    upto = เอาหนังที่เริ่ม (แถบวันที่) ไม่เกินวันนี้ของเดือน 0 = ทั้งหมด • upto ก่อนวันที่ 16 ไม่สร้างรอบ 16
    จับคู่จอกับโฟลเดอร์: DGT / ID ดูรหัสหน้าชื่อโฟลเดอร์ • BKJ1_04 / BKJ2_20 ดูเลขจอในหัวคอลัมน์ • METRO_07 ดู 007 • จออื่น (So Bangkok, Twin Tube, The Big Y, BASE) ดูชื่อ ----- */
-const pzFilm=(b,n)=>!((b.jam||b.metro)&&/^#/.test(n)); /* 5.5.63: จอ BKJ / Metro ไม่สร้างโฟลเดอร์แถว # (#BANGKOK JAM_ETA / #EDA / #Traffic MTP … = ข้อมูลจราจร/ข่าว ไม่ใช่หนัง) • #Fast Ads / #Module ยังสร้าง */ const PMON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],PMOD=['#Fast Ads','#Module ขาว','#Module ดำ','#Module สี'], /* 5.5: #Fast Ads ทุกจอ */
+const pzFilm=(b,n,R)=>!(R&&R.t&&(b.jam||b.metro)&&/^#/.test(n)); /* 5.5.63–64: จอ BKJ / Metro รอบ 16–สิ้นเดือน ไม่สร้างโฟลเดอร์แถว # (#BANGKOK JAM_ETA / #EDA / #Traffic MTP …) • รอบ 1–15 ยังสร้างเหมือนเดิม • #Fast Ads / #Module ยังสร้างทุกรอบ */ const PMON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],PMOD=['#Fast Ads','#Module ขาว','#Module ดำ','#Module สี'], /* 5.5: #Fast Ads ทุกจอ */
  p2=n=>String(n).padStart(2,'0'),
  fsafe=n=>String(n).replace(/[<>:"\/\\|?*\u0000-\u001f]/g,'_').replace(/[\s.]+$/,'').trim(),
  isMonD=n=>/^\d{1,2}\s*[A-Za-z]{3}[A-Za-z]*\s*\d{2,4}$/.test(String(n).trim()),
@@ -1544,7 +1544,7 @@ function pzPlan(W,res,rs,upto,X){ /* 5.5.1: X = {S, shut, dir} จากโฟ�
  const T=new Map(),skip=[],closed=[],FXC=fxCtx(res); /* 5.5.30: จำนวนจอต่อสถานี MRT */
  for(const r of res||[])for(const b of r.fold||[]){const pack=pzPack(b);
   if(!pack){skip.push({f:r.name,sn:b.sn,id:b.code?codeOf(b.raw)||b.code:''});continue}
-  const fs=RS.map(R=>[...new Set((b.items||[]).filter(([n,g,,,pre])=>n&&(pre||(R.t?g>=cut:g<cut))&&g<capT&&g>=m0&&g<m1).map(([n])=>String(n).trim()).filter(n=>n&&pzFilm(b,n)))]);
+  const fs=RS.map(R=>[...new Set((b.items||[]).filter(([n,g,,,pre])=>n&&(pre||(R.t?g>=cut:g<cut))&&g<capT&&g>=m0&&g<m1).map(([n])=>String(n).trim()).filter(n=>n&&pzFilm(b,n,R)))]);
   const fk=fxKind(b),Ls=pzScr(b,pack,FXC),T0=X&&!fk?picTg(b,X.S):[];
   for(let[id,key,path,mods]of Ls){let ns='ck';
    if(fk){const I=X&&X.fx&&X.fx[fk],p0=I&&fxPick(fk,0,I.best,path[0]);if(p0){path=[p0,...path.slice(1)];ns='fd'}} /* 5.5.30: แพคใหม่ → ชื่อเดิมในโฟลเดอร์ที่เลือก */
@@ -1596,7 +1596,7 @@ async function picPlan(root, W, res, rs, upto) {
         }
         continue;
       }
-      const fs = RS.map(R => [...new Set((b.items || []).filter(([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1).map(([n]) => String(n).trim()).filter(n => n && pzFilm(b, n)))]);
+      const fs = RS.map(R => [...new Set((b.items || []).filter(([n, g, , , pre]) => n && (pre || (R.t ? g >= cut : g < cut)) && g < capT && g >= m0 && g < m1).map(([n]) => String(n).trim()).filter(n => n && pzFilm(b, n, R)))]);
       for (let [id, k, s] of picTg(b, S)) {
         if (!s) {
           if (k && shut.some(x => sameK(x, k))) { closed.push({ f: r.name, sn: b.sn, id }); continue; }
@@ -1784,7 +1784,8 @@ async function picMake(P) {
    จอ = คอลัมน์ก่อนรหัสจอ DGT / ID (แถว 10–12) และก่อนคอลัมน์ผลวิเคราะห์แรกของแต่ละช่วง (BKJ / Metro / จอที่ไม่มีรหัส) แบบเดียวกับตอนเติม
    หัววันที่ = ตัวเลขแรกในคอลัมน์หน้าชื่อหนัง แถว 14–40 • แถบวันที่ = แถวที่คอลัมน์หน้าชื่อหนังเป็นวันที่ (สูตร =C25 อ่านจากช่องต้นทาง) • หนังใต้แถบ = เริ่มวันนั้น ----- */
 async function chkFold(f){const R=await chkRead(f,{blank:1}),fold=[]; /* 5.5.29: ชีตใบเปล่า (ยังไม่มีรายการหนัง) → จอก็สร้างโฟลเดอร์ได้ (พร้อม #Fast Ads / #Module และแถว # ของจอ) */
- for(const x of R.sheets)for(const b of x.blocks)if(b.items.some(i=>!i[4])||x.blank)fold.push({sn:x.sn,lc:b.lc,items:b.items.filter(i=>!RMK(i[0])).map(i=>[durTail(i[0]),...i.slice(1)]), /* 5.5.31 • 5.5.33 */blank:x.blank?1:0,...picId(x.ws,x.sn,b.lc)});
+ const none=R.sheets.some(x=>x.blocks.length)&&R.sheets.every(x=>x.blank||x.blocks.every(b=>!b.items.some(i=>!i[4]))); /* 5.5.66: ทั้งไฟล์ไม่มีหนังเลย แต่มีแถบวันที่แล้ว (ใบเปล่าแบบเก่า) → ถือเป็นใบเปล่า อ่านจอได้ */
+ for(const x of R.sheets)for(const b of x.blocks)if(b.items.some(i=>!i[4])||x.blank||none)fold.push({sn:x.sn,lc:b.lc,items:b.items.filter(i=>!RMK(i[0])).map(i=>[durTail(i[0]),...(none&&!x.blank?[null,...i.slice(2)]:i.slice(1))]), /* 5.5.31 • 5.5.33 */blank:x.blank||none?1:0,...picId(x.ws,x.sn,b.lc)});
  return{fold,mx:R.mx}}
 async function chkRead(f,o){const sheets=[];let mx=0;
  const wb=XLSX.read(f.buf,{type:'array'}),zip=await JSZip.loadAsync(f.buf.slice(0));
@@ -3666,13 +3667,13 @@ const sdaBk=A=>{const k=sdaKs(A);return k.includes('move')?'สำรองก�
 function sdaBtns(A){const L=sdaL(A);if(A.sv||!L.length)return'';const more=L.length>A.names.length||sdaKs(A).length>1;
  return`${more?`<p class="hint">ยังไม่ได้บันทึก ${L.length} ไฟล์ (${esc(sdaWhat(A))}) — กดบันทึกครั้งเดียวได้ครบทุกขั้น: ${esc(L.join(', '))}</p>`:''}<div class="picb">${FSA?`<button class="btn primary" data-a="sdbsave">${IC.save}บันทึกลงโฟลเดอร์ใบเช็ค${CKDIR?` (${esc(CKDIR.name)})`:''}</button>`:''}<button class="btn ${FSA?'secondary':'primary'}" data-a="sdbdl">${IC.dl}ดาวน์โหลด (.zip)</button>${FSA?'<button class="linkb" data-a="sdbsave" data-k="pick">บันทึกไปโฟลเดอร์อื่น</button>':''}</div>`}
 const sdbKy=(n,c)=>n+'|'+sdbK(c); /* 4.8.1: SDA = ผลเพิ่มจอในใบเช็คของหน้านี้ {done,names,sv} */
-const sdb=()=>{if(SDB===undefined){try{SDB=JSON.parse(store.get('ps_sdb')||'null')}catch(_){SDB=null}if(SDB&&!Array.isArray(SDB.rows))SDB=null}return SDB};
+const sdb=()=>{if(SDB===undefined){try{SDB=JSON.parse(store.get('ps_sdb')||'null')}catch(_){SDB=null}if(SDB&&!Array.isArray(SDB.rows))SDB=null;if(SDB)sdbNat(SDB)}return SDB}; /* 5.5.65: จอแพค Nation เป็นของทีม Nation (ชื่อเล่นซ้ำกับคนในกรุงเทพฯ ได้ เช่น เดฟ) → นับเป็นคน “<ชื่อ> Nation” แยกจากใบเช็คของคนชื่อเดียวกัน */ function sdbNat(D){for(const r of D.rows||[])if(/nation/i.test(r.pk)&&!/nation/i.test(r.w)){r.w=r.w+' Nation';r.p=sdbP(r.w)}return D}
 function sdbRead(buf,name){const wb=XLSX.read(buf,{type:'array'}),ord=[...wb.SheetNames].sort((a,b)=>(/data\s*base/i.test(b)?1:0)-(/data\s*base/i.test(a)?1:0));
  for(const sn of ord){const A=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null,blankrows:false});
   for(let h=0;h<Math.min(8,A.length);h++){const H=(A[h]||[]).map(v=>String(v==null?'':v).trim()),ix=re=>H.findIndex(v=>re.test(v)),cC=ix(/^code$/i),cW=ix(/รับผิดชอบ/);if(cC<0||cW<0)continue;
    const cL=ix(/^location$/i),cP=ix(/new\s*package/i),cF=ix(/^format$/i),cN=ix(/หมายเหตุ/),tx=(R,i)=>i>=0&&R[i]!=null?String(R[i]).trim():'',rows=[];
    for(let i=h+1;i<A.length;i++){const R=A[i]||[],k=sdbK(R[cC]),w=tx(R,cW);if(k&&w&&!/รับผิดชอบ/.test(w))rows.push({c:String(R[cC]).trim(),k,w,p:sdbP(w),pk:tx(R,cP),loc:tx(R,cL),fmt:tx(R,cF),nt:tx(R,cN)})}
-   if(rows.length>=10){const dm=String(name||'').match(/(\d{1,2})[-_.](\d{1,2})[-_.](\d{2,4})/);return{name:String(name||''),sn,date:dm?dm[1]+'-'+dm[2]+'-'+dm[3]:'',at:Date.now(),rows}}}}
+   if(rows.length>=10){const dm=String(name||'').match(/(\d{1,2})[-_.](\d{1,2})[-_.](\d{2,4})/);return sdbNat({name:String(name||''),sn,date:dm?dm[1]+'-'+dm[2]+'-'+dm[3]:'',at:Date.now(),rows})}}}
  return null}
 function sdbCheck(files){const D=sdb();if(!D)return null;const own=new Map(),byP=new Map();
  for(const r of D.rows){if(!own.has(r.k))own.set(r.k,r);const L=byP.get(r.p)||byP.set(r.p,[]).get(r.p);if(!L.some(x=>x.k===r.k))L.push(r)}
@@ -4003,22 +4004,22 @@ const PLW={src:null};
 function plwSrc(){if(PLW.src!==null)return PLW.src;let u='';try{const sc=[...document.scripts].map(x=>x.textContent||''),xs=sc.find(t=>/^\/\*! xlsx\.js/.test(t)),jz=sc.find(t=>/JSZip v\d/.test(t.slice(0,200)));
   if(xs&&jz&&typeof Worker==='function'&&typeof Blob==='function'&&typeof DecompressionStream==='function')u=URL.createObjectURL(new Blob([xs,'\n;',jz,'\n;const EMPTYC=',String(EMPTYC),',WSX=',String(WSX),',FORMC=',String(FORMC),',ROWC=',String(ROWC),',HELPSH=',String(HELPSH),';\n',String(slimXlsx),
    '\nonmessage=async e=>{const{id,buf}=e.data;try{const s=await slimXlsx(buf),wb=XLSX.read(s,{type:"array"});postMessage({id,buf:s,wb},[s])}catch(err){postMessage({id,err:String(err&&err.message||err)})}};'],{type:'text/javascript'}))}catch(_){u=''}return PLW.src=u}
-function plwRead(arr){const M=new Map(),todo=arr.filter(f=>!/Metro.*LED/i.test(f.name)),src=todo.length>=3?plwSrc():'';if(!src)return M;
+const plBuf=async x=>x.buf||(x.buf=await x.file.arrayBuffer()); let PLSTOP=false; /* 5.5.67: Playlist อ่านทีละไฟล์ • PLSTOP = กดยกเลิกระหว่างอ่าน */ function plwRead(arr){const M=new Map(),todo=arr.filter(f=>!/Metro.*LED/i.test(f.name)),src=todo.length>=3?plwSrc():'';if(!src)return M;
  const n=Math.min(4,todo.length,Math.max(2,(navigator.hardwareConcurrency||2)-1)),ws=[];try{for(let i=0;i<n;i++)ws.push(new Worker(src))}catch(_){ws.forEach(w=>w.terminate());return M}
- const res=[],q=todo.map((f,i)=>i);let left=todo.length,dead=false;todo.forEach((f,i)=>M.set(f,new Promise(r=>res[i]=r)));
+ const res=[],q=todo.map((f,i)=>i);let left=todo.length,dead=false,ahead=0;const idle=[],LIM=n+4;todo.forEach((f,i)=>M.set(f,new Promise(r=>res[i]=r))); /* 5.5.67: อ่านไฟล์ตอนส่งให้ worker และอ่านล่วงหน้าไม่เกิน LIM ไฟล์ (Playlist ทั้งเดือนไม่ต้องอยู่ในหน่วยความจำพร้อมกัน) */
  const stop=()=>{if(dead)return;dead=true;ws.forEach(w=>w.terminate());res.forEach(r=>r(null))}; /* พัง → ไฟล์ที่ยังไม่เสร็จอ่านแบบเดิม */
- const next=w=>{if(dead)return;const i=q.shift();if(i==null)return;let c;try{c=todo[i].buf.slice(0)}catch(_){res[i](null);left--;return next(w)}w.postMessage({id:i,buf:c},[c])};
+ const next=async w=>{if(dead)return;if(ahead>=LIM){idle.push(w);return}const i=q.shift();if(i==null)return;ahead++;let c;try{c=(await plBuf(todo[i])).slice(0);if(todo[i].file)todo[i].buf=null}catch(_){res[i](null);left--;ahead--;return next(w)}if(dead)return;w.postMessage({id:i,buf:c},[c])};  M.free=()=>{ahead--;if(idle.length&&!dead)next(idle.shift())};M.stop=stop;
  for(const w of ws){w.onmessage=e=>{const d=e.data;res[d.id](d.err?null:{name:todo[d.id].name,buf:d.buf,wb:d.wb});if(--left<=0){dead=true;ws.forEach(x=>x.terminate())}else next(w)};w.onerror=ev=>{try{ev.preventDefault()}catch(_){}stop()};next(w)}
  return M}
-async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try{arr.push({name:f.name,buf:await f.arrayBuffer()})}catch(_){rb.push(f.name)}} /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
+async function addFiles(kind,files){const arr=[],rb=[];if(kind==='pl')for(const f of files)arr.push({name:f.name,file:f,buf:null}); /* 5.5.67: Playlist อ่านทีละไฟล์ในลูป (แถบขยับตั้งแต่ไฟล์แรก) */ else for(const f of files){try{arr.push({name:f.name,buf:await f.arrayBuffer()})}catch(_){rb.push(f.name)}} /* 5.3.1: ไฟล์ที่เปิดไม่ได้ ไม่ทำให้หยุดเงียบ */
  if(rb.length){say(`เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')} — ถ้าลากจากในไฟล์ .zip ที่เปิดดูใน Windows ให้ลากไฟล์ .zip มาทั้งไฟล์ หรือแตกไฟล์ก่อน`);if(!arr.length)return view()}
  if(kind==='ck'){C.push(...arr);MQN='catchck';note=`เพิ่มใบเช็ครูป ${arr.length} ไฟล์`;return view()}
  if(kind==='pj'){PLI=[];try{const o=JSON.parse(new TextDecoder().decode(arr[0].buf));PFS=[];if(Array.isArray(o)){DB=o;PLD=null;PLM={}}else{DB=o.DB||[];PLD=plDate()||(o.PLD?new Date(o.PLD):null)}note='เปิดโปรเจกต์แล้ว';}catch(e){note='ไฟล์โปรเจกต์ไม่ถูกต้อง'}return view()}
  note='กำลังอ่าน Playlist …';view();await new Promise(r=>setTimeout(r,30));let n=0,skip=[],info=[];
- const ok=[],emp=[],got=[],PW=plwRead(arr);let _i=0;for(const f of arr){_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name);let p;try{const g=PW.has(f)?await PW.get(f):null;p=parsePlaylist(/Metro.*LED/i.test(f.name)?f:g||{name:f.name,buf:await slimXlsx(f.buf)})}catch(e){p=null}PLX=PLX.filter(x=>x.f!==f.name);PLI=PLI.filter(x=>x.f!==f.name);if(p&&p.why){(p.info?info:skip).push(f.name);PLX.push({f:f.name,why:p.why,info:p.info});continue}if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
+ const ok=[],emp=[],got=[],PW=plwRead(arr),PLX0=PLX.slice(),PLI0=PLI.slice(),t0=performance.now();let _i=0;PLSTOP=false;for(const f of arr){if(PLSTOP)break;_i++;if(typeof busyStep==='function')await busyStep('กำลังอ่าน Playlist',_i,arr.length,f.name,t0);let p;try{const inW=PW.has(f),g=inW?await PW.get(f):null;if(inW&&PW.free)PW.free();if(PLSTOP)break;if(!g){try{await plBuf(f)}catch(_){rb.push(f.name);continue}}p=parsePlaylist(/Metro.*LED/i.test(f.name)?f:g||{name:f.name,buf:await slimXlsx(f.buf)})}catch(e){p=null}if(f.file)f.buf=null;PLX=PLX.filter(x=>x.f!==f.name);PLI=PLI.filter(x=>x.f!==f.name);if(p&&p.why){(p.info?info:skip).push(f.name);PLX.push({f:f.name,why:p.why,info:p.info});continue}if(!p){skip.push(f.name);PLX.push({f:f.name,why:'ไม่รู้จักรูปแบบไฟล์ (ไม่ใช่ สรุปรายการหนังแยกจอ / Signature Max / Show DC / BKJ / Metro LED)'});continue}
   if(!p.some(s=>s.rows.some(r=>!r.off))){emp.push(f.name);PLX.push({f:f.name,why:'อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) — ใช้ข้อมูลเดิมไว้ก่อน'});continue} /* อ่านได้แต่ไม่มีรายการหนังเลย → ไม่ลบข้อมูลเดิม */
   const fd0=p.dt||fullNameDate(f.name)||dataDate(p)||nameDate(f.name,autoBase());for(const x of p){x.pf=f.name;x.pd=fd0?+fd0:0}let I2=[];{const I=p.iss||[];plCheck(p,I);I2=I.map(x=>({f:f.name,...x}));PLI.push(...I2)}got.push({f,p,d:fd0?+fd0:0,I:I2})}
- got.sort((a,b)=>a.d-b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
+ if(PLSTOP){if(PW.stop)PW.stop();PLSTOP=false;PLX=PLX0;PLI=PLI0;MQN='warn';note=`ยกเลิกแล้ว — ยังไม่ได้นำเข้า Playlist ชุดนี้ (อ่านไป ${_i} จาก ${arr.length} ไฟล์)`;if(typeof busyDone==='function')busyDone();return view()} /* 5.5.67: ยกเลิก → ไม่นำเข้าอะไรจากชุดนี้ */  if(kind==='pl'&&rb.length)say(`เปิดไฟล์ไม่ได้ ${rb.length} ไฟล์: ${rb.join(', ')}`);  got.sort((a,b)=>a.d-b.d); /* โยนไฟล์หลายวันพร้อมกัน → จอเดียวกันใช้ไฟล์ของวันล่าสุด */
  {const kk=g=>new Set(g.p.map(x=>x.m+'|'+x.c)),rv=g=>g.f.name.replace(/\.[^.]+$/,'').length,ov=(a,b)=>{const A=kk(a),B=kk(b);return A.size===B.size&&[...A].every(k=>B.has(k))}; /* จอชุดเดียวกันทั้งไฟล์เท่านั้น (ไฟล์ NTW แต่ละแพ็กที่มีจอบางจอซ้ำกันไม่นับ) */
   for(let i=0;i<got.length;i++)for(let j=i+1;j<got.length&&got[j].d===got[i].d;j++)if(got[i].d&&got[i].f.name!==got[j].f.name&&ov(got[i],got[j])){if(rv(got[i])>rv(got[j]))[got[i],got[j]]=[got[j],got[i]];
    const w=got[j],x={f:w.f.name,lv:'info',t:`มีไฟล์วันเดียวกันของจอชุดเดียวกัน 2 ไฟล์ — ระบบใช้ไฟล์นี้ ${rv(w)>rv(got[i])?'(ชื่อมีข้อความต่อท้าย ถือเป็นฉบับแก้ไข) ':''}แทน “${got[i].f.name}” • ถ้าไม่ถูก ให้เอาไฟล์ที่ไม่ใช้ออกแล้วโยนใหม่`};w.I.push(x);PLI.push(x)}} /* 4.4.1 */
@@ -4032,7 +4033,7 @@ async function addFiles(kind,files){const arr=[],rb=[];for(const f of files){try
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(info.length?` • ข้ามไฟล์ที่ไม่ได้ใช้ ${info.length} ไฟล์`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.62 (18 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.67 (19 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4203,7 +4204,7 @@ const alertHTML=(k,t,body)=>`<div class="alert ${k}" role="${k==='er'?'alert':'s
 const rndHTML=wd=>{const pr=per(wd),c=shownCol(pr.two?2:1);return`<span class="rnd"><i style="background:${swHex(c)}">${end(wd)}</i>${pr.two?(OP.r2==='new'?`รอบ 16–${pr.E.getUTCDate()} ${TH[pr.E.getUTCMonth()]} เริ่มรายการใหม่ ต่อท้ายรอบ 1–15 ในชีตเดิม`:`วันที่ 16–${pr.E.getUTCDate()} ${TH[pr.E.getUTCMonth()]} ทำต่อในรายการเดิม (แถบวันที่สีรอบ 2)`):`รอบ 1–15 ${TH[pr.E.getUTCMonth()]}`}${effCol(pr.two?2:1)?'':' (สีตามชีต)'}</span>`};
 const vBusy=()=>BUSY?`<div class="busy" role="status" aria-live="polite"><div class="bbox${mqOn()?' mqb':''}">${mqOn()?`<span class="mq" aria-hidden="true">${mqPic('scan')}</span>`:''}<div class="bin">${vBusyIn()}</div></div></div>`:'';
 function busyDone(){if(BUSY&&!FILLING){BUSY=null;$('.wrap').inert=false}}
-async function busyStep(t,i,n,f){BUSY={t,i,n,f};busyPaint();$('.wrap').inert=true;await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)))}
+async function busyStep(t,i,n,f,t0){BUSY={t,i,n,f,t0,stop:!!t0&&n>=20};busyPaint();$('.wrap').inert=true;await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)))}
 
 /* ----- ขั้นที่ 1 ----- */
 /* 4.3: Playlist หลายวัน — รายการวัน แบบที่ขาด และวันที่ขาดไป */
@@ -4531,7 +4532,7 @@ const vShot=()=>{if(!TC.length)return'';if(SHOT&&SHOT.sig!==ckSig())SHOT=null;co
 const vPicCk=()=>{if(!TC.length)return'';if(PICX&&PICX.sig!==ckSig())PICX=null;if(PICX&&PICX.res.some(r=>r.fold.length))return vPic();
  return`<section class="pic" data-tour="tpic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูปจากใบเช็คนี้</h3><p class="hint">ไม่ต้องใส่ Playlist — ระบบอ่านรายชื่อหนังที่อยู่ในใบเช็คที่ใส่ไว้ (ใบที่เติมแล้ว • ใบเปล่าสร้างได้เฉพาะโฟลเดอร์จอ) แล้วสร้างโฟลเดอร์ที่ยังไม่มีในโฟลเดอร์แยกรูป เลือกรอบและวันที่ได้หลังอ่าน ระบบไม่แก้ใบเช็ค</p>${PICX?alertHTML('wr','ไม่พบรายชื่อหนังในใบเช็คที่ใส่',`<p>${esc(PICX.bad.join(', ')||'ตรวจว่าเป็นใบเช็ครูปที่มีแถบวันที่และรายชื่อหนัง')}</p>`):''}<div><button class="btn secondary" data-a="picck">${IC.folder}อ่านรายชื่อหนังจากใบเช็ค</button></div></section>`};
 const cHl=(a,b)=>{const B=new Set(String(b).split(/\s+/));return String(a).split(/(\s+)/).map(t=>!t.trim()||B.has(t)?esc(t):`<mark>${esc(t)}</mark>`).join('')}; /* คำที่ไม่มีในอีกชื่อ = ส่วนที่ต่าง */
-const vCmp=()=>{const L=PICX;if(!L||!L.res.some(r=>(r.fold||[]).some(b=>CPN[b.media])))return L&&L.res.length?`<section class="pic cmp" data-tour="tcmp"><h3>${IC.folder}ตรวจโฟลเดอร์เทียบจอ Plan B TV BKK</h3><p class="hint">ไม่มีจอ Plan B TV (40 / 80 / CITY / Spare) ในใบเช็คชุดนี้</p></section>`:'';const c=L.cmp,R=c&&c.R;let b='';
+const vCmp=()=>{const L=PICX;if(!L||!L.res.some(r=>(r.fold||[]).some(b=>CPN[b.media])))return L?`<section class="pic cmp" data-tour="tcmp"><h3>${IC.folder}ตรวจโฟลเดอร์เทียบจอ Plan B TV BKK</h3><p class="hint">${L.res.length?'ไม่มีจอ Plan B TV (40 / 80 / CITY / Spare) ในใบเช็คชุดนี้':'อ่านจอจากใบเช็คที่เลือกไม่ได้'}${(L.bad||[]).length?` • อ่านไม่ได้ ${L.bad.length} ไฟล์: ${L.bad.map(esc).join(', ')}`:''}</p></section>`:'';const c=L.cmp,R=c&&c.R;let b='';
  const btn=`<div class="picb"><button class="btn secondary" data-a="cmpscan" data-k="again">ตรวจอีกครั้ง</button>${R&&!R.err?'<button class="btn quiet" data-a="cmpcopy">คัดลอกผลตรวจ</button>':''}<button class="linkb" data-a="cmpscan" data-k="pick">เลือกโฟลเดอร์อื่น</button></div>`;
  if(!FSA)b='<p class="hint">ปุ่มนี้ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์</p>';
  else if(!R)b=`<p class="hint">ตรวจว่าจอในใบเช็คอยู่ในโฟลเดอร์แพคที่ถูกต้องไหม เช่น จอในชีต 80 RED ต้องมีโฟลเดอร์อยู่ใน Plan B TV 80 RED • ระบบดูอย่างเดียว ไม่ย้ายหรือแก้อะไรในเครื่อง</p><div><button class="btn secondary" data-a="cmpscan">${IC.folder}เลือกโฟลเดอร์เทียบจอแล้วตรวจ</button></div><p class="hint">ครั้งแรกให้เลือกโฟลเดอร์ “เทียบจอ Plan B TV BKK” (ที่มีโฟลเดอร์รอบ เช่น 10 Oct 16-31 อยู่ข้างใน) ครั้งต่อไประบบจำไว้</p>`;
@@ -4601,7 +4602,7 @@ function mqShow(pose,text){text=mqKrub(text);const d=$('#mq');if(!d)return;clear
 IC.bot='<svg viewBox="0 0 24 24"><rect x="4.5" y="8" width="15" height="11" rx="4.5"/><path d="M12 8V5.5M9.5 13h.01M14.5 13h.01M10 16c1.2.8 2.8.8 4 0"/><circle cx="12" cy="4.5" r="1"/></svg>';
 IC.cam='<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="4"/></svg>';
 IC.cmpi='<svg viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7zM7 9h1M16 9h1"/></svg>';
-const vBusyIn=()=>`<b>${BUSY.i?`${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์`:`${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round(100*Math.max(0,BUSY.i-1)/Math.max(1,BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small><small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>`;
+const busyLeft=()=>{if(!BUSY.t0||BUSY.i<4)return'';const s=Math.round((performance.now()-BUSY.t0)/(BUSY.i-1)*(BUSY.n-BUSY.i+1)/1000);return s<5?'':s<90?`เหลือประมาณ ${s} วินาที`:`เหลือประมาณ ${Math.round(s/60)} นาที`}; /* 5.5.67 */ const vBusyIn=()=>`<b>${BUSY.i?`${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์`:`${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round(100*Math.max(0,BUSY.i-1)/Math.max(1,BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft()?`<small><b>${busyLeft()}</b></small>`:''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop?'<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>':''}`;
 /* วาดกล่องรอ: ถ้ามีกล่องอยู่แล้วเปลี่ยนเฉพาะข้อความ น้องโฟกัสจะได้ขยับต่อเนื่อง ไม่เริ่มใหม่ทุกไฟล์ */
 function busyPaint(){const b=$('#busy');if(!b)return;if(!BUSY){if(b.innerHTML)b.innerHTML='';return}
  const bi=b.querySelector('.bin');if(bi&&!!b.querySelector('.bbox .mq')===mqOn())bi.innerHTML=vBusyIn();else b.innerHTML=vBusy()}
@@ -4688,7 +4689,7 @@ function tcStat(){if(PICX&&PICX.sig!==ckSig())PICX=null;if(SHOT&&SHOT.sig!==ckSi
  const shot=!R?['mu','—','','ยังไม่ได้ตรวจวันที่ถ่าย']
   :D?[D.saved?'ok':'wr',D.n.toLocaleString(),'ช่องที่ใส่แล้ว',D.saved&&D.sv?`บันทึกลงโฟลเดอร์ “${esc(D.sv.dir)}” แล้ว`:'ยังไม่ได้บันทึก — ดาวน์โหลด หรือบันทึกลงโฟลเดอร์ใบเช็ค']
   :[NF?'wr':'ok',NF.toLocaleString(),'ช่องที่จะใส่',nIss?`ควรดูอีก ${nIss.toLocaleString()} ช่อง`:'ไม่มีช่องที่ต้องดูเพิ่ม'];
- const cmp=!hasCP?['mu','—','','ไม่มีจอ Plan B TV ในใบเช็คชุดนี้']
+ const cmp=!hasCP?['mu','—','',L&&!L.res.length?'อ่านจอจากใบเช็คไม่ได้':'ไม่มีจอ Plan B TV ในใบเช็คชุดนี้']
   :!CR?['mu','—','','ยังไม่ได้ตรวจ']
   :CR.err?['er','!','','ไม่พบโฟลเดอร์รอบในโฟลเดอร์ที่เลือก']
   :CR.n?['er',CR.n.toLocaleString(),'เรื่องที่ต้องแก้',`รอบ “${esc(CR.rdn)}”`]
@@ -5377,6 +5378,7 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
   A.sv={dir:d.name,day,bk:sdaBk(A)};MQN='party';note=`บันทึกใบเช็คที่${sdaWhat(A)}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${d.name}”`},
  sdbclear:()=>{if(!confirm('ลบฐานข้อมูลจอออกจากเครื่องนี้? (ใส่ใหม่ได้ตลอด)'))return;SDB=null;SDQ=null;if(BLK){BLK.plan=null;BLK.mplan=null}store.set('ps_sdb','');note='ลบฐานข้อมูลจอแล้ว'},
+ plstop:()=>{PLSTOP=true;if(BUSY){BUSY.f='กำลังยกเลิก …';busyPaint()}},
  toolv:k=>{if(!['pic','shot','cmp','blank','sdb'].includes(k))return;TOOLV=k;if(k==='sdb')(sdb()?sdbRun():anaRun()).then(()=>view(),()=>view());setTimeout(()=>{const d=$('#tdetail');if(d)d.scrollIntoView({behavior:'smooth',block:'start'})},60)},
  mqx:()=>{clearTimeout(MQT);const d=$('#mq');if(d)d.innerHTML=''},
  mqtoggle:()=>{const on=!mqOn();store.set('ps_mascot',on?'on':'off');clearTimeout(MQT);const d=$('#mq');if(d)d.innerHTML='';if(on){MQN='idle';note='สวัสดีครับ! น้องโฟกัสจะโผล่มาบอกตอนรับไฟล์ ตอนทำงานเสร็จ และตอนมีเรื่องต้องดู'}else note='ปิดผู้ช่วยแล้ว กดปุ่มหน้ายิ้มมุมขวาบนเพื่อเปิดอีกครั้ง'},

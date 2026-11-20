@@ -170,6 +170,7 @@
  *   เวอร์ชัน 5.5.65: จอแพค Nation ในฐานข้อมูลจอ = คน … Nation
  *   เวอร์ชัน 5.5.66: ใบเปล่าที่มีแถบวันที่แล้ว อ่านจอได้
  *   เวอร์ชัน 5.5.67: อ่าน Playlist ทีละไฟล์ + เวลาที่เหลือ + ยกเลิก
+ *   เวอร์ชัน 5.5.68: เส้นตารางใต้แถบวันที่สุดท้ายไม่หาย
  * ======================================================================
  */
 
@@ -308,9 +309,25 @@ class Sheet {
   }
   setS(col, n, s) {
     const c = this.cell(col, n);
+    if (s == null) s = this.defS(col, n);
     if (s != null) c.setAttribute('s', s);
     else c.removeAttribute('s');
   }
+  defS(col, n) {
+    const R = this.row(n, false);
+    if (R && R.getAttribute('customFormat') === '1' && R.getAttribute('s') != null)
+      return R.getAttribute('s');
+    if (!this._cs) {
+      this._cs = [];
+      for (const e of this.doc.getElementsByTagNameNS(NS, 'col')) {
+        const st = e.getAttribute('style');
+        if (st == null || st === '0') continue;
+        for (let i = +e.getAttribute('min'); i <= +e.getAttribute('max'); i++) this._cs[i] = st;
+      }
+    }
+    const v = this._cs[col2n(col)];
+    return v == null ? null : v;
+  } /* 5.5.68: ช่องว่างที่ไม่มีแบบของตัวเอง ใช้แบบของคอลัมน์ / แถว (เหมือนที่ Excel แสดงก่อนเติม) — กันเส้นตารางใต้แถบวันที่สุดท้ายหาย เมื่อชีตตีเส้นตารางไว้ที่ทั้งคอลัมน์ */
   setNum(col, n, v) {
     const c = this.cell(col, n);
     while (c.firstChild) c.removeChild(c.firstChild);
@@ -2102,8 +2119,15 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         const L = (c.getAttribute('r') || '').match(/[A-Z]+/);
         if (!L || !cols.has(L[0])) continue;
         const st = c.getAttribute('s');
-        if (st == null && !c.firstChild) continue;
-        c.setAttribute('s', ST.derive(st || 0, 'calibri', { fontName: 'Calibri' }));
+        if (st == null && !c.firstChild) {
+          const d = r > cur ? sh.defS(L[0], r) : null;
+          if (d != null) c.setAttribute('s', d);
+          continue;
+        }
+        /* 5.5.68: ช่องว่างใต้แถบสุดท้ายที่เวอร์ชันก่อนทำเส้นหาย → คืนแบบของคอลัมน์ */ c.setAttribute(
+          's',
+          ST.derive(st || 0, 'calibri', { fontName: 'Calibri' }),
+        );
       }
     }
   } /* 5.5.18: ฟอนต์ Calibri ทุกใบตอนเติม */
@@ -11389,7 +11413,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.67 (19 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.68 (20 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
