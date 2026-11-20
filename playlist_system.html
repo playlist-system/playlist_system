@@ -1845,7 +1845,9 @@ const shotOk=(ST,st)=>{if(!ST||st==null)return false;const d=ST.doc,g=n=>d.getEl
  const fc=ST.fcOf(st);return fc==='T0'||fc==='T2'||(/^[0-9A-F]{6,8}$/.test(fc)&&lum(fc)>160)};
 const SHOTBW={fill:'FF000000',color:'FFFFFFFF',fontName:'Calibri',center:true};
 /* 5.5.75: ตัวเลือกโฟลเดอร์ที่จับเวลา — หน้าต่างเลือกปิดแล้ว (หน้าเว็บได้โฟกัสกลับ) แต่ Chrome ยังไม่ส่งโฟลเดอร์มาเกิน 6 วินาที → บอกให้ใช้แบบอัปโหลด */
-let SHOTPK=false,SHOTSLOW=false;
+let SHOTPK=false,SHOTSLOW=false,SHOTUP=false;
+/* 5.5.76: Chrome เปิดหน้าต่างเลือกไฟล์ได้ทีละอัน — ถ้าโฟลเดอร์ที่เลือกก่อนหน้า (ไดรฟ์เครือข่าย) ยังเปิดไม่เสร็จ ปุ่มเลือกไฟล์อื่นจะกดไม่ขึ้น → บอกเหตุแทนการเงียบ */
+const pkStuck=()=>SHOTPK||SHOTUP?'Chrome ยังเปิดโฟลเดอร์ที่เลือกไว้ก่อนหน้านี้ไม่เสร็จ (ไดรฟ์เครือข่ายอ่านช้า) — ระหว่างนี้ Chrome จะไม่เปิดหน้าต่างเลือกไฟล์อื่น รอสักครู่ หรือกด F5 โหลดหน้าใหม่ แล้วเลือกโฟลเดอร์ที่เล็กลง':'';
 async function shotPick(){let done=false,tm=null;const onF=()=>{if(done)return;clearTimeout(tm);tm=setTimeout(()=>{if(done)return;SHOTSLOW=true;MQN='warn';note='Chrome ยังไม่ส่งโฟลเดอร์ที่เลือกมาให้ระบบ — ไดรฟ์เครือข่ายบางแห่งเปิดแบบนี้ไม่ได้ ใช้ปุ่ม “เลือกแบบอัปโหลดโฟลเดอร์” แทน';view()},6000)};
  SHOTPK=true;addEventListener('focus',onF);try{return await showDirectoryPicker({id:'pic',mode:'read'})}finally{done=true;SHOTPK=false;clearTimeout(tm);removeEventListener('focus',onF)}}
 /* รายการไฟล์จาก input webkitdirectory → โฟลเดอร์เสมือน (entries / getFile แบบเดียวกับ File System Access) — มีเฉพาะโฟลเดอร์ที่มีรูป */
@@ -4094,7 +4096,7 @@ async function addFiles(kind,files){const arr=[],rb=[];if(kind==='pl')for(const 
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(info.length?` • ข้ามไฟล์ที่ไม่ได้ใช้ ${info.length} ไฟล์`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.75 (20 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.76 (20 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4570,7 +4572,7 @@ const vPic=()=>{const L=picS();if(!L||!L.res.some(r=>r.fold&&r.fold.length))retu
  return`<section class="pic" data-tour="tpic"><h3>${IC.folder}สร้างโฟลเดอร์แยกรูป รอบ ${rn}</h3>${srcL}${b}</section>`};
 let SHOT=null; /* ใส่วันที่ถ่าย (3.12): {sig, d = โฟลเดอร์แยกรูป, R = ผลตรวจ, done = ไฟล์ที่ใส่แล้ว} */
 const shotFill=()=>{if(!SHOT||!SHOT.R)return[];const M=SHOT.man||{};return[...SHOT.R.fill,...SHOT.R.bad.filter(x=>{const v=M[x.scr+'|'+x.f+'|'+x.rnd];return v==='f'?x.fday>0:v}).map(x=>{const v=M[x.scr+'|'+x.f+'|'+x.rnd];return{...x,day:v==='f'?x.fday:v,man:v==='f'?2:1}})]};
-const shotSlowH=()=>alertHTML('wr','Chrome ยังไม่ส่งโฟลเดอร์ที่เลือกมาให้','<p>ไดรฟ์เครือข่ายบางแห่ง Chrome เปิดแบบเลือกโฟลเดอร์ไม่ได้ กด <b>เลือกแบบอัปโหลดโฟลเดอร์</b> แล้วเลือกโฟลเดอร์เดิม ตอน Chrome ถามให้กด “อัปโหลด” — ระบบอ่านรูปในเครื่องนี้ ไม่ได้ส่งไฟล์ไปไหน</p><p class="hint">แบบอัปโหลด Chrome ต้องนับไฟล์ทุกไฟล์ก่อน เลือกโฟลเดอร์ให้เล็ก เช่น โฟลเดอร์รอบ (11 Nov 2026 16-30) ใน Pic @ Digital MRT • โฟลเดอร์ที่ไม่มีรูปจะไม่เห็น</p>');
+const shotSlowH=()=>alertHTML('wr','Chrome ยังไม่ส่งโฟลเดอร์ที่เลือกมาให้','<p>ไดรฟ์เครือข่ายบางแห่ง Chrome เปิดแบบเลือกโฟลเดอร์ไม่ได้ กด <b>เลือกแบบอัปโหลดโฟลเดอร์</b> แล้วเลือกโฟลเดอร์เดิม ตอน Chrome ถามให้กด “อัปโหลด” — ระบบอ่านรูปในเครื่องนี้ ไม่ได้ส่งไฟล์ไปไหน</p><p>ระหว่างที่ Chrome ค้าง ปุ่มเลือกไฟล์อื่น (เช่น ช่องลากใบเช็ค) จะกดไม่ขึ้น — ถ้าเป็นแบบนั้น กด <b>F5</b> โหลดหน้าใหม่ก่อน</p><p class="hint">แบบอัปโหลด Chrome ต้องนับไฟล์ทุกไฟล์ก่อน เลือกโฟลเดอร์ให้เล็ก เช่น โฟลเดอร์รอบ (11 Nov 2026 16-30) ใน Pic @ Digital MRT • โฟลเดอร์ที่ไม่มีรูปจะไม่เห็น</p>');
 const vShot=()=>{if(!TC.length)return'';if(SHOT&&SHOT.sig!==ckSig())SHOT=null;const R=SHOT&&SHOT.R,D=SHOT&&SHOT.done,FL=shotFill(),NF=FL.length,NS=R&&R.sty?R.sty.length:0,M=(SHOT&&SHOT.man)||{};
  const lst=(A,fx,open)=>{const by=new Map();for(const x of A){const k=x.scr+'|'+x.f;if(!by.has(k))by.set(k,[]);by.get(k).push(x)}
   return`<ul>${[...by.values()].slice(0,150).map(L=>`<li><b>${esc(L[0].scr)}</b> <span class="shm">${esc(L[0].f)}</span> — ${L.length} ช่อง<small>${esc(L.slice(0,8).map(fx).join(' • '))}${L.length>8?' …':''}</small></li>`).join('')}${by.size>150?`<li>… และอีก ${by.size-150} จอ</li>`:''}</ul>`};
@@ -5322,7 +5324,7 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   say(`กำลังส่งใบเช็ค MRT ${fs.length} ไฟล์เข้า Google Sheets … หน้าต่างใหม่จะเปิดแล้วปิดเอง`)},
  mrtset:()=>{MRTSET=!MRTSET;if(MRTSET)FOCUSSEL='#mrturl'},
  mrtsave:()=>{const v=(($('#mrturl')||{}).value||'').trim();if(!/^https:\/\/script\.google\.com\/\S+\/exec$/.test(v)){MQN='warn';note='ลิงก์ไม่ถูกต้อง — ใช้ลิงก์หน้ามือถือ MRT ที่ขึ้นต้นด้วย https://script.google.com และลงท้ายด้วย /exec';FOCUSSEL='#mrturl';return}store.set('ps_mrturl',v);MRTSET=false;MQN='done';note='จำลิงก์ใบเช็ค MRT แล้ว — กด “ส่งเข้าใบเช็ค MRT” ได้เลย'},
- pick:k=>{if(!BUSY&&!FILLING)openPicker(k)},pickdir:k=>{if(BUSY||FILLING)return;const p=$('#pickdir');if(!p)return;p.dataset.k=k||'pl';p.value='';p.click()},
+ pick:k=>{if(BUSY||FILLING)return;const m=pkStuck();if(m){MQN='warn';note=m;return}openPicker(k)},pickdir:k=>{if(BUSY||FILLING)return;const p=$('#pickdir');if(!p)return;p.dataset.k=k||'pl';p.value='';p.click()},
  adv:()=>{adv=!adv},rx:k=>{RO.has(+k)?RO.delete(+k):RO.add(+k)},tab:k=>{if(BUSY||FILLING)return;if(k==='res'&&!last)return;tab=k;cs=null;window.scrollTo(0,0)},media:k=>{fm=k},open:k=>{if(DB[+k])cs=+k},back:()=>{cs=null},
  plday:k=>{const d=+k;if(BUSY||FILLING||!d)return;const n=PFS.filter(e=>e.d===d).length;PFS=PFS.filter(e=>e.d!==d);plSync();LIT=new Set();note=`เอา Playlist วันที่ ${thd(new Date(d))} ออกแล้ว (${n} ไฟล์)`}, /* 4.3 */
  reset:()=>{if(confirm('ล้าง Playlist ใบเช็ครูป และผลการเติมที่ใส่ไว้ทั้งหมด เพื่อเริ่มวันใหม่?')){DB=[];PFS=[];PLD=null;PLM={};PLX=[];PLI=[];OP.base='';OP.media='ทั้งหมด';BASEERR='';C=[];last=null;TC=[];TCS='';TCK=TCL=null;PICX=null;SHOT=null;RO.clear();fm='ทั้งหมด';q='';TQ='';cs=null;dirty=0;LIT=new Set();note='ล้างแล้ว เริ่มใส่ Playlist ของวันใหม่ได้เลย'}},
@@ -5357,15 +5359,17 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   HDB.set('pic',d).catch(()=>{});PICD=d;note='กำลังตรวจโฟลเดอร์แยกรูป …';view();
   const P=await picPlan(d,L.W,L.res,PICR,picUp());L.pic={d,P,made:k==='again'&&L.pic?L.pic.made:null};
   note=P.plan.length?(P.n?`ตรวจแล้ว จะสร้าง ${P.n.toLocaleString()} โฟลเดอร์`:'โฟลเดอร์แยกรูปครบแล้ว'):`ไม่พบโฟลเดอร์จอในโฟลเดอร์ “${d.name}” — เลือกโฟลเดอร์แยกรูปที่มีโฟลเดอร์ Pic @ …`},
- shotscan:async k=>{if(!TC.length||!FSA||SHOTPK)return;let d=k==='again'&&SHOT?SHOT.d:null;
+ shotscan:async k=>{if(!TC.length||!FSA)return;{const m=pkStuck();if(m){MQN='warn';note=m;return}}let d=k==='again'&&SHOT?SHOT.d:null;
   try{if(!d&&k!=='pick'){const x=await HDB.get('pic').catch(()=>null);if(x)d=x}
    if(d&&(await d.queryPermission({mode:'read'}))!=='granted'&&(await d.requestPermission({mode:'read'}))!=='granted')d=null;
    if(!d){d=await shotPick();HDB.set('pic',d).catch(()=>{})}} /* 5.5.74: งานนี้อ่านรูปอย่างเดียว — ขอสิทธิ์ดูไฟล์ ไม่ขอสิทธิ์แก้ */
   catch(e){MQN='warn';note=e&&e.name==='AbortError'?'ยังไม่ได้เลือกโฟลเดอร์ — ถ้าเลือกแล้ว Chrome ถามว่าให้ดูไฟล์ได้ไหม ต้องกดอนุญาต (ถ้าไม่ขึ้นหน้าต่างเลือกโฟลเดอร์ กดปุ่มอีกครั้ง)':'เลือกโฟลเดอร์ไม่ได้ ('+errN(e)+') — ลองเลือกโฟลเดอร์ข้างใน เช่น Pic @ … แทนตัวไดรฟ์ หรือใช้ “เลือกแบบอัปโหลดโฟลเดอร์”';return}
   await shotRun(d)},
  /* 5.5.75: ไดรฟ์เครือข่ายบางแห่ง (เช่น \\172.24.100.82) เลือกแล้ว Chrome ไม่ส่งโฟลเดอร์มา → เลือกแบบอัปโหลดโฟลเดอร์ (input webkitdirectory) อ่านในเบราว์เซอร์ ไม่ได้ส่งไปไหน */
- shotup:()=>{if(!TC.length||BUSY||FILLING)return;const inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.webkitdirectory=true;
-  inp.addEventListener('change',async()=>{const fs=[...(inp.files||[])];if(!fs.length){MQN='warn';note='ยังไม่ได้เลือกโฟลเดอร์';view();return}
+ shotup:()=>{if(!TC.length||BUSY||FILLING)return;{const m=pkStuck();if(m){MQN='warn';note=m;return}}const inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.webkitdirectory=true;
+  SHOTUP=true;inp.addEventListener('cancel',()=>{SHOTUP=false},{once:true}); /* หน้าต่างปิดแล้ว Chrome ยังนับไฟล์อยู่ → บอกให้รอ */
+  const onF=()=>{setTimeout(()=>{if(SHOTUP){MQN='find';note='Chrome กำลังนับไฟล์ในโฟลเดอร์ที่เลือก … โฟลเดอร์ใหญ่บนไดรฟ์เครือข่ายอาจหลายนาที แล้ว Chrome จะถามให้กด “อัปโหลด” • ถ้าค้างนาน กด F5 แล้วเลือกโฟลเดอร์ที่เล็กลง (เช่น โฟลเดอร์รอบ)';view()}},1200)};addEventListener('focus',onF,{once:true});
+  inp.addEventListener('change',async()=>{SHOTUP=false;const fs=[...(inp.files||[])];if(!fs.length){MQN='warn';note='ยังไม่ได้เลือกโฟลเดอร์';view();return}
    const d=vDir(fs);if(!d){MQN='warn';note='โฟลเดอร์ที่เลือกไม่มีไฟล์รูป';view();return}await shotRun(d);view()},{once:true});
   inp.click();say('เลือกโฟลเดอร์ แล้วกด “อัปโหลด” ตอน Chrome ถาม — ระบบอ่านรูปในเครื่องนี้ ไม่ได้ส่งไฟล์ไปไหน • โฟลเดอร์ใหญ่ Chrome จะนับไฟล์สักพัก')},
  shotapply:async()=>{const FL=shotFill();if(!FL.length&&!(SHOT&&SHOT.R&&SHOT.R.sty&&SHOT.R.sty.length))return;note='กำลังใส่วันที่ถ่าย …';view();const RR={...SHOT.R,fill:FL};
