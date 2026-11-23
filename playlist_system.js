@@ -179,6 +179,7 @@
  *   เวอร์ชัน 5.5.74: ใส่วันที่ถ่าย บอกความคืบหน้าตั้งแต่อ่านโฟลเดอร์
  *   เวอร์ชัน 5.5.75: ใส่วันที่ถ่าย เลือกแบบอัปโหลดโฟลเดอร์ (ไดรฟ์เครือข่าย)
  *   เวอร์ชัน 5.5.76: บอกเหตุเมื่อปุ่มเลือกไฟล์กดไม่ขึ้นเพราะ Chrome ค้างโฟลเดอร์เครือข่าย
+ *   เวอร์ชัน 5.5.77: ดึง Playlist วันจันทร์ไม่ถูกตัดที่ 3 นาที + ปุ่มบอกสถานะของ PLAYLIST INBOX
  * ======================================================================
  */
 
@@ -11788,7 +11789,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.76 (20 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.77 (23 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -15678,9 +15679,16 @@ const PLW_URL =
   /* 5.5.41: ดึง Playlist วันนี้เข้าระบบเอง — เปิดหน้า Playlist รายวันด้วย ?send=studio หน้านั้นรวมไฟล์เป็น .zip แล้วส่งกลับมาทาง postMessage (ไม่ต้องดาวน์โหลด / ลากวาง) */
   plpBtn = c =>
     PLW_URL
-      ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย — วันจันทร์ / หลังวันหยุด เลือกดึงวันที่ยังไม่ได้ดึงมาพร้อมกันได้ (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP ? ' disabled' : ''}>${IC.up}${PLP ? 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</button>`
+      ? `<button class="btn ${c}" data-a="plpull" title="ดึง Playlist ของวันนี้ (11 แบบ + Playlist เพิ่มเติม) จาก Google Drive ของบริษัทเข้าระบบเลย — วันจันทร์ / หลังวันหยุด เลือกดึงวันที่ยังไม่ได้ดึงมาพร้อมกันได้ (ต้องล็อกอินบัญชี Google ของบริษัท)"${PLP && !PLP.late ? ' disabled' : ''}>${IC.up}<span class="plpl">${PLP ? PLP.lab || 'กำลังดึง Playlist …' : 'ดึง Playlist วันนี้'}</span></button>`
       : '';
-let PLP = null; /* {w: หน้าต่างที่เปิด, t: เวลาเริ่ม, iv: ตัวจับเวลา} */
+let PLP =
+  null; /* {w: หน้าต่างที่เปิด, t: เวลาที่ได้ข่าวล่าสุด, iv: ตัวจับเวลา, st: ขั้นที่หน้า INBOX บอกมา (load/ask/zip), lab: ข้อความบนปุ่ม, late: รอนานแล้ว (ปุ่มกดได้ = เปิดหน้านั้นขึ้นมา)} */
+/* 5.5.77: ปุ่มบอกว่าหน้า PLAYLIST INBOX ทำอะไรอยู่ (INBOX ส่งสถานะมา) • รอนานก็ไม่ปิดหน้านั้นทิ้ง — วันจันทร์ต้องเลือกวันและรวมไฟล์หลายวัน */
+const plpLab = t => {
+  if (!PLP) return;
+  PLP.lab = t;
+  document.querySelectorAll('[data-a="plpull"] .plpl').forEach(e => (e.textContent = t));
+};
 /* 5.5.72: ส่งใบเช็ค MRT ที่เติมแล้วเข้า Google Sheets “ใบเช็ครูป MRT (ทดลอง)” — เปิดหน้ารับของเว็บแอปใบเช็ค MRT (?recv=studio) หน้านั้นบอก ready แล้วระบบส่งไฟล์ให้ทาง postMessage
    (แบบเดียวกับ “ดึง Playlist วันนี้” แต่กลับทาง) • หน้ารับเก็บไฟล์ลงโฟลเดอร์นำเข้าใน Drive แล้วนำเข้าเหมือนเมนู ขึ้นรอบใหม่ถามในหน้านั้น • ลิงก์เว็บแอปจำไว้ในเครื่องนี้ */
 let MRTW = null,
@@ -15784,11 +15792,29 @@ addEventListener('message', async e => {
   const d = e.data;
   if (
     !d ||
-    !d.psPL ||
+    !(d.psPL || d.psPLw) ||
     !PLP ||
     !/(^https:\/\/script\.google\.com$)|(\.googleusercontent\.com$)/.test(e.origin || '')
   )
     return;
+  if (d.psPLw) {
+    const was = PLP.late;
+    PLP.t = Date.now();
+    PLP.late = false;
+    PLP.st = d.stage;
+    if (d.stage === 'ask') {
+      plpLab('รอเลือกวันในหน้า PLAYLIST INBOX');
+      say(
+        'หน้า PLAYLIST INBOX ถามว่าจะส่ง Playlist วันที่ยังไม่ได้ดึงมาด้วยไหม — เลือกวันแล้วกด “ส่ง” ในหน้านั้น',
+      );
+      try {
+        PLP.w.focus();
+      } catch (_) {}
+    } else if (d.stage === 'zip') plpLab(`กำลังรวมไฟล์ ${d.done || 0}/${d.total || '?'} …`);
+    else plpLab('กำลังเปิดรายการ Playlist …');
+    if (was) view();
+    return;
+  }
   if (!d.ok) {
     plpEnd('ดึง Playlist ไม่ได้: ' + (d.err || 'ไม่ทราบสาเหตุ'));
     return;
@@ -16972,6 +16998,13 @@ const ACT = {
     FOCUSSEL = '[data-dz="pl"]';
   },
   plpull: () => {
+    if (PLP && PLP.late) {
+      try {
+        PLP.w.focus();
+      } catch (_) {}
+      say('หน้า PLAYLIST INBOX ยังเปิดอยู่ — ดูที่หน้านั้น (ถ้าไม่ต้องการแล้ว ปิดหน้านั้นได้เลย)');
+      return;
+    }
     if (BUSY || FILLING || PLP || !PLW_URL) return;
     const w = window.open(PLW_URL + '?send=studio', 'psplp');
     if (!w) {
@@ -16988,12 +17021,20 @@ const ACT = {
         plpEnd(
           'หน้า PLAYLIST INBOX ปิด หรือเบราว์เซอร์ตัดการเชื่อมก่อนส่งไฟล์ — ถ้าหน้านั้นยังเปิดอยู่ กด “ดาวน์โหลด” แล้วลากไฟล์ .zip มาวางแทน',
         );
-      else if (s > 180)
-        plpEnd(
-          'รอนานเกิน 3 นาที — ถ้าหน้า PLAYLIST INBOX ขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดอีกครั้ง หรือกด “ดาวน์โหลด” ในหน้านั้นแล้วลากไฟล์ .zip มาวาง',
+      else if (s > (PLP.st === 'zip' ? 120 : 90) && !PLP.late && PLP.st !== 'ask') {
+        PLP.late = true;
+        plpLab('รอหน้า PLAYLIST INBOX — กดเพื่อดูหน้านั้น');
+        view();
+        say(
+          PLP.st
+            ? 'หน้า PLAYLIST INBOX เงียบไปนาน — กดปุ่มเพื่อดูหน้านั้น ระบบยังรอรับไฟล์อยู่ (ถ้าหน้านั้นขึ้นข้อผิดพลาด กด “ดาวน์โหลด” แล้วลากไฟล์ .zip มาวาง)'
+            : 'ยังไม่ได้ข่าวจากหน้า PLAYLIST INBOX — กดปุ่มเพื่อดูหน้านั้น: ถ้าขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัท • ถ้าขึ้นให้เลือกวัน ให้กด “ส่ง” • ระบบยังรอรับไฟล์อยู่',
         );
+      }
     }, 1000);
-    say('กำลังดึง Playlist วันนี้จาก Google Drive … หน้าใหม่จะเปิดแล้วปิดเอง');
+    say(
+      'กำลังเปิด PLAYLIST INBOX … ถ้าหน้านั้นถามเรื่อง Playlist วันที่ยังไม่ได้ดึง ให้เลือกวันแล้วกด “ส่ง” ในหน้านั้น',
+    );
   },
   mrtsend: () => {
     if (MRTW || FILLING || BUSY) return;

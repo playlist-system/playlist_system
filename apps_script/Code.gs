@@ -1117,17 +1117,18 @@ function toast(m, err) { var t = $('#toast'); t.textContent = m; t.className = '
 function call(fn, args, ok) {
   google.script.run.withSuccessHandler(ok).withFailureHandler(function (e) {
     var m = (e && e.message) || String(e); BUSY = '';
+    if (SEND && !SENDOK) toStudio({ ok: false, err: m });
     if (!D) $('#app').innerHTML = '<div class="errc"><h2>เปิดข้อมูลไม่ได้</h2><p>' + esc(m) + '</p></div>';
     else draw();
     toast(m, 1);
   })[fn].apply(null, args);
 }
 function load(day) {
-  BUSY = 'load'; draw();
+  BUSY = 'load'; draw(); waitStudio('load');
   call('webDay', [day || ''], function (d) {
     D = d; BUSY = ''; defaults(); CSEL = {}; TRAY = false;
     if (D.catchup) D.catchup.days.forEach(function (a) { CSEL[a.day] = true; });
-    if (SEND && !SENT) { SENT = true; if (D.catchup && opener_()) { SENDASK = true; draw(); } else { draw(); sendStudio([D.day]); } }
+    if (SEND && !SENT) { SENT = true; if (D.catchup && opener_()) { SENDASK = true; draw(); waitStudio('ask', { n: D.catchup.days.length }); } else { draw(); sendStudio([D.day]); } }
     else draw();
   });
 }
@@ -1163,6 +1164,9 @@ function freq(k) {
 /* ---------- ส่งเข้าระบบ ---------- */
 /* เปิดจากปุ่ม “ดึง Playlist วันนี้” ในระบบ: รวม Playlist ที่ติ๊กไว้เป็น .zip แล้วส่งกลับให้หน้าระบบ (ส่งให้เฉพาะ studioOrigin) */
 function opener_() { try { return window.top.opener || null; } catch (e) { return null; } }
+/* ส่งข้อความกลับหน้าระบบ • ok:false = ทำไม่สำเร็จ (psPL) • สถานะระหว่างทำ load / ask / zip ใช้ psPLw — ระบบเวอร์ชันก่อน 5.5.77 ไม่รู้จัก psPLw จึงไม่สับสน */
+function toStudio(o, key) { var w = opener_(); if (!SEND || !w || !STUDIO) return; o[key || 'psPL'] = 1; if (D && !o.day) o.day = D.day; try { w.postMessage(o, STUDIO); } catch (e) {} }
+function waitStudio(stage, x) { var o = { stage: stage }; for (var k in x || {}) o[k] = x[k]; toStudio(o, 'psPLw'); }
 function sendStudio(days) {
   var w = opener_();
   SENDASK = false; SENDDAYS = days || [D.day];
@@ -1471,8 +1475,9 @@ function zipRun(E, zname, key, cb, after) {
   var out = [], next = 0, done = 0, failed = false;
   if (!E.length || BUSY) return;
   BUSY = cb ? 'zip' : key; PROG = 0; ZTOT = E.length; draw();
-  function prog() { if (BUSY === 'zipall') { var b = $('#zipall'); if (b) b.innerHTML = sv(P.down, 18, 0, 2.2) + esc(catchLabel()); } else drawBar(); }
-  function fail(e) { if (failed) return; failed = true; BUSY = ''; if (typeof cb === 'function') SENDMSG = 'รวมไฟล์ไม่สำเร็จ: ' + ((e && e.message) || e) + ' — กด “ดาวน์โหลด” อีกครั้ง หรือใช้ “เปิดใน Drive”'; draw(); toast('ดาวน์โหลดไม่สำเร็จ: ' + ((e && e.message) || e) + ' — ลองอีกครั้ง หรือใช้ปุ่ม “เปิดใน Drive”', 1); }
+  if (typeof cb === 'function') waitStudio('zip', { done: 0, total: E.length });
+  function prog() { if (typeof cb === 'function') waitStudio('zip', { done: done, total: E.length }); if (BUSY === 'zipall') { var b = $('#zipall'); if (b) b.innerHTML = sv(P.down, 18, 0, 2.2) + esc(catchLabel()); } else drawBar(); }
+  function fail(e) { if (failed) return; failed = true; BUSY = ''; if (typeof cb === 'function') { SENDMSG = 'รวมไฟล์ไม่สำเร็จ: ' + ((e && e.message) || e) + ' — กด “ดาวน์โหลด” อีกครั้ง หรือใช้ “เปิดใน Drive”'; toStudio({ ok: false, err: 'รวมไฟล์ไม่สำเร็จ: ' + ((e && e.message) || e) }); } draw(); toast('ดาวน์โหลดไม่สำเร็จ: ' + ((e && e.message) || e) + ' — ลองอีกครั้ง หรือใช้ปุ่ม “เปิดใน Drive”', 1); }
   function one(i, part, acc) {
     google.script.run.withFailureHandler(fail).withSuccessHandler(function (r) {
       if (failed) return;
@@ -1500,7 +1505,7 @@ function zipRun(E, zname, key, cb, after) {
     draw();
     toast('ดาวน์โหลด ' + zname + ' (' + out.length + ' ไฟล์) แล้ว — ลากไฟล์นี้ลงขั้นที่ 1 ของ PHOTO CHECK STUDIO ได้เลย ไม่ต้องแตกไฟล์');
   }
-  for (var k = 0; k < Math.min(3, E.length); k++) one(next++, 0, []);
+  for (var k = 0; k < Math.min(5, E.length); k++) one(next++, 0, []);
 }
 function zip(cb) {
   var Pk = picked();
