@@ -183,6 +183,7 @@
  *   เวอร์ชัน 5.5.78: ใส่งาน Freeze Screen อัตโนมัติ (เอาติ๊กออกได้)
  *   เวอร์ชัน 5.5.79: ชีตที่ไม่ใช่ชีตจอ แจ้งเป็นข้อมูล ไม่ขึ้นต้องแก้
  *   เวอร์ชัน 5.5.80: ออกวันที่ไม่ย้อนก่อนวันที่ยังฉาย + อ่านชื่อไฟล์ On22 Nov 26
+ *   เวอร์ชัน 5.5.81: กล่องบอกสถานะตอนกดบันทึก + สาเหตุที่บันทึกไม่ได้
  * ======================================================================
  */
 
@@ -11824,7 +11825,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.80 (24 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.81 (24 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -12509,6 +12510,86 @@ function busyDone() {
     $('.wrap').inert = false;
   }
 }
+/* 5.5.81: ปุ่มบันทึก (บันทึกทับไฟล์เดิม / วันที่ถ่าย / ใบเปล่า / ย้ายจอ) — เดิมระหว่างรอ Chrome ถามสิทธิ์ เลือกโฟลเดอร์ หรือเขียนไฟล์ หน้าจอไม่เปลี่ยนเลย ดูเหมือนกดแล้วไม่มีอะไรเกิดขึ้น
+   → ขึ้นกล่องบอกทันทีว่ากำลังทำขั้นไหน • ค้างนานบอกวิธีแก้ • กดยกเลิกได้ • บันทึกไม่ได้บอกสาเหตุตามชนิดข้อผิดพลาด */
+let SVW = null;
+const SVA = new Set(['savedir', 'shotsave', 'blksave', 'sdbsave']);
+const SVTXT = {
+  start: ['กำลังเตรียมบันทึก …', ''],
+  perm: [
+    'รอสิทธิ์แก้ไขไฟล์จาก Chrome',
+    'ถ้ามีกล่องเล็ก ๆ ถามใต้แถบที่อยู่ด้านบน ให้กด “แก้ไขไฟล์” หรือ “อนุญาต”',
+  ],
+  pick: [
+    'รอเลือกโฟลเดอร์',
+    'หน้าต่างเลือกโฟลเดอร์เปิดอยู่ — เลือกโฟลเดอร์ของใบเช็ค กด “เลือกโฟลเดอร์” แล้วกด “แก้ไขไฟล์”',
+  ],
+  xl: ['ตรวจว่ามีใบเช็คเปิดอยู่ใน Excel ไหม', ''],
+  write: ['กำลังบันทึก', ''],
+};
+const SVSLOW = {
+  start: 'ยังเตรียมไม่เสร็จ — ถ้าค้างนาน กดยกเลิกแล้วกดบันทึกใหม่ หรือใช้ปุ่มดาวน์โหลด',
+  perm: 'ยังไม่ได้คำตอบจาก Chrome — กล่องถามสิทธิ์อาจถูกบังหรือถูกปิดไป ลองคลิกไอคอนทางซ้ายของแถบที่อยู่ด้านบน • ถ้าไม่เจอ กด “ยกเลิก” แล้วกดบันทึกใหม่ หรือใช้ปุ่มดาวน์โหลด',
+  pick: 'หน้าต่างเลือกโฟลเดอร์ยังไม่ปิด — อาจซ่อนอยู่หลังหน้าจอ (กด Alt+Tab ดู) หรือ Chrome กำลังอ่านโฟลเดอร์บนไดรฟ์เครือข่ายซึ่งช้า',
+  xl: 'ตรวจโฟลเดอร์ช้า — โฟลเดอร์อาจอยู่บนไดรฟ์เครือข่าย รอสักครู่',
+  write: 'บันทึกช้ากว่าปกติ — ไฟล์อยู่บนไดรฟ์เครือข่าย หรือโปรแกรมสแกนไวรัสกำลังตรวจไฟล์ รอสักครู่',
+};
+const SVWHY = {
+  NotAllowedError:
+    'Chrome ไม่ได้ให้สิทธิ์แก้ไฟล์ในโฟลเดอร์นี้ (อาจกด “ไม่อนุญาต” ไป หรือคอมเครื่องนี้ถูกตั้งไม่ให้เว็บแก้ไฟล์) — กดบันทึกใหม่แล้วกด “แก้ไขไฟล์” หรือใช้ปุ่มดาวน์โหลด',
+  NoModificationAllowedError:
+    'ไฟล์ถูกล็อก — เปิดอยู่ใน Excel หรือเป็นไฟล์อ่านอย่างเดียว ปิดไฟล์ก่อนแล้วกดบันทึกอีกครั้ง',
+  NotFoundError:
+    'หาโฟลเดอร์หรือไฟล์ไม่เจอ (อาจถูกย้าย ลบ หรือเปลี่ยนชื่อ) — กด “บันทึกไปโฟลเดอร์อื่น” แล้วเลือกโฟลเดอร์ใหม่',
+  InvalidModificationError: 'ไฟล์ถูกแก้จากที่อื่นระหว่างบันทึก — กดบันทึกอีกครั้ง',
+  InvalidStateError: 'ไฟล์ถูกแก้จากที่อื่นระหว่างบันทึก — กดบันทึกอีกครั้ง',
+  QuotaExceededError: 'พื้นที่ดิสก์เต็ม — ลบไฟล์ที่ไม่ใช้ก่อน หรือใช้ปุ่มดาวน์โหลด',
+  SecurityError: 'Chrome ไม่ยอมเปิดหน้าต่างเลือกโฟลเดอร์ — กดปุ่มบันทึกอีกครั้ง',
+  TypeMismatchError: 'ชื่อนี้เป็นโฟลเดอร์ ไม่ใช่ไฟล์ — ตรวจโฟลเดอร์ที่เลือก',
+};
+const NOFSA =
+  'เบราว์เซอร์นี้บันทึกทับไฟล์ในเครื่องไม่ได้ — เปิดระบบใน Chrome หรือ Edge บนคอมพิวเตอร์ (ไม่ใช่เปิดจาก LINE / Outlook) หรือใช้ปุ่มดาวน์โหลด';
+const svWhy = W => {
+  const t = [...new Set(W.map(([, e]) => SVWHY[e]).filter(Boolean))];
+  return t.length ? t.join(' • ') : 'ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง หรือใช้ปุ่มดาวน์โหลด';
+};
+const svPick = e =>
+  `เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — ${SVWHY[e && e.name] || 'เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)'}`;
+function svBegin() {
+  SVW = { k: 'start', i: 0, n: 0, f: '', t0: Date.now(), t1: Date.now() };
+  BUSY = { sv: 1 };
+  $('.wrap').inert = true;
+  busyPaint();
+  SVW.iv = setInterval(() => {
+    if (BUSY && BUSY.sv) busyPaint();
+  }, 1000);
+}
+function svEnd() {
+  if (!SVW) return;
+  clearInterval(SVW.iv);
+  SVW = null;
+  if (BUSY && BUSY.sv) {
+    BUSY = null;
+    $('.wrap').inert = false;
+    busyPaint();
+  }
+}
+const svSt = (k, i, n, f) => {
+  if (!SVW) return;
+  if (SVW.k !== k) SVW.t1 = Date.now();
+  Object.assign(SVW, { k, i: i || 0, n: n || 0, f: f || '' });
+  busyPaint();
+};
+const svX = () => !!(SVW && SVW.stop); /* กดยกเลิกแล้ว → หยุดก่อนเขียนไฟล์ถัดไป */
+const vSv = () => {
+  const w = SVW;
+  if (!w) return '';
+  const [t, h] = SVTXT[w.k] || SVTXT.start,
+    sec = Math.max(0, Math.round((Date.now() - w.t1) / 1000)),
+    wr = w.k === 'write' && w.n,
+    slow = sec >= 10 && SVSLOW[w.k];
+  return `<b>${esc2(wr ? `${t} ${w.i} จาก ${w.n} ไฟล์` : t)}</b>${wr ? `<div class="bar"><i style="width:${Math.round((100 * Math.max(0, w.i - 1)) / Math.max(1, w.n))}%"></i></div>` : ''}${w.f ? `<small>${esc2(w.f)}</small>` : ''}${h ? `<small>${esc2(h)}</small>` : ''}${slow ? `<small class="svslow"><b>${esc2(SVSLOW[w.k])}</b></small>` : ''}<small>ผ่านไป ${sec} วินาที</small><button class="btn secondary bxstop" data-a="svstop">ยกเลิก</button>`;
+};
 async function busyStep(t, i, n, f, t0) {
   BUSY = { t, i, n, f, t0, stop: !!t0 && n >= 20 };
   busyPaint();
@@ -14083,9 +14164,11 @@ const busyLeft = () => {
   return s < 5 ? '' : s < 90 ? `เหลือประมาณ ${s} วินาที` : `เหลือประมาณ ${Math.round(s / 60)} นาที`;
 };
 /* 5.5.67 */ const vBusyIn = () =>
-  BUSY.cnt != null
-    ? `<b>${esc2(BUSY.t)}</b><small>อ่านแล้ว ${BUSY.cnt.toLocaleString()} โฟลเดอร์ — ${esc2(BUSY.f)}</small><small>ไดรฟ์เครือข่ายอาจใช้เวลาหลายนาที ไม่ต้องกดซ้ำ • เลือกโฟลเดอร์ให้เล็กลงจะเร็วขึ้น เช่น Pic @ Digital MRT</small>`
-    : `<b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft() ? `<small><b>${busyLeft()}</b></small>` : ''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop ? '<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>' : ''}`;
+  BUSY.sv
+    ? vSv()
+    : BUSY.cnt != null
+      ? `<b>${esc2(BUSY.t)}</b><small>อ่านแล้ว ${BUSY.cnt.toLocaleString()} โฟลเดอร์ — ${esc2(BUSY.f)}</small><small>ไดรฟ์เครือข่ายอาจใช้เวลาหลายนาที ไม่ต้องกดซ้ำ • เลือกโฟลเดอร์ให้เล็กลงจะเร็วขึ้น เช่น Pic @ Digital MRT</small>`
+      : `<b>${BUSY.i ? `${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์` : `${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round((100 * Math.max(0, BUSY.i - 1)) / Math.max(1, BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft() ? `<small><b>${busyLeft()}</b></small>` : ''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop ? '<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>' : ''}`;
 /* วาดกล่องรอ: ถ้ามีกล่องอยู่แล้วเปลี่ยนเฉพาะข้อความ น้องโฟกัสจะได้ขยับต่อเนื่อง ไม่เริ่มใหม่ทุกไฟล์ */
 function busyPaint() {
   const b = $('#busy');
@@ -17612,18 +17695,26 @@ const ACT = {
   },
   shotsave: async k => {
     const D = SHOT && SHOT.done;
-    if (!D || !FSA) return;
+    if (!D) return;
+    if (!FSA) {
+      MQN = 'warn';
+      note = NOFSA;
+      return;
+    }
     let d = k === 'two' ? D.pk && D.pk.d : k === 'pick' ? null : CKDIR;
     const t0 = Date.now();
     try {
-      if (
-        d &&
-        (await d.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
-        (await d.requestPermission({ mode: 'readwrite' })) !== 'granted'
-      )
-        d = null;
-      if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
+      if (d && (await d.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        svSt('perm');
+        if ((await d.requestPermission({ mode: 'readwrite' })) !== 'granted') d = null;
+      }
+      if (svX()) return;
+      if (!d) {
+        svSt('pick');
+        d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
+      }
     } catch (e) {
+      if (svX()) return;
       if (e && e.name === 'AbortError') {
         D.pkf = pkInfo(e, t0);
         MQN = 'warn';
@@ -17632,9 +17723,11 @@ const ACT = {
         return;
       }
       MQN = 'err';
-      note = `เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;
+      note = svPick(e);
       return;
     }
+    if (svX()) return;
+    svSt('xl');
     if (
       !(await xlAsk(
         d,
@@ -17694,14 +17787,17 @@ const ACT = {
       ).getDirectoryHandle(day, { create: true });
     } catch (e) {
       MQN = 'err';
-      note = `สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;
+      note = `สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก${SVWHY[e && e.name] ? ' • ' + SVWHY[e.name] : ''}`;
       return;
     }
     const has = has0;
     const bad = [],
       W = [];
-    let neu = 0;
+    let neu = 0,
+      si = 0;
     for (const x of D.files) {
+      if (svX()) break;
+      svSt('write', ++si, D.files.length, x.name);
       try {
         const old = await has(d, x.name);
         if (!old) neu++;
@@ -17725,7 +17821,7 @@ const ACT = {
     } catch (_) {}
     if (bad.length) {
       MQN = 'err';
-      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
+      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ${svWhy(W)}`;
       return;
     }
     D.saved = true;
@@ -17986,14 +18082,29 @@ const ACT = {
   },
   blksave: async () => {
     const B = BLK;
-    if (!B || !B.ok || !FSA) return;
-    let d;
-    try {
-      d = await showDirectoryPicker({ id: 'blank', mode: 'readwrite', startIn: 'desktop' });
-    } catch (e) {
-      if (!(e && e.name === 'AbortError')) note = 'เลือกโฟลเดอร์ไม่ได้';
+    if (!B || !B.ok) return;
+    if (!FSA) {
+      MQN = 'warn';
+      note = NOFSA;
       return;
     }
+    let d;
+    try {
+      svSt('pick');
+      d = await showDirectoryPicker({ id: 'blank', mode: 'readwrite', startIn: 'desktop' });
+    } catch (e) {
+      if (svX()) return;
+      if (e && e.name === 'AbortError') {
+        MQN = 'warn';
+        note =
+          'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้';
+      } else {
+        MQN = 'err';
+        note = svPick(e);
+      }
+      return;
+    }
+    if (svX()) return;
     let same = false;
     try {
       same = !!(CKDIR && d.isSameEntry && (await d.isSameEntry(CKDIR)));
@@ -18032,8 +18143,12 @@ const ACT = {
       note = 'สร้างโฟลเดอร์สำรองไม่ได้ ยังไม่ได้บันทึก';
       return;
     }
+    let si = 0;
+    const sn = B.res.filter(r => r.blob).length;
     for (const r of B.res) {
       if (!r.blob) continue;
+      if (svX()) break;
+      svSt('write', ++si, sn, r.name);
       try {
         if (bk && ex.includes(r.name)) {
           const old = await (await d.getFileHandle(r.name)).getFile(),
@@ -18044,13 +18159,13 @@ const ACT = {
         const w = await (await d.getFileHandle(r.name, { create: true })).createWritable();
         await w.write(r.blob);
         await w.close();
-      } catch (_) {
-        bad.push(r.name);
+      } catch (e) {
+        bad.push([r.name, errN(e)]);
       }
     }
     if (bad.length) {
       MQN = 'err';
-      note = `บันทึกไม่ได้ ${bad.length} ไฟล์ (${bad.join(', ')}) — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
+      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ${svWhy(bad)}`;
       return;
     }
     B.sv = { dir: d.name, ok: B.ok, ow: ex.length };
@@ -18265,20 +18380,37 @@ const ACT = {
   },
   sdbsave: async k => {
     const A = SDA;
-    if (!A || !sdaL(A).length || !FSA) return;
-    let d = k === 'pick' ? null : CKDIR;
-    try {
-      if (
-        d &&
-        (await d.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
-        (await d.requestPermission({ mode: 'readwrite' })) !== 'granted'
-      )
-        d = null;
-      if (!d) d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
-    } catch (e) {
-      if (!(e && e.name === 'AbortError')) note = 'เลือกโฟลเดอร์ไม่ได้';
+    if (!A || !sdaL(A).length) return;
+    if (!FSA) {
+      MQN = 'warn';
+      note = NOFSA;
       return;
     }
+    let d = k === 'pick' ? null : CKDIR;
+    try {
+      if (d && (await d.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        svSt('perm');
+        if ((await d.requestPermission({ mode: 'readwrite' })) !== 'granted') d = null;
+      }
+      if (svX()) return;
+      if (!d) {
+        svSt('pick');
+        d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
+      }
+    } catch (e) {
+      if (svX()) return;
+      if (e && e.name === 'AbortError') {
+        MQN = 'warn';
+        note =
+          'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้';
+      } else {
+        MQN = 'err';
+        note = svPick(e);
+      }
+      return;
+    }
+    if (svX()) return;
+    svSt('xl');
     if (!(await xlAsk(d, sdaL(A)))) {
       note = 'ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';
       return;
@@ -18294,10 +18426,14 @@ const ACT = {
       note = 'สร้างโฟลเดอร์สำรองไม่ได้ ยังไม่ได้บันทึก';
       return;
     }
-    const bad = [];
-    for (const n of sdaL(A)) {
+    const bad = [],
+      sl = sdaL(A);
+    let si = 0;
+    for (const n of sl) {
       const f = TC.find(x => x.name === n);
       if (!f) continue;
+      if (svX()) break;
+      svSt('write', ++si, sl.length, n);
       try {
         let old = null;
         try {
@@ -18324,7 +18460,7 @@ const ACT = {
     }
     if (bad.length) {
       MQN = 'err';
-      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;
+      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ${svWhy(bad)}`;
       return;
     }
     A.sv = { dir: d.name, day, bk: sdaBk(A) };
@@ -18341,6 +18477,23 @@ const ACT = {
     }
     store.set('ps_sdb', '');
     note = 'ลบฐานข้อมูลจอแล้ว';
+  },
+  svstop: () => {
+    const w = SVW;
+    if (!w) return;
+    w.stop = true;
+    w.cnote =
+      w.k === 'write' && w.i > 1
+        ? `หยุดบันทึกแล้ว — บันทึกไปแล้ว ${w.i - 1} จาก ${w.n} ไฟล์ (ไฟล์เดิมเก็บไว้ในโฟลเดอร์สำรองแล้ว) ที่เหลือยังไม่ได้บันทึก`
+        : 'ยกเลิกแล้ว — ยังไม่ได้บันทึก ไม่มีไฟล์ไหนถูกแก้ • ถ้ามีหน้าต่างของ Chrome ค้างอยู่ ปิดได้เลย • ใช้ปุ่มดาวน์โหลดแทนได้';
+    clearInterval(w.iv);
+    if (BUSY && BUSY.sv) {
+      BUSY = null;
+      $('.wrap').inert = false;
+      busyPaint();
+    }
+    MQN = 'warn';
+    note = w.cnote;
   },
   plstop: () => {
     PLSTOP = true;
@@ -18619,20 +18772,28 @@ const ACT = {
       : `สร้างแล้ว ${r.n} โฟลเดอร์`;
   },
   savedir: async k => {
-    if (!last || !FSA) return;
+    if (!last) {
+      note = 'ยังไม่มีผลการเติม — กดเติมใบเช็คก่อน';
+      return;
+    }
+    if (!FSA) {
+      MQN = 'warn';
+      note = NOFSA;
+      return;
+    }
     let d = k === 'pick' ? null : CKDIR;
     try {
       if (!d && k !== 'pick') {
         const x = await HDB.get('ck').catch(() => null);
         if (x) d = x;
       }
-      if (
-        d &&
-        (await d.queryPermission({ mode: 'readwrite' })) !== 'granted' &&
-        (await d.requestPermission({ mode: 'readwrite' })) !== 'granted'
-      )
-        d = null;
+      if (d && (await d.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        svSt('perm');
+        if ((await d.requestPermission({ mode: 'readwrite' })) !== 'granted') d = null;
+      }
+      if (svX()) return;
       if (!d) {
+        svSt('pick');
         const t0 = Date.now();
         try {
           d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite' });
@@ -18642,15 +18803,18 @@ const ACT = {
         }
       }
     } catch (e) {
+      if (svX()) return;
       if (e && e.name === 'AbortError') {
         MQN = 'warn';
         note = `ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้${e.pk ? ` (รายละเอียด: ${e.pk})` : ''}`;
         return;
       }
       MQN = 'err';
-      note = `เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;
+      note = svPick(e);
       return;
     }
+    if (svX()) return;
+    svSt('xl');
     if (
       !(await xlAsk(
         d,
@@ -18660,6 +18824,7 @@ const ACT = {
       note = 'ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';
       return;
     } /* 5.5.53 */
+    if (svX()) return;
     CKDIR = d;
     HDB.set('ck', d).catch(() => {});
     const day = last.W0
@@ -18672,7 +18837,7 @@ const ACT = {
       ).getDirectoryHandle(day, { create: true });
     } catch (e) {
       MQN = 'err';
-      note = `สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;
+      note = `สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก${SVWHY[e && e.name] ? ' • ' + SVWHY[e.name] : ''}`;
       return;
     }
     const has = async (dir, n) => {
@@ -18683,11 +18848,15 @@ const ACT = {
       }
     };
     let ok = 0,
-      neu = 0;
+      neu = 0,
+      si = 0;
     const bad = [],
-      W = [];
+      W = [],
+      sn = last.res.filter(r => r.blob).length;
     for (const r of last.res) {
       if (!r.blob) continue;
+      if (svX()) break;
+      svSt('write', ++si, sn, r.name);
       try {
         const old = await has(d, r.name);
         if (old) {
@@ -18719,7 +18888,7 @@ const ACT = {
     );
     MQN = bad.length ? 'err' : 'party';
     note = bad.length
-      ? `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`
+      ? `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ${svWhy(W)}`
       : `บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`;
   },
   next: () => {
@@ -18972,10 +19141,28 @@ document.addEventListener('click', async e => {
   if (!a || a.tagName === 'INPUT') return;
   if (a.dataset.a === 'file') return;
   if (a.disabled) return;
+  const sv = SVA.has(a.dataset.a);
+  if (sv && SVW) {
+    MQN = 'warn';
+    note =
+      'การบันทึกครั้งก่อนยังค้างอยู่ใน Chrome — ปิดหน้าต่างเลือกโฟลเดอร์หรือกล่องถามสิทธิ์ที่ค้างอยู่ก่อน หรือกด F5 แล้วเริ่มใหม่';
+    view();
+    return;
+  }
+  if (sv) svBegin();
+  let w = SVW;
   try {
     await ACT[a.dataset.a](a.dataset.k);
   } catch (x) {
     note = 'ผิดพลาด: ' + (x.message || x);
+  }
+  if (sv) {
+    const st = w && w.stop;
+    if (SVW === w) svEnd();
+    if (st) {
+      note = w.cnote;
+      MQN = 'warn';
+    }
   }
   view();
 });

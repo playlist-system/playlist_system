@@ -507,7 +507,8 @@ p.hint.tsafe{margin:18px 0 0}
 #tour:not(:empty)~#msg{top:16px;bottom:auto;transform:translate(-50%,-16px)}#tour:not(:empty)~#msg.show{transform:translate(-50%,0)}
 .busy{position:fixed;inset:0;z-index:75;display:grid;place-items:center;padding:16px;background:var(--scrim)}
 .bbox{width:min(460px,100%);display:grid;gap:10px;padding:22px 24px;border-radius:18px;background:var(--sf);color:var(--tx);border:1px solid var(--ln);box-shadow:var(--shadow2)}
-.bbox b{font:600 18px/1.4 var(--f-hd)}.bbox small{color:var(--mu);font-size:13px;overflow-wrap:anywhere} .bbox .bxstop{margin-top:4px;justify-self:start;min-width:120px} .bbox small b{font:inherit;font-weight:700;color:var(--tx)}
+.bbox b{font:600 18px/1.4 var(--f-hd)}.bbox small{color:var(--mu);font-size:13px;overflow-wrap:anywhere} .bbox .bxstop{margin-top:4px;justify-self:start;min-width:120px}
+.svslow{color:var(--warn,#b45309)} .bbox small b{font:inherit;font-weight:700;color:var(--tx)}
 .bar{height:8px;border-radius:999px;background:var(--sf3);overflow:hidden}.bar i{display:block;height:100%;border-radius:999px;background:var(--ac);transition:width .2s}
 .pastebox{width:100%;min-height:220px;padding:12px;border:1.5px solid var(--ln2);border-radius:12px;background:var(--sf2);color:var(--tx);font:15px/1.6 var(--f-ui);resize:vertical}
 .pastebox:focus{outline:none;border-color:var(--focus)}
@@ -4102,7 +4103,7 @@ async function addFiles(kind,files){const arr=[],rb=[];if(kind==='pl')for(const 
  MQN=skip.length||emp.length?'warn':'catch';note=`นำเข้า ${new Set(got.flatMap(x=>x.p.map(s=>s.m+'|'+s.c))).size} จอ`+(skip.length?` • ข้าม ${skip.length} ไฟล์ที่ไม่รู้จัก`:'')+(info.length?` • ข้ามไฟล์ที่ไม่ได้ใช้ ${info.length} ไฟล์`:'')+(emp.length?` • ${emp.join(', ')}: อ่านได้แต่ไม่พบรายการหนัง (รูปแบบไฟล์อาจเปลี่ยน) จึงใช้ข้อมูลเดิมไว้ก่อน`:'');if(typeof busyDone==='function')busyDone();view()}
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.80 (24 พ.ย. 2569)';
+const VERTXT='PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.81 (24 พ.ย. 2569)';
 const IC={
  up:'<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
  folder:'<svg viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
@@ -4273,6 +4274,21 @@ const alertHTML=(k,t,body)=>`<div class="alert ${k}" role="${k==='er'?'alert':'s
 const rndHTML=wd=>{const pr=per(wd),c=shownCol(pr.two?2:1);return`<span class="rnd"><i style="background:${swHex(c)}">${end(wd)}</i>${pr.two?(OP.r2==='new'?`รอบ 16–${pr.E.getUTCDate()} ${TH[pr.E.getUTCMonth()]} เริ่มรายการใหม่ ต่อท้ายรอบ 1–15 ในชีตเดิม`:`วันที่ 16–${pr.E.getUTCDate()} ${TH[pr.E.getUTCMonth()]} ทำต่อในรายการเดิม (แถบวันที่สีรอบ 2)`):`รอบ 1–15 ${TH[pr.E.getUTCMonth()]}`}${effCol(pr.two?2:1)?'':' (สีตามชีต)'}</span>`};
 const vBusy=()=>BUSY?`<div class="busy" role="status" aria-live="polite"><div class="bbox${mqOn()?' mqb':''}">${mqOn()?`<span class="mq" aria-hidden="true">${mqPic('scan')}</span>`:''}<div class="bin">${vBusyIn()}</div></div></div>`:'';
 function busyDone(){if(BUSY&&!FILLING){BUSY=null;$('.wrap').inert=false}}
+/* 5.5.81: ปุ่มบันทึก (บันทึกทับไฟล์เดิม / วันที่ถ่าย / ใบเปล่า / ย้ายจอ) — เดิมระหว่างรอ Chrome ถามสิทธิ์ เลือกโฟลเดอร์ หรือเขียนไฟล์ หน้าจอไม่เปลี่ยนเลย ดูเหมือนกดแล้วไม่มีอะไรเกิดขึ้น
+   → ขึ้นกล่องบอกทันทีว่ากำลังทำขั้นไหน • ค้างนานบอกวิธีแก้ • กดยกเลิกได้ • บันทึกไม่ได้บอกสาเหตุตามชนิดข้อผิดพลาด */
+let SVW=null;const SVA=new Set(['savedir','shotsave','blksave','sdbsave']);
+const SVTXT={start:['กำลังเตรียมบันทึก …',''],perm:['รอสิทธิ์แก้ไขไฟล์จาก Chrome','ถ้ามีกล่องเล็ก ๆ ถามใต้แถบที่อยู่ด้านบน ให้กด “แก้ไขไฟล์” หรือ “อนุญาต”'],pick:['รอเลือกโฟลเดอร์','หน้าต่างเลือกโฟลเดอร์เปิดอยู่ — เลือกโฟลเดอร์ของใบเช็ค กด “เลือกโฟลเดอร์” แล้วกด “แก้ไขไฟล์”'],xl:['ตรวจว่ามีใบเช็คเปิดอยู่ใน Excel ไหม',''],write:['กำลังบันทึก','']};
+const SVSLOW={start:'ยังเตรียมไม่เสร็จ — ถ้าค้างนาน กดยกเลิกแล้วกดบันทึกใหม่ หรือใช้ปุ่มดาวน์โหลด',perm:'ยังไม่ได้คำตอบจาก Chrome — กล่องถามสิทธิ์อาจถูกบังหรือถูกปิดไป ลองคลิกไอคอนทางซ้ายของแถบที่อยู่ด้านบน • ถ้าไม่เจอ กด “ยกเลิก” แล้วกดบันทึกใหม่ หรือใช้ปุ่มดาวน์โหลด',pick:'หน้าต่างเลือกโฟลเดอร์ยังไม่ปิด — อาจซ่อนอยู่หลังหน้าจอ (กด Alt+Tab ดู) หรือ Chrome กำลังอ่านโฟลเดอร์บนไดรฟ์เครือข่ายซึ่งช้า',xl:'ตรวจโฟลเดอร์ช้า — โฟลเดอร์อาจอยู่บนไดรฟ์เครือข่าย รอสักครู่',write:'บันทึกช้ากว่าปกติ — ไฟล์อยู่บนไดรฟ์เครือข่าย หรือโปรแกรมสแกนไวรัสกำลังตรวจไฟล์ รอสักครู่'};
+const SVWHY={NotAllowedError:'Chrome ไม่ได้ให้สิทธิ์แก้ไฟล์ในโฟลเดอร์นี้ (อาจกด “ไม่อนุญาต” ไป หรือคอมเครื่องนี้ถูกตั้งไม่ให้เว็บแก้ไฟล์) — กดบันทึกใหม่แล้วกด “แก้ไขไฟล์” หรือใช้ปุ่มดาวน์โหลด',NoModificationAllowedError:'ไฟล์ถูกล็อก — เปิดอยู่ใน Excel หรือเป็นไฟล์อ่านอย่างเดียว ปิดไฟล์ก่อนแล้วกดบันทึกอีกครั้ง',NotFoundError:'หาโฟลเดอร์หรือไฟล์ไม่เจอ (อาจถูกย้าย ลบ หรือเปลี่ยนชื่อ) — กด “บันทึกไปโฟลเดอร์อื่น” แล้วเลือกโฟลเดอร์ใหม่',InvalidModificationError:'ไฟล์ถูกแก้จากที่อื่นระหว่างบันทึก — กดบันทึกอีกครั้ง',InvalidStateError:'ไฟล์ถูกแก้จากที่อื่นระหว่างบันทึก — กดบันทึกอีกครั้ง',QuotaExceededError:'พื้นที่ดิสก์เต็ม — ลบไฟล์ที่ไม่ใช้ก่อน หรือใช้ปุ่มดาวน์โหลด',SecurityError:'Chrome ไม่ยอมเปิดหน้าต่างเลือกโฟลเดอร์ — กดปุ่มบันทึกอีกครั้ง',TypeMismatchError:'ชื่อนี้เป็นโฟลเดอร์ ไม่ใช่ไฟล์ — ตรวจโฟลเดอร์ที่เลือก'};
+const NOFSA='เบราว์เซอร์นี้บันทึกทับไฟล์ในเครื่องไม่ได้ — เปิดระบบใน Chrome หรือ Edge บนคอมพิวเตอร์ (ไม่ใช่เปิดจาก LINE / Outlook) หรือใช้ปุ่มดาวน์โหลด';
+const svWhy=W=>{const t=[...new Set(W.map(([,e])=>SVWHY[e]).filter(Boolean))];return t.length?t.join(' • '):'ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง หรือใช้ปุ่มดาวน์โหลด'};
+const svPick=e=>`เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — ${SVWHY[e&&e.name]||'เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)'}`;
+function svBegin(){SVW={k:'start',i:0,n:0,f:'',t0:Date.now(),t1:Date.now()};BUSY={sv:1};$('.wrap').inert=true;busyPaint();SVW.iv=setInterval(()=>{if(BUSY&&BUSY.sv)busyPaint()},1000)}
+function svEnd(){if(!SVW)return;clearInterval(SVW.iv);SVW=null;if(BUSY&&BUSY.sv){BUSY=null;$('.wrap').inert=false;busyPaint()}}
+const svSt=(k,i,n,f)=>{if(!SVW)return;if(SVW.k!==k)SVW.t1=Date.now();Object.assign(SVW,{k,i:i||0,n:n||0,f:f||''});busyPaint()};
+const svX=()=>!!(SVW&&SVW.stop); /* กดยกเลิกแล้ว → หยุดก่อนเขียนไฟล์ถัดไป */
+const vSv=()=>{const w=SVW;if(!w)return'';const[t,h]=SVTXT[w.k]||SVTXT.start,sec=Math.max(0,Math.round((Date.now()-w.t1)/1000)),wr=w.k==='write'&&w.n,slow=sec>=10&&SVSLOW[w.k];
+ return`<b>${esc2(wr?`${t} ${w.i} จาก ${w.n} ไฟล์`:t)}</b>${wr?`<div class="bar"><i style="width:${Math.round(100*Math.max(0,w.i-1)/Math.max(1,w.n))}%"></i></div>`:''}${w.f?`<small>${esc2(w.f)}</small>`:''}${h?`<small>${esc2(h)}</small>`:''}${slow?`<small class="svslow"><b>${esc2(SVSLOW[w.k])}</b></small>`:''}<small>ผ่านไป ${sec} วินาที</small><button class="btn secondary bxstop" data-a="svstop">ยกเลิก</button>`};
 async function busyStep(t,i,n,f,t0){BUSY={t,i,n,f,t0,stop:!!t0&&n>=20};busyPaint();$('.wrap').inert=true;await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)))}
 
 /* ----- ขั้นที่ 1 ----- */
@@ -4675,7 +4691,7 @@ function mqShow(pose,text){text=mqKrub(text);const d=$('#mq');if(!d)return;clear
 IC.bot='<svg viewBox="0 0 24 24"><rect x="4.5" y="8" width="15" height="11" rx="4.5"/><path d="M12 8V5.5M9.5 13h.01M14.5 13h.01M10 16c1.2.8 2.8.8 4 0"/><circle cx="12" cy="4.5" r="1"/></svg>';
 IC.cam='<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="4"/></svg>';
 IC.cmpi='<svg viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7zM7 9h1M16 9h1"/></svg>';
-const busyLeft=()=>{if(!BUSY.t0||BUSY.i<4)return'';const s=Math.round((performance.now()-BUSY.t0)/(BUSY.i-1)*(BUSY.n-BUSY.i+1)/1000);return s<5?'':s<90?`เหลือประมาณ ${s} วินาที`:`เหลือประมาณ ${Math.round(s/60)} นาที`}; /* 5.5.67 */ const vBusyIn=()=>BUSY.cnt!=null?`<b>${esc2(BUSY.t)}</b><small>อ่านแล้ว ${BUSY.cnt.toLocaleString()} โฟลเดอร์ — ${esc2(BUSY.f)}</small><small>ไดรฟ์เครือข่ายอาจใช้เวลาหลายนาที ไม่ต้องกดซ้ำ • เลือกโฟลเดอร์ให้เล็กลงจะเร็วขึ้น เช่น Pic @ Digital MRT</small>`:`<b>${BUSY.i?`${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์`:`${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round(100*Math.max(0,BUSY.i-1)/Math.max(1,BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft()?`<small><b>${busyLeft()}</b></small>`:''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop?'<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>':''}`;
+const busyLeft=()=>{if(!BUSY.t0||BUSY.i<4)return'';const s=Math.round((performance.now()-BUSY.t0)/(BUSY.i-1)*(BUSY.n-BUSY.i+1)/1000);return s<5?'':s<90?`เหลือประมาณ ${s} วินาที`:`เหลือประมาณ ${Math.round(s/60)} นาที`}; /* 5.5.67 */ const vBusyIn=()=>BUSY.sv?vSv():BUSY.cnt!=null?`<b>${esc2(BUSY.t)}</b><small>อ่านแล้ว ${BUSY.cnt.toLocaleString()} โฟลเดอร์ — ${esc2(BUSY.f)}</small><small>ไดรฟ์เครือข่ายอาจใช้เวลาหลายนาที ไม่ต้องกดซ้ำ • เลือกโฟลเดอร์ให้เล็กลงจะเร็วขึ้น เช่น Pic @ Digital MRT</small>`:`<b>${BUSY.i?`${BUSY.t} ${BUSY.i} จาก ${BUSY.n} ไฟล์`:`${BUSY.t} ${BUSY.n} ไฟล์ กำลังเตรียม…`}</b><div class="bar"><i style="width:${Math.round(100*Math.max(0,BUSY.i-1)/Math.max(1,BUSY.n))}%"></i></div><small>${esc2(BUSY.f)}</small>${busyLeft()?`<small><b>${busyLeft()}</b></small>`:''}<small>ไฟล์ใหญ่อาจใช้เวลาหลายวินาที ระหว่างนี้หน้าจออาจขยับไม่ได้ ไม่ต้องกดซ้ำ</small>${BUSY.stop?'<button class="btn secondary bxstop" data-a="plstop">ยกเลิก</button>':''}`;
 /* วาดกล่องรอ: ถ้ามีกล่องอยู่แล้วเปลี่ยนเฉพาะข้อความ น้องโฟกัสจะได้ขยับต่อเนื่อง ไม่เริ่มใหม่ทุกไฟล์ */
 function busyPaint(){const b=$('#busy');if(!b)return;if(!BUSY){if(b.innerHTML)b.innerHTML='';return}
  const bi=b.querySelector('.bin');if(bi&&!!b.querySelector('.bbox .mq')===mqOn())bi.innerHTML=vBusyIn();else b.innerHTML=vBusy()}
@@ -5400,20 +5416,20 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   MQN='photo';note=SHOT.done.n||!SHOT.done.ns?`ใส่วันที่ถ่ายแล้ว ${SHOT.done.n.toLocaleString()} ช่อง`:`แก้สีช่องวันที่ถ่ายแล้ว ${SHOT.done.ns.toLocaleString()} ช่อง`},
  shotdl:async()=>{const D=SHOT&&SHOT.done;if(!D)return;const z=new JSZip();for(const x of D.files)z.file(x.name,x.blob,{createFolders:false});z.file('รายงานวันที่ถ่าย.txt',D.txt);
   saveBlob('ใบเช็ครูป_ใส่วันที่ถ่าย.zip',await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
- shotsave:async k=>{const D=SHOT&&SHOT.done;if(!D||!FSA)return;let d=k==='two'?(D.pk&&D.pk.d):k==='pick'?null:CKDIR;const t0=Date.now();
-  try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;
-   if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}catch(e){if(e&&e.name==='AbortError'){D.pkf=pkInfo(e,t0);MQN='warn';note='ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ลองวิธี 2 ขั้นในกล่องด้านบน หรือดาวน์โหลด .zip';return}MQN='err';note=`เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;return}
-  if(!(await xlAsk(d,D.files.map(x=>x.name)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
+ shotsave:async k=>{const D=SHOT&&SHOT.done;if(!D)return;if(!FSA){MQN='warn';note=NOFSA;return}let d=k==='two'?(D.pk&&D.pk.d):k==='pick'?null:CKDIR;const t0=Date.now();
+  try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'){svSt('perm');if((await d.requestPermission({mode:'readwrite'}))!=='granted')d=null}
+   if(svX())return;if(!d){svSt('pick');d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}}catch(e){if(svX())return;if(e&&e.name==='AbortError'){D.pkf=pkInfo(e,t0);MQN='warn';note='ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ลองวิธี 2 ขั้นในกล่องด้านบน หรือดาวน์โหลด .zip';return}MQN='err';note=svPick(e);return}
+  if(svX())return;svSt('xl');if(!(await xlAsk(d,D.files.map(x=>x.name)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
   const has0=async(dir,n)=>{try{return await (await dir.getFileHandle(n)).getFile()}catch(_){return null}},same=async(f,b)=>{if(!f||!b||f.size!==b.byteLength)return false;const u=new Uint8Array(await f.arrayBuffer()),v=new Uint8Array(b);for(let i=0;i<u.length;i++)if(u[i]!==v[i])return false;return true};
   const dif=[];for(const x of D.files){try{const old=await has0(d,x.name);if(old&&!(await same(old,D.orig&&D.orig.get(x.name)))&&!(await same(old,x.blob.buffer.slice(x.blob.byteOffset,x.blob.byteOffset+x.blob.byteLength))))dif.push(x.name)}catch(e){MQN='err';note=`อ่านไฟล์ ${x.name} ในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ถ้าไฟล์เปิดอยู่ใน Excel ให้ปิดก่อน แล้วกดบันทึกอีกครั้ง (ยังไม่ได้บันทึก)`;return}}
   if(dif.length&&!confirm(`ไฟล์ในโฟลเดอร์ “${d.name}” ไม่ใช่ฉบับเดียวกับที่ใส่วันที่ถ่าย (อาจถูกแก้ทีหลัง หรือเป็นคนละไฟล์):\n${dif.join('\n')}\n\nบันทึกทับไหม? ไฟล์เดิมจะเก็บไว้ในโฟลเดอร์ สำรองก่อนใส่วันที่ถ่าย`)){note='ยังไม่ได้บันทึก — ถ้าจะใส่วันที่ลงไฟล์ในโฟลเดอร์นั้น กด “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์นั้น แล้วตรวจและใส่อีกครั้ง';return}
   CKDIR=d;HDB.set('ck',d).catch(()=>{});const day=isoD(new Date(Date.now()+7*36e5));
-  let bk;try{bk=await (await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย',{create:true})).getDirectoryHandle(day,{create:true})}catch(e){MQN='err';note=`สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;return}
-  const has=has0;const bad=[],W=[];let neu=0;
-  for(const x of D.files){try{const old=await has(d,x.name);if(!old)neu++;if(old&&!(await has(bk,x.name))){const w=await (await bk.getFileHandle(x.name,{create:true})).createWritable();await w.write(await old.arrayBuffer());await w.close()}
+  let bk;try{bk=await (await d.getDirectoryHandle('สำรองก่อนใส่วันที่ถ่าย',{create:true})).getDirectoryHandle(day,{create:true})}catch(e){MQN='err';note=`สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก${SVWHY[e&&e.name]?' • '+SVWHY[e.name]:''}`;return}
+  const has=has0;const bad=[],W=[];let neu=0,si=0;
+  for(const x of D.files){if(svX())break;svSt('write',++si,D.files.length,x.name);try{const old=await has(d,x.name);if(!old)neu++;if(old&&!(await has(bk,x.name))){const w=await (await bk.getFileHandle(x.name,{create:true})).createWritable();await w.write(await old.arrayBuffer());await w.close()}
     const w=await (await d.getFileHandle(x.name,{create:true})).createWritable();await w.write(x.blob);await w.close()}catch(e){bad.push(x.name);W.push([x.name,errN(e)])}}
   try{const w=await (await bk.getFileHandle('รายงานวันที่ถ่าย.txt',{create:true})).createWritable();await w.write(D.txt);await w.close()}catch(_){}
-  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
+  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ${svWhy(W)}`;return}
   D.saved=true;D.pkf=D.pk=null;D.sv={dir:d.name,ok:D.files.length,neu,day};MQN='done';note=`บันทึกลงโฟลเดอร์ “${d.name}” แล้ว ${D.files.length} ไฟล์`},
  /* 5.5.62: บันทึกแบบ 2 ขั้น — 1 เลือกโฟลเดอร์ (อ่าน) 2 กดอีกครั้งเพื่อขอสิทธิ์แก้ไฟล์ แยกให้เห็นว่าติดขั้นไหน */
  shotpk1:async()=>{const D=SHOT&&SHOT.done;if(!D||D.saved||!FSA)return;const t0=Date.now();let d;
@@ -5451,17 +5467,18 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   B.moved=R;B.mplan=null;B.plan=null;B.sv=null;MQN=R.go.length?'done':'warn';note=R.go.length?`ย้ายจอในใบเปล่าแล้ว ${R.go.length} จอ — กดบันทึกลงโฟลเดอร์ใหม่`:'ย้ายจอไม่ได้ — ดูรายละเอียดในกล่อง'},
  blkdl:async()=>{const B=BLK;if(!B||!B.ok)return;const z=new JSZip();for(const r of B.res)if(r.blob)z.file(r.name,r.blob,{createFolders:false});z.file('รายงานใบเปล่า.txt',blkTxt(B));
   saveBlob(`ใบเปล่า_${(B.mon||'เดือนใหม่').replace(/\s+/g,'_')}.zip`,await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
- blksave:async()=>{const B=BLK;if(!B||!B.ok||!FSA)return;let d;
-  try{d=await showDirectoryPicker({id:'blank',mode:'readwrite',startIn:'desktop'})}catch(e){if(!(e&&e.name==='AbortError'))note='เลือกโฟลเดอร์ไม่ได้';return}
+ blksave:async()=>{const B=BLK;if(!B||!B.ok)return;if(!FSA){MQN='warn';note=NOFSA;return}let d;
+  try{svSt('pick');d=await showDirectoryPicker({id:'blank',mode:'readwrite',startIn:'desktop'})}catch(e){if(svX())return;if(e&&e.name==='AbortError'){MQN='warn';note='ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้'}else{MQN='err';note=svPick(e)}return}
+  if(svX())return;
   let same=false;try{same=!!(CKDIR&&d.isSameEntry&&await d.isSameEntry(CKDIR))}catch(_){}
   if(same){MQN='warn';note=`โฟลเดอร์ “${d.name}” คือโฟลเดอร์ใบเช็คเดิม — สร้างโฟลเดอร์ใหม่ของเดือนใหม่ (เช่น 11 NOV 26) แล้วเลือกโฟลเดอร์นั้น`;return}
   const ex=[];for(const r of B.res)if(r.blob){try{await d.getFileHandle(r.name);ex.push(r.name)}catch(_){}}
   if(ex.length&&!confirm(`โฟลเดอร์ “${d.name}” มีไฟล์ชื่อเดียวกันอยู่แล้ว ${ex.length} ไฟล์:\n${ex.join('\n')}\n\nเขียนทับด้วยใบเปล่าไหม? ไฟล์เดิมจะเก็บไว้ในโฟลเดอร์ สำรองก่อนทำใบเปล่า`)){note='ยังไม่ได้บันทึก — เลือกโฟลเดอร์ว่างของเดือนใหม่';return}
   let bk=null;const bad=[];
   try{if(ex.length)bk=await(await d.getDirectoryHandle('สำรองก่อนทำใบเปล่า',{create:true})).getDirectoryHandle(isoD(new Date(Date.now()+7*36e5)),{create:true})}catch(_){MQN='err';note='สร้างโฟลเดอร์สำรองไม่ได้ ยังไม่ได้บันทึก';return}
-  for(const r of B.res){if(!r.blob)continue;try{if(bk&&ex.includes(r.name)){const old=await(await d.getFileHandle(r.name)).getFile(),w0=await(await bk.getFileHandle(r.name,{create:true})).createWritable();await w0.write(await old.arrayBuffer());await w0.close()}
-   const w=await(await d.getFileHandle(r.name,{create:true})).createWritable();await w.write(r.blob);await w.close()}catch(_){bad.push(r.name)}}
-  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์ (${bad.join(', ')}) — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
+  let si=0;const sn=B.res.filter(r=>r.blob).length;for(const r of B.res){if(!r.blob)continue;if(svX())break;svSt('write',++si,sn,r.name);try{if(bk&&ex.includes(r.name)){const old=await(await d.getFileHandle(r.name)).getFile(),w0=await(await bk.getFileHandle(r.name,{create:true})).createWritable();await w0.write(await old.arrayBuffer());await w0.close()}
+   const w=await(await d.getFileHandle(r.name,{create:true})).createWritable();await w.write(r.blob);await w.close()}catch(e){bad.push([r.name,errN(e)])}}
+  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ${svWhy(bad)}`;return}
   B.sv={dir:d.name,ok:B.ok,ow:ex.length};MQN='party';note=`บันทึกใบเปล่า ${B.ok} ไฟล์ลงโฟลเดอร์ “${d.name}” แล้ว`},
  sdbrun:async()=>{SDQ=null;await sdbRun()},
  sdbx:k=>{const p=String(k).split('|'),v=p[0]==='1',kind=p[1],key=p.slice(2).join('|');if(kind==='u'){if(v)SDX.rm.add(key);else SDX.rm.delete(key)}else{if(v)SDX.no.delete(key);else SDX.no.add(key)}}, /* 5.5.8: เลือกเพิ่ม / ย้าย / เอาออก ทีละจอ */
@@ -5484,16 +5501,18 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
    let P=null;try{P=await wbPost(f.buf,{sm:f.nd&&f.nd.SM})}catch(_){P=null}if(!P||!P.fix)continue;f.buf=P.buf;f.nd=null;try{f.nd=sheetNeeds(f.buf,f.name)}catch(_){f.nd={S:[]}}names.push(f.name);fx.push({name:f.name,fixes:P.fixes||[]});n+=P.fix}
   const pv=PICX;if(pv)pv.sig=ckSig();SDA={kind:'fix',names,fx,n,...sdaJoin(P0,'fix',names),sv:null,sig:ckSig()};SDQ=null;await sdbRun();MQN=n?'done':'warn';note=n?`แก้สูตรคะแนนแล้ว ${n} แถว (${names.length} ไฟล์) — บันทึก หรือดาวน์โหลด`:'แก้สูตรไม่ได้ — ดูรายละเอียดในกล่อง'},
  sdbdl:async()=>{const A=SDA;if(!A||!sdaL(A).length)return;const z=new JSZip();for(const n of sdaL(A)){const f=TC.find(x=>x.name===n);if(f)z.file(n,f.buf,{createFolders:false})}saveBlob('ใบเช็ค_'+sdaKs(A).map(k=>SDAK[k]).join('_')+'.zip',await z.generateAsync({type:'uint8array',compression:'DEFLATE'}))},
- sdbsave:async k=>{const A=SDA;if(!A||!sdaL(A).length||!FSA)return;let d=k==='pick'?null:CKDIR;
-  try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;if(!d)d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}catch(e){if(!(e&&e.name==='AbortError'))note='เลือกโฟลเดอร์ไม่ได้';return}
-  if(!(await xlAsk(d,sdaL(A)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
+ sdbsave:async k=>{const A=SDA;if(!A||!sdaL(A).length)return;if(!FSA){MQN='warn';note=NOFSA;return}let d=k==='pick'?null:CKDIR;
+  try{if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'){svSt('perm');if((await d.requestPermission({mode:'readwrite'}))!=='granted')d=null}if(svX())return;if(!d){svSt('pick');d=await showDirectoryPicker({id:'ck',mode:'readwrite',startIn:'desktop'})}}catch(e){if(svX())return;if(e&&e.name==='AbortError'){MQN='warn';note='ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้'}else{MQN='err';note=svPick(e)}return}
+  if(svX())return;svSt('xl');if(!(await xlAsk(d,sdaL(A)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
   const day=isoD(new Date(Date.now()+7*36e5));let bk;try{bk=await(await d.getDirectoryHandle(sdaBk(A),{create:true})).getDirectoryHandle(day,{create:true})}catch(_){MQN='err';note='สร้างโฟลเดอร์สำรองไม่ได้ ยังไม่ได้บันทึก';return}
-  const bad=[];for(const n of sdaL(A)){const f=TC.find(x=>x.name===n);if(!f)continue;try{let old=null;try{old=await(await d.getFileHandle(n)).getFile()}catch(_){}
+  const bad=[],sl=sdaL(A);let si=0;for(const n of sl){const f=TC.find(x=>x.name===n);if(!f)continue;if(svX())break;svSt('write',++si,sl.length,n);try{let old=null;try{old=await(await d.getFileHandle(n)).getFile()}catch(_){}
    if(old){let has=false;try{await bk.getFileHandle(n);has=true}catch(_){}if(!has){const w0=await(await bk.getFileHandle(n,{create:true})).createWritable();await w0.write(await old.arrayBuffer());await w0.close()}}
    const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(f.buf);await w.close()}catch(e){bad.push([n,errN(e)])}}
-  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`;return}
+  if(bad.length){MQN='err';note=`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(bad)} — ${svWhy(bad)}`;return}
   A.sv={dir:d.name,day,bk:sdaBk(A)};MQN='party';note=`บันทึกใบเช็คที่${sdaWhat(A)}แล้ว ${sdaL(A).length} ไฟล์ลงโฟลเดอร์ “${d.name}”`},
  sdbclear:()=>{if(!confirm('ลบฐานข้อมูลจอออกจากเครื่องนี้? (ใส่ใหม่ได้ตลอด)'))return;SDB=null;SDQ=null;if(BLK){BLK.plan=null;BLK.mplan=null}store.set('ps_sdb','');note='ลบฐานข้อมูลจอแล้ว'},
+ svstop:()=>{const w=SVW;if(!w)return;w.stop=true;w.cnote=w.k==='write'&&w.i>1?`หยุดบันทึกแล้ว — บันทึกไปแล้ว ${w.i-1} จาก ${w.n} ไฟล์ (ไฟล์เดิมเก็บไว้ในโฟลเดอร์สำรองแล้ว) ที่เหลือยังไม่ได้บันทึก`:'ยกเลิกแล้ว — ยังไม่ได้บันทึก ไม่มีไฟล์ไหนถูกแก้ • ถ้ามีหน้าต่างของ Chrome ค้างอยู่ ปิดได้เลย • ใช้ปุ่มดาวน์โหลดแทนได้';
+  clearInterval(w.iv);if(BUSY&&BUSY.sv){BUSY=null;$('.wrap').inert=false;busyPaint()}MQN='warn';note=w.cnote},
  plstop:()=>{PLSTOP=true;if(BUSY){BUSY.f='กำลังยกเลิก …';busyPaint()}},
  toolv:k=>{if(!['pic','shot','cmp','blank','sdb'].includes(k))return;TOOLV=k;if(k==='sdb')(sdb()?sdbRun():anaRun()).then(()=>view(),()=>view());setTimeout(()=>{const d=$('#tdetail');if(d)d.scrollIntoView({behavior:'smooth',block:'start'})},60)},
  mqx:()=>{clearTimeout(MQT);const d=$('#mq');if(d)d.innerHTML=''},
@@ -5536,22 +5555,25 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   if(picSig(F)!==picSig(L.pic.P)){L.pic={d:L.pic.d,P:F,made:null};MQN='warn';note='รายการเปลี่ยนตามตัวเลือกล่าสุด ยังไม่ได้สร้าง — ตรวจรายการแล้วกดสร้างอีกครั้ง';return}
   const T0=performance.now(),r=await picMake(F);r.sec=+((performance.now()-T0)/1000).toFixed(1);r.miss=F.miss.length;L.pic.P=await picPlan(L.pic.d,L.W,L.res,PICR,picUp());L.pic.made=r;
   MQN=r.bad.length?'warn':'photo';note=r.bad.length?`สร้างแล้ว ${r.n} โฟลเดอร์ สร้างไม่ได้ ${r.bad.length} โฟลเดอร์`:`สร้างแล้ว ${r.n} โฟลเดอร์`},
- savedir:async k=>{if(!last||!FSA)return;let d=k==='pick'?null:CKDIR;
+ savedir:async k=>{if(!last){note='ยังไม่มีผลการเติม — กดเติมใบเช็คก่อน';return}if(!FSA){MQN='warn';note=NOFSA;return}let d=k==='pick'?null:CKDIR;
   try{if(!d&&k!=='pick'){const x=await HDB.get('ck').catch(()=>null);if(x)d=x}
-   if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'&&(await d.requestPermission({mode:'readwrite'}))!=='granted')d=null;
-   if(!d){const t0=Date.now();try{d=await showDirectoryPicker({id:'ck',mode:'readwrite'})}catch(e){if(e&&e.name==='AbortError')e.pk=pkInfo(e,t0);throw e}}
-  }catch(e){if(e&&e.name==='AbortError'){MQN='warn';note=`ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้${e.pk?` (รายละเอียด: ${e.pk})`:''}`;return}MQN='err';note=`เลือกโฟลเดอร์ไม่ได้ (${errN(e)}) — เลือกโฟลเดอร์ของใบเช็ค เช่น 11 NOV 26\\1-15 (เลือก Desktop ตรง ๆ ไม่ได้)`;return}
+   if(d&&(await d.queryPermission({mode:'readwrite'}))!=='granted'){svSt('perm');if((await d.requestPermission({mode:'readwrite'}))!=='granted')d=null}
+   if(svX())return;
+   if(!d){svSt('pick');const t0=Date.now();try{d=await showDirectoryPicker({id:'ck',mode:'readwrite'})}catch(e){if(e&&e.name==='AbortError')e.pk=pkInfo(e,t0);throw e}}
+  }catch(e){if(svX())return;if(e&&e.name==='AbortError'){MQN='warn';note=`ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลดแทนได้${e.pk?` (รายละเอียด: ${e.pk})`:''}`;return}MQN='err';note=svPick(e);return}
+  if(svX())return;svSt('xl');
   if(!(await xlAsk(d,last.res.filter(r=>r.blob).map(r=>r.name)))){note='ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';return} /* 5.5.53 */
+  if(svX())return;
   CKDIR=d;HDB.set('ck',d).catch(()=>{});const day=last.W0?isoD(new Date(last.W0))+' ถึง '+isoD(new Date(last.W)):isoD(new Date(last.W)); /* 4.3: หลายวัน = ก่อนเติมวันแรก */
-  let bk;try{bk=await (await d.getDirectoryHandle('สำรองก่อนเติม',{create:true})).getDirectoryHandle(day,{create:true})}catch(e){MQN='err';note=`สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก`;return}
+  let bk;try{bk=await (await d.getDirectoryHandle('สำรองก่อนเติม',{create:true})).getDirectoryHandle(day,{create:true})}catch(e){MQN='err';note=`สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก${SVWHY[e&&e.name]?' • '+SVWHY[e.name]:''}`;return}
   const has=async(dir,n)=>{try{return await (await dir.getFileHandle(n)).getFile()}catch(_){return null}};
-  let ok=0,neu=0;const bad=[],W=[];
-  for(const r of last.res){if(!r.blob)continue;
+  let ok=0,neu=0,si=0;const bad=[],W=[],sn=last.res.filter(r=>r.blob).length;
+  for(const r of last.res){if(!r.blob)continue;if(svX())break;svSt('write',++si,sn,r.name);
    try{const old=await has(d,r.name);if(old){if(!(await has(bk,r.name))){const w=await (await bk.getFileHandle(r.name,{create:true})).createWritable();await w.write(await old.arrayBuffer());await w.close()}}else neu++;
     const w=await (await d.getFileHandle(r.name,{create:true})).createWritable();await w.write(r.blob);await w.close();ok++}catch(e){bad.push(r.name);W.push([r.name,errN(e)])}}
   try{const w=await (await bk.getFileHandle('รายงาน.txt',{create:true})).createWritable();await w.write(last.txt||'');await w.close()}catch(_){}
   last.sv={dir:d.name,ok,neu,bad,day};if(!bad.length)last.saved=true;thruSet(last.res.filter(r=>!bad.includes(r.name)),last.W);
-  MQN=bad.length?'err':'party';note=bad.length?`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง`:`บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`},
+  MQN=bad.length?'err':'party';note=bad.length?`บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ${svWhy(W)}`:`บันทึกทับ ${ok} ไฟล์ในโฟลเดอร์ “${d.name}” แล้ว`},
  next:()=>{if(!last)return;if(!last.saved&&!confirm('ผลการเติมนี้ยังไม่ได้บันทึกหรือดาวน์โหลด ใช้เป็นใบเช็คตั้งต้นของวันถัดไปเลยไหม? (ยังดาวน์โหลดผลนี้ได้จนกว่าจะเติมครั้งถัดไป)'))return;
   const old=new Map(C.map(f=>[f.name,f]));C=last.res.filter(r=>r.blob).map(r=>{const o=old.get(r.name)||{};const x={...o,name:r.name,buf:r.blob.buffer.slice(r.blob.byteOffset,r.blob.byteOffset+r.blob.byteLength),thru:+(r.thru||last.W)};delete x.nd;return x});
   DB=[];PFS=[];PLD=null;PLM={};PLX=[];PLI=[];OP.base='';BASEERR='';LIT=new Set();RO.clear();cs=null;fm='ทั้งหมด';q='';TQ='';dirty=0;tab='dat';window.scrollTo(0,0);
@@ -5575,7 +5597,11 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
    const fi=res.findIndex(r=>r.rep.some(isMust));if(fi>=0)RO.add(fi)}
   finally{FILLING=false;BUSY=null;$('.wrap').inert=false}}};
 function g(fn){const t=TQ.toLowerCase();if(!t)return;let c=0;for(const s of DB){let h=0;s.rows=s.rows.filter(r=>{if(!String(r.ad).toLowerCase().includes(t))return true;c++;h++;if(fn)fn(r);return !!fn});if(h){s.rows=stable(s.rows);touch(s)}}note=`แก้ไข ${c} แถว`}
-document.addEventListener('click',async e=>{const a=e.target.closest('[data-a]');if(!a||a.tagName==='INPUT')return;if(a.dataset.a==='file')return;if(a.disabled)return;try{await ACT[a.dataset.a](a.dataset.k)}catch(x){note='ผิดพลาด: '+(x.message||x)}view()});
+document.addEventListener('click',async e=>{const a=e.target.closest('[data-a]');if(!a||a.tagName==='INPUT')return;if(a.dataset.a==='file')return;if(a.disabled)return;
+ const sv=SVA.has(a.dataset.a);if(sv&&SVW){MQN='warn';note='การบันทึกครั้งก่อนยังค้างอยู่ใน Chrome — ปิดหน้าต่างเลือกโฟลเดอร์หรือกล่องถามสิทธิ์ที่ค้างอยู่ก่อน หรือกด F5 แล้วเริ่มใหม่';view();return}
+ if(sv)svBegin();let w=SVW;
+ try{await ACT[a.dataset.a](a.dataset.k)}catch(x){note='ผิดพลาด: '+(x.message||x)}
+ if(sv){const st=w&&w.stop;if(SVW===w)svEnd();if(st){note=w.cnote;MQN='warn'}}view()});
 document.addEventListener('change',e=>{const t=e.target;
  if(t.id==='o_base'){const raw=t.value.trim();if(!raw){OP.base='';BASEERR=''}else{const d=parseUserDate(raw);if(d){OP.base=end(d);BASEERR=''}else{BASEERR=raw;OP.base=''}}softView();return}
  if(t.dataset.frz!=null){const k=t.dataset.frz;if(t.checked)FRZOUT.delete(k);else FRZOUT.add(k);frzSave();softView();return}
