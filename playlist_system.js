@@ -180,6 +180,7 @@
  *   เวอร์ชัน 5.5.75: ใส่วันที่ถ่าย เลือกแบบอัปโหลดโฟลเดอร์ (ไดรฟ์เครือข่าย)
  *   เวอร์ชัน 5.5.76: บอกเหตุเมื่อปุ่มเลือกไฟล์กดไม่ขึ้นเพราะ Chrome ค้างโฟลเดอร์เครือข่าย
  *   เวอร์ชัน 5.5.77: ดึง Playlist วันจันทร์ไม่ถูกตัดที่ 3 นาที + ปุ่มบอกสถานะของ PLAYLIST INBOX
+ *   เวอร์ชัน 5.5.78: ใส่งาน Freeze Screen อัตโนมัติ (เอาติ๊กออกได้)
  * ======================================================================
  */
 
@@ -6412,7 +6413,7 @@ async function fillWb(f, on, metro, o) {
               ? ' • คงรายการเดิมของ ' + L.keep + ' (ไม่มีใน Playlist ที่ใส่มา) แถบวันที่ยังตรงกันทั้งชีต'
               : '') +
             (L.fdrop ? ' • ลบแถว #FAST_ADS ' + L.fdrop + ' แถว (ไม่ใช่หนังโฆษณา)' : '') +
-            (n => (n ? ' • ใส่งาน Freeze Screen ตามที่เลือก ' + n + ' เรื่อง' : ''))(
+            (n => (n ? ' • ใส่งาน Freeze Screen ' + n + ' เรื่อง' : ''))(
               new Set(
                 by[sn].flatMap(j =>
                   SIGAL[j[3].c] ? [] : j[3].rows.filter(r => !r.off && frzOn(r)).map(r => r.ad.trim()),
@@ -6518,7 +6519,7 @@ async function fillWb(f, on, metro, o) {
                 : 'ตรวจ: ไม่ใส่เพราะจำนวนครั้ง = 0 → ') +
                 z.join(', ') +
                 (!sig && j[3].rows.some(r => !r.off && isFrz(r) && z.includes(r.ad))
-                  ? ' (งาน Freeze Screen ติ๊กให้ใส่ได้ในขั้นที่ 3)'
+                  ? ' (มีงาน Freeze Screen ที่เอาติ๊กออกไว้ในขั้นที่ 3)'
                   : ''),
               0,
             ]);
@@ -10125,10 +10126,12 @@ function noteSkip(scr, r) {
   return false;
 }
 const ALLAL = new Set(Object.values(SIGAL).flat());
-/* 4.1.2: งาน Freeze Screen = จำนวนครั้ง 0 และหมายเหตุ/ชื่อมีคำว่า Freeze (ขึ้นจอเฉพาะช่วงเวลา) — ปกติไม่ใส่ ใส่เฉพาะเรื่องที่ผู้ใช้ติ๊กไว้ (FRZIN) */
-let FRZIN = new Set();
+/* 4.1.2: งาน Freeze Screen = จำนวนครั้ง 0 และหมายเหตุ/ชื่อมีคำว่า Freeze (ขึ้นจอเฉพาะช่วงเวลา)
+   5.5.78: หัวหน้าให้ใส่สินค้า Freeze Screen ด้วย → ใส่ทุกเรื่องอัตโนมัติ (รวมเรื่องใหม่วันต่อไป) • เรื่องที่ผู้ใช้เอาติ๊กออกเก็บใน FRZOUT (ps_frzout) */
+let FRZOUT = new Set();
 const isFrz = r => r.cnt === 0 && /freeze/i.test(String(r.note || '') + ' ' + String(r.ad || ''));
-const frzOn = r => isFrz(r) && FRZIN.has(String(r.ad).trim());
+const frzIn = ad => !FRZOUT.has(String(ad).trim());
+const frzOn = r => isFrz(r) && frzIn(r.ad);
 const sigNoCnt = (scr, r) => !!SIGAL[scr.c] && r.cnt == null && !String(r.note || '').trim(); /* 5.5.15 */
 const skipRow = (scr, r) =>
   SIGAL[scr.c] ? noteSkip(scr, r) || sigNoCnt(scr, r) : r.cnt === 0 && !MTP.test(r.ad.trim()) && !frzOn(r);
@@ -11227,7 +11230,7 @@ function plCheck(p, I) {
     });
   }
 }
-/* 4.1.2: งาน Freeze Screen ใน Playlist วันนี้ (จำนวนครั้ง = 0) — ผู้ใช้ติ๊กเรื่องที่จะใส่ ระบบจำไว้ในเครื่อง (ps_frz) */
+/* 4.1.2: งาน Freeze Screen ใน Playlist วันนี้ (จำนวนครั้ง = 0) • 5.5.78: ใส่ทุกเรื่อง เรื่องที่เอาติ๊กออก ระบบจำไว้ในเครื่อง (ps_frzout) */
 const frzList = (S = DB) => {
   const M = new Map();
   for (const s of S) {
@@ -11246,7 +11249,7 @@ const frzList = (S = DB) => {
   }
   return [...M.values()].sort((a, b) => cmpN(a.ad, b.ad));
 };
-const frzSave = () => store.set('ps_frz', JSON.stringify([...FRZIN].slice(-300)));
+const frzSave = () => store.set('ps_frzout', JSON.stringify([...FRZOUT].slice(-300)));
 const frzRep = () => {
   const L = frzList();
   return L.length
@@ -11254,7 +11257,8 @@ const frzRep = () => {
         '',
         'งาน Freeze Screen (จำนวนครั้ง = 0)',
         ...L.map(
-          x => `  ${FRZIN.has(x.ad) ? 'ใส่' : 'ไม่ใส่'} | ${x.ad}${x.t ? ' | ' + x.t : ''} | ${x.n.size} จอ`,
+          x =>
+            `  ${frzIn(x.ad) ? 'ใส่' : 'ไม่ใส่ (เอาติ๊กออก)'} | ${x.ad}${x.t ? ' | ' + x.t : ''} | ${x.n.size} จอ`,
         ),
       ]
     : [];
@@ -11266,8 +11270,8 @@ const frzAll = () => {
 const vFrz = () => {
   const L = frzList(frzAll());
   if (!L.length) return '';
-  const on = L.filter(x => FRZIN.has(x.ad)).length;
-  return `<div class="cols frz"><p class="cl">งาน Freeze Screen <span class="frzn">${on ? `ใส่ ${on} จาก ${L.length} เรื่อง` : `${L.length} เรื่อง ยังไม่ใส่`}</span></p><small>หนังที่ขึ้นจอเฉพาะช่วงเวลา (Playlist ใส่จำนวนครั้ง = 0 และหมายเหตุ Freeze Screen) ปกติระบบไม่ใส่ลงใบเช็ค ติ๊กเรื่องที่ต้องการให้ใส่ ระบบจำไว้ใช้วันต่อไป</small>${L.map(x => `<label class="cb frzi"><input type="checkbox" data-frz="${esc(x.ad)}"${FRZIN.has(x.ad) ? ' checked' : ''}><span>${esc(x.ad)}<small>${x.t ? esc(x.t) + ' • ' : ''}${x.n.size} จอ</small></span></label>`).join('')}</div>`;
+  const on = L.filter(x => frzIn(x.ad)).length;
+  return `<div class="cols frz"><p class="cl">งาน Freeze Screen <span class="frzn">${on === L.length ? `ใส่ทั้ง ${on} เรื่อง` : `ใส่ ${on} จาก ${L.length} เรื่อง`}</span></p><small>หนังที่ขึ้นจอเฉพาะช่วงเวลา (Playlist ใส่จำนวนครั้ง = 0 และหมายเหตุ Freeze Screen) ระบบใส่ลงใบเช็คให้ทุกเรื่อง เรื่องไหนไม่ต้องการ เอาติ๊กออก ระบบจำไว้ใช้วันต่อไป</small>${L.map(x => `<label class="cb frzi"><input type="checkbox" data-frz="${esc(x.ad)}"${frzIn(x.ad) ? ' checked' : ''}><span>${esc(x.ad)}<small>${x.t ? esc(x.t) + ' • ' : ''}${x.n.size} จอ</small></span></label>`).join('')}</div>`;
 };
 const plRepOf = I =>
     I.length
@@ -11789,7 +11793,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.77 (23 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.78 (24 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -11849,9 +11853,9 @@ OP.nostAdd = store.get('ps_nost') === '1';
 /* 5.5.21: ย้ายจอตามฐานข้อมูลให้เอง (ค่าเริ่มต้น เปิด) */ OP.col2 = store.get('ps_col2') || '';
 OP.padc = store.get('ps_padc') || '';
 try {
-  FRZIN = new Set(JSON.parse(store.get('ps_frz') || '[]'));
+  FRZOUT = new Set(JSON.parse(store.get('ps_frzout') || '[]'));
 } catch (_) {
-  FRZIN = new Set();
+  FRZOUT = new Set();
 }
 let adv = false,
   HELP = false,
@@ -18953,8 +18957,8 @@ document.addEventListener('change', e => {
   }
   if (t.dataset.frz != null) {
     const k = t.dataset.frz;
-    if (t.checked) FRZIN.add(k);
-    else FRZIN.delete(k);
+    if (t.checked) FRZOUT.delete(k);
+    else FRZOUT.add(k);
     frzSave();
     softView();
     return;
