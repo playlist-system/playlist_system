@@ -185,6 +185,7 @@
  *   เวอร์ชัน 5.5.80: ออกวันที่ไม่ย้อนก่อนวันที่ยังฉาย + อ่านชื่อไฟล์ On22 Nov 26
  *   เวอร์ชัน 5.5.81: กล่องบอกสถานะตอนกดบันทึก + สาเหตุที่บันทึกไม่ได้
  *   เวอร์ชัน 5.5.82: หน้างานโฟลเดอร์และรูปแบบใหม่ (แถบ 3 ขั้น • วิธีทำ + ภาพตัวอย่าง • การ์ดเครื่องมืออื่น) แค่หน้าตา
+ *   เวอร์ชัน 5.5.83: ภาพ “จะได้แบบนี้” ใช้ข้อมูลจริง (โครงโฟลเดอร์ของจอจริง • รูปจริง + แถวจริงในใบเช็ค)
  * ======================================================================
  */
 
@@ -3994,22 +3995,25 @@ async function shotScan(root, files, prog, wprog) {
       ),
     ];
     const days = [],
-      fdays = [];
+      fdays = [],
+      pd = [];
     for (const i of ix) {
       try {
         const f = await fs[i].getFile(),
           e = await exifDay(f);
-        if (e) days.push(e);
-        else {
+        if (e) {
+          days.push(e);
+          pd.push([e, fs[i]]);
+        } else {
           const d = new Date(f.lastModified);
           fdays.push(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
         }
       } catch (_) {}
     }
-    const v = { n: fs.length, days, fdays };
+    const v = { n: fs.length, days, fdays, pd };
     CF.set(k, v);
     return v;
-  }; /* รูปที่ไม่มีวันที่ถ่ายในไฟล์ (เช่น ส่งต่อทาง LINE) ไม่เดาจากวันที่ของไฟล์ */
+  }; /* 5.5.83: pd = [วันที่ถ่าย, ไฟล์รูป] ใช้แสดงรูปจริงในหน้างานโฟลเดอร์ */ /* รูปที่ไม่มีวันที่ถ่ายในไฟล์ (เช่น ส่งต่อทาง LINE) ไม่เดาจากวันที่ของไฟล์ */
   let bi = 0;
   const tot = files.reduce((t, f) => t + 1, 0);
   for (const f of files) {
@@ -4200,6 +4204,11 @@ async function shotScan(root, files, prog, wprog) {
                 nornd: !A.rd && !(B && B.rd),
                 st: C.st,
                 src,
+                ph: day
+                  ? ((okA.length ? A.P : B.P).pd || [])
+                      .filter(q => new Date(q[0]).getUTCDate() === day)
+                      .map(q => q[1])[0] || null
+                  : null,
               };
             if (val != null) {
               if (!n) R.has.push(row);
@@ -11826,7 +11835,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.82 (24 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.83 (24 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -14110,8 +14119,126 @@ const tvMini = (k, z) =>
   }</div>`;
 const TVLG = {
   pic: '<p class="tv-lg"><span><i class="tv-k new"></i>โฟลเดอร์ที่ระบบจะสร้าง</span><span><i class="tv-k old"></i>มีอยู่แล้ว ไม่แตะ</span></p>',
+  zip: '<p class="tv-lg"><span><i class="tv-k old"></i>โฟลเดอร์ที่จะอยู่ในไฟล์ .zip</span></p>',
+  shotR:
+    '<p class="tv-lg"><span><i class="tv-k ring"></i>ระบบจะใส่ให้</span><span><i class="tv-k w"></i>ควรดูก่อน</span></p>',
   shot: '<p class="tv-lg"><span><i class="tv-k cell"></i>มีเลขอยู่แล้ว ไม่เปลี่ยน</span><span><i class="tv-k ring"></i>ระบบใส่ให้</span><span><i class="tv-k w"></i>ควรดูก่อน</span></p>',
 };
+let TVI = 0,
+  TVIMG = null; /* 5.5.83: จอที่แสดงในภาพโครงโฟลเดอร์ (กด “จอถัดไป”) • รูปจริงที่โหลดไว้ */
+const tvTreeX = (lv, kids, more, have) =>
+  `<div class="tv-tree">${lv.map(([t, k], l) => `<div class="tv-tr l${l}${k === 1 ? ' n' : ''}" style="--l:${l}" title="${esc(t)}">${TVFD}<span>${esc(t)}</span>${k === 1 ? '<em>จะสร้าง</em>' : ''}</div>`).join('')}${kids.map(([t, k]) => `<div class="tv-tr l${lv.length}${k === 1 ? ' n' : k === 2 ? ' z' : ''}" style="--l:${lv.length}" title="${esc(t)}">${TVFD}<span>${esc(t)}</span><em>${k === 1 ? 'จะสร้าง' : k === 2 ? 'ใน .zip' : 'มีแล้ว'}</em></div>`).join('')}${more > 0 ? `<div class="tv-tr more" style="--l:${lv.length}"><span>… และอีก ${more.toLocaleString()} โฟลเดอร์</span></div>` : ''}${have > 0 ? `<div class="tv-tr more" style="--l:${lv.length}"><span>มีอยู่แล้ว ${have.toLocaleString()} โฟลเดอร์ ไม่แตะ</span></div>` : ''}</div>`;
+/* ภาพโครงโฟลเดอร์จากข้อมูลจริง: เลือกโฟลเดอร์แล้ว = จอที่ต้องสร้างโฟลเดอร์ (ของจริงในโฟลเดอร์ที่เลือก) • ยังไม่เลือก = โครงในไฟล์ .zip จากใบเช็ค */
+function tvPicFig(L) {
+  const P = L && L.pic && L.pic.P;
+  if (P && P.plan && P.plan.length) {
+    const W = P.plan.filter(x => x.need.length || x.mk.length),
+      A = W.length ? W : P.plan,
+      i = TVI % A.length,
+      x = A[i];
+    const lv = [
+      [P.dir, 0],
+      ...String(x.bk || '')
+        .split('/')
+        .filter(Boolean)
+        .map(n => [n, 0]),
+      ...x.chain.map(([n, h]) => [n, h ? 0 : 1]),
+    ];
+    return {
+      n: A.length,
+      cap: `จอ ${i + 1} จาก ${A.length.toLocaleString()}${W.length ? ' ที่ต้องสร้างโฟลเดอร์' : ''} • <b>${esc(x.label)}</b>`,
+      html: tvTreeX(
+        lv,
+        x.need.slice(0, 6).map(([, f]) => [f, 1]),
+        x.need.length - 6,
+        x.have,
+      ),
+      src: 'จากโฟลเดอร์ที่เลือก',
+    };
+  }
+  if (L && L.res && L.res.length) {
+    const zk = PICR + '|' + picUp();
+    if (L.tvzk !== zk) {
+      L.tvzk = zk;
+      try {
+        L.tvz = pzPlan(L.W, L.res, PICR, picUp(), null);
+      } catch (_) {
+        L.tvz = null;
+      }
+    }
+    const Z = L.tvz;
+    if (Z && Z.list.length) {
+      const i = TVI % Z.list.length,
+        x = Z.list[i];
+      return {
+        n: Z.list.length,
+        cap: `จอ ${i + 1} จาก ${Z.list.length.toLocaleString()} • <b>${esc(x.path[x.path.length - 1] || x.pack)}</b>`,
+        html: tvTreeX(
+          [[x.pack, 0], [x.rnd, 0], ...x.path.map(n => [n, 0])],
+          x.sub.slice(0, 7).map(n => [n, 2]),
+          x.sub.length - 7,
+          0,
+        ),
+        src: 'จากใบเช็คของคุณ',
+        zip: true,
+      };
+    }
+  }
+  return null;
+}
+/* รูปจริงของหนังเรื่องที่จะใส่วันที่ — โหลดจากไฟล์ในเครื่องครั้งเดียว (ไม่ส่งไปไหน) */
+function tvImg(x) {
+  const k = x.f + '|' + x.scr + '|' + x.nm;
+  if (TVIMG && TVIMG.k === k) return TVIMG;
+  const old = TVIMG,
+    o = { k, url: '', name: (x.ph && x.ph.name) || '' };
+  TVIMG = o;
+  if (old && old.url) URL.revokeObjectURL(old.url);
+  if (x.ph && /\.(jpe?g|png|webp)$/i.test(o.name))
+    Promise.resolve()
+      .then(() => x.ph.getFile())
+      .then(f => {
+        if (TVIMG !== o) return;
+        o.url = URL.createObjectURL(f);
+        view();
+      })
+      .catch(() => {});
+  return o;
+}
+/* ภาพใบเช็คจากผลตรวจวันที่ถ่ายจริง: แถวจริงในใบเช็ค + รูปจริงที่อ่านวันที่ได้ */
+function tvShotFig() {
+  const R = SHOT && SHOT.R;
+  if (!R) return null;
+  const F = R.fill || [],
+    W = [...R.has.map(x => [x, 'h']), ...R.bad.map(x => [x, 'b']), ...R.none.map(x => [x, 'n'])];
+  const row = F.find(x => x.ph) || F[0];
+  if (!row && !W.length) return null;
+  const b = row || W[0][0],
+    same = x => x.f === b.f && x.scr === b.scr,
+    w = W.find(([x]) => same(x));
+  const rows = [
+    ...F.filter(same)
+      .slice(0, 3)
+      .map(x => [x, 'f']),
+    ...(w ? [w] : []),
+  ];
+  const I = row ? tvImg(row) : null,
+    ph = row
+      ? `<div class="tv-ph2"><span class="tv-pic real"${I && I.url ? ` style="background-image:url('${I.url}')"` : ''}>${I && I.url ? '' : IC.cam}</span><span><small>${esc((I && I.name) || 'ไฟล์รูป')}</small><b>ถ่ายวันที่ ${row.day}</b><em>${esc(row.nm)}</em></span></div><span class="tv-ar">${IC.tvArr}</span>`
+      : '';
+  const tr = rows
+    .map(([x, k]) => {
+      const c = k === 'f' ? ' tv-in' : ' tv-wn',
+        nt = k === 'f' ? 'ใส่ให้' : k === 'h' ? 'ไม่พบรูป' : k === 'b' ? 'รูปไม่มีวันที่' : 'ยังไม่มีรูป';
+      return `<tr><td class="tv-rn">${esc(x.r)}</td><td class="tv-fm" title="${esc(x.nm)}">${esc(String(x.nm).length > 22 ? String(x.nm).slice(0, 21) + '…' : x.nm)}</td><td class="tv-dc${c}">${k === 'f' ? x.day : k === 'h' ? esc(x.v) : ''}</td><td class="tv-x${c}">${nt}</td></tr>`;
+    })
+    .join('');
+  return {
+    cap: `<b>${esc(b.f)}</b> • ชีต ${esc(b.sn)} • ${esc(b.scr)}`,
+    html: `<div class="tv-sh">${ph}<table class="tv-g"><thead><tr><th></th><th>ชื่อหนัง</th><th>วันที่ถ่าย</th><th class="tv-x"></th></tr></thead><tbody>${tr}</tbody></table></div>`,
+    src: 'จากใบเช็คและรูปจริงของคุณ',
+  };
+}
 const TVHINT = {
   blank: 'ทำครั้งเดียวตอนขึ้นเดือนใหม่',
   sdb: 'ใส่ไฟล์ฐานข้อมูลครั้งเดียว ระบบจำไว้',
@@ -14218,12 +14345,14 @@ function vTools() {
       ],
       fig: tvTree(rnN),
       lg: TVLG.pic,
+      real: K === 'pic' ? tvPicFig(L) : null,
+      ex: 'เลือกใบเช็คแล้ว ภาพตรงนี้จะเป็นโครงโฟลเดอร์ของจอจริง',
       dl: [
-        ['Pic @ แพค', 'แพคของจอ'],
+        ['Pic @ …', 'แพคของจอ'],
         [esc(rnN), 'เดือนและรอบที่เลือก'],
-        ['ST-01 …', 'จอแต่ละจอ ชื่อจากใบเช็คของแต่ละคน'],
+        ['ชื่อจอ', 'จอแต่ละจอ ชื่อจากใบเช็คของแต่ละคน'],
         ['#Fast Ads • #Module', 'โฟลเดอร์ที่มีในทุกจอ'],
-        ['A_30s …', 'หนังแต่ละเรื่องของรอบ ช่างภาพวางรูปไว้ที่นี่'],
+        ['ชื่อหนัง', 'หนังแต่ละเรื่องของรอบ ช่างภาพวางรูปไว้ที่นี่'],
       ],
     },
     shot: {
@@ -14245,6 +14374,8 @@ function vTools() {
       ],
       fig: tvSheet(),
       lg: TVLG.shot,
+      real: K === 'shot' ? tvShotFig() : null,
+      ex: 'เลือกโฟลเดอร์แยกรูปแล้ว ภาพตรงนี้จะเป็นแถวจริงในใบเช็คและรูปจริงของคุณ',
       dl: [
         ['ตัวเลข', 'วันที่ถ่ายที่อ่านจากไฟล์รูปในโฟลเดอร์ของหนังเรื่องนั้น'],
         ['มีเลขแล้ว', 'ไม่เปลี่ยนเลข'],
@@ -14336,7 +14467,7 @@ function vTools() {
  <div class="tv-cols"><div class="tv-l"><h3 class="tv-cap">ทำอย่างไร</h3><ol class="tv-how">${M.how.map(([t, d], i) => `<li${d ? ' class="tv-ok"' : ''}><span class="tv-sn" aria-hidden="true">${d ? IC.check : i + 1}</span><span>${t}${d ? '<span class="sr"> (ทำแล้ว)</span>' : ''}</span></li>`).join('')}</ol>
  <div class="tv-work">${work}</div>
  <details class="tv-faq"${TVFAQ ? ' open' : ''}><summary>${IC.tvChv}ถ้าเจอปัญหา<small>${M.faq.length} เรื่อง</small></summary><ul>${M.faq.map(([q, x]) => `<li><b>${q}</b><span>${x}</span></li>`).join('')}</ul></details></div>
- <figure class="tv-fig"><figcaption class="tv-cap">จะได้แบบนี้<small>ภาพตัวอย่าง</small></figcaption><div class="tv-box">${M.fig}</div>${M.lg || ''}<dl class="tv-dl">${M.dl.map(([x, y]) => `<dt>${x}</dt><dd>${y}</dd>`).join('')}</dl></figure></div></section>`;
+ <figure class="tv-fig"><figcaption class="tv-cap">จะได้แบบนี้<small>${M.real ? M.real.src : 'ภาพตัวอย่าง'}</small></figcaption>${M.real ? `<p class="tv-cap2"><span>${M.real.cap}</span>${M.real.n > 1 ? '<button class="linkb" data-a="tvnext">จอถัดไป</button>' : ''}</p>` : ''}<div class="tv-box">${M.real ? M.real.html : M.fig}</div>${M.real ? (K === 'shot' ? TVLG.shotR : M.real.zip ? TVLG.zip : M.lg || '') : M.lg || ''}${!M.real && M.ex ? `<p class="tv-note">${M.ex}</p>` : ''}<dl class="tv-dl">${M.dl.map(([x, y]) => `<dt>${x}</dt><dd>${y}</dd>`).join('')}</dl></figure></div></section>`;
   const oc = (k, t, d, fig, st) =>
     `<article class="tv-card${K === k ? ' on' : ''}"><div class="tv-ill" aria-hidden="true">${fig}</div><div class="tv-cb"><h3>${t}</h3><p>${d}</p><div class="tv-st st-${st[0]}">${st[0] === 'ok' ? IC.okc : st[0] === 'mu' ? IC.info : IC.warn}<span><b>${tvSt(st)}</b><small>${st[1] === '—' ? TVHINT[k] : st[3]}</small></span></div>${n ? `<button class="btn ${K === k ? 'primary' : 'secondary'}" data-a="toolv" data-k="${k}" aria-controls="tdetail">${K === k ? 'เปิดอยู่ด้านบน' : 'เปิด'}</button>` : ''}</div></article>`;
   return `${shead('งานโฟลเดอร์และรูป', 'หลังเติมใบเช็คแต่ละวัน ทำ 3 ขั้นนี้ตามลำดับ กดที่ขั้นเพื่อดูวิธีทำและภาพตัวอย่าง • ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
@@ -18852,6 +18983,9 @@ const ACT = {
     await tcRead();
     MQN = PICX && PICX.res.length ? 'catch' : 'warn';
   },
+  tvnext: () => {
+    TVI++;
+  } /* 5.5.83: ภาพโครงโฟลเดอร์ — ดูจอถัดไป */,
   tcclear: () => {
     if (!tcOk()) return;
     TC = [];
