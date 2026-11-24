@@ -1061,14 +1061,14 @@ a.btn{text-decoration:none}
 .tv-faq li{display:grid;gap:2px;padding:10px 14px;border-radius:12px;background:var(--sf2);font-size:14.5px}
 .tv-faq li span{color:var(--mu)}
 .tv-fig{margin:0;padding:20px 24px 24px;display:grid;gap:14px;align-content:start;background:var(--sf2);border-left:1px solid var(--ln);min-width:0}
-.tv-box{display:grid;place-items:center;padding:16px;border-radius:16px;background:var(--sf);border:1px solid var(--ln);overflow-x:auto}
+.tv-box{display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:16px;border-radius:16px;background:var(--sf);border:1px solid var(--ln);overflow-x:auto}
 .tv-lg{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;font-size:13.5px;color:var(--mu)}
 .tv-lg span{display:inline-flex;align-items:center;gap:6px}
 .tv-k{display:inline-block;width:12px;height:12px;border-radius:4px;flex:none}
 .tv-k.new{background:var(--ac)}.tv-k.old{background:var(--sf3);border:1px solid var(--ln2)}.tv-k.cell{background:#16171C;box-shadow:0 0 0 1px var(--ln2)}.tv-k.ring{background:#16171C;box-shadow:inset 0 0 0 2px #5B3BEF,0 0 0 1px var(--ln2)}.tv-k.w{background:var(--wrsoft);border:1px solid var(--wrln)}
 .tv-dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 14px;margin:0;padding-top:12px;border-top:1px solid var(--ln);font-size:14px;line-height:1.5}
 .tv-dl dt{font-weight:600;color:var(--tx)}.tv-dl dd{margin:0;color:var(--mu)}
-.tv-tree{display:grid;gap:2px;width:100%;font-size:14.5px;line-height:1.35}
+.tv-tree{display:grid;grid-template-columns:minmax(0,1fr);justify-self:stretch;gap:2px;width:100%;font-size:14.5px;line-height:1.35}
 .tv-tr{position:relative;display:flex;align-items:center;gap:8px;min-height:32px;padding:4px 10px 4px calc(var(--l)*24px + 10px);border-radius:10px;color:var(--tx2)}
 .tv-tr::before{content:"";position:absolute;left:calc(var(--l)*24px - 8px);top:-6px;width:11px;height:22px;border-left:1.5px solid var(--ln2);border-bottom:1.5px solid var(--ln2);border-bottom-left-radius:6px}
 .tv-tr.l0::before{display:none}
@@ -1090,7 +1090,7 @@ a.btn{text-decoration:none}
 .tv-g .tv-fm{font-family:var(--f-mono,ui-monospace,monospace);min-width:84px}
 .tv-g .tv-dc{width:46px;text-align:center;font-weight:700;background:#16171C;color:#fff}
 .tv-g .tv-dc.tv-in{box-shadow:inset 0 0 0 3px #5B3BEF}
-.tv-g .tv-dc.tv-wn{background:#FFF1E0;box-shadow:inset 0 0 0 2px #FFCF9E}
+.tv-g .tv-dc.tv-wn{background:#FFF1E0;color:#9A4A00;box-shadow:inset 0 0 0 2px #FFCF9E}
 .tv-g .tv-x,.tv-g th.tv-x{border:0;background:none;padding:0 0 0 8px;font-size:12.5px;font-weight:600}
 .tv-g .tv-x.tv-in{color:var(--acd)}.tv-g .tv-x.tv-wn{color:var(--wr)}
 .tv-mini{display:flex;align-items:center;justify-content:center;gap:10px}
@@ -1114,9 +1114,17 @@ a.btn{text-decoration:none}
 .tv-st b{display:block;font-size:14.5px;font-weight:600}.tv-st small{display:block;font-size:13px;color:var(--tx2)}
 .tv-st.st-ok{background:var(--oksoft);color:var(--ok)}.tv-st.st-wr{background:var(--wrsoft);color:var(--wr)}.tv-st.st-er{background:var(--ersoft);color:var(--er)}
 .tv-cb>.btn{align-self:flex-start}
+.tv-cap2{display:flex;align-items:center;justify-content:space-between;gap:4px 12px;flex-wrap:wrap;margin:-6px 0 0;font-size:13px;color:var(--mu)}
+.tv-cap2 b{color:var(--tx2);font-weight:600;overflow-wrap:anywhere}.tv-cap2 .linkb{font-size:13px;min-height:32px}
+.tv-tr>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tv-tr.z em{background:var(--sf3);color:var(--tx2)}
+.tv-tr.more{color:var(--mu);font-size:13.5px}.tv-tr.more::before{border-bottom-style:dashed}
+.tv-pic.real{background:var(--sf2) center/cover no-repeat;display:grid;place-items:center;color:var(--mu)}.tv-pic.real::after{display:none}.tv-pic.real svg{width:26px;height:26px}
+.tv-ph2 em{font-style:normal;font-size:12.5px;color:var(--mu);overflow-wrap:anywhere}
+.tv-note{margin:0;padding:10px 12px;border-radius:12px;background:var(--sf);border:1px dashed var(--ln2);font-size:13.5px;color:var(--tx2)}
 @media (max-width:1180px){.tv-cols{grid-template-columns:1fr}.tv-fig{border-left:0;border-top:1px solid var(--ln)}.tv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.tv-steps{grid-template-columns:1fr}.tv-steps li+li{border-left:0;border-top:1px solid var(--ln)}.tv-step{min-height:68px}.tv-grid{grid-template-columns:1fr}
- .tv-ph,.tv-l,.tv-fig{padding-left:16px;padding-right:16px}.tv-box{padding:12px}}
+ .tv-ph,.tv-l,.tv-fig{padding-left:16px;padding-right:16px}.tv-box{padding:12px}.tv-g .tv-x{display:none}}
 </style></head><body>
 <div class="wrap"><header class="hdr"><div class="brand"><span class="logo5" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="3.5"/><path d="M8 7l2-3h4l2 3"/><path d="M9.2 13.6l2 2 3.8-4"/></svg></span><div><b>PHOTO CHECK STUDIO</b><small>BUILT WITH AI • 2026</small></div></div><nav id="hnav" class="hnav" aria-label="เมนูหลัก"></nav></header><div class="shell"><nav id="side" class="side" aria-label="เมนู" data-tour="steps"></nav><div class="mainc"><nav id="sect" class="sect" aria-label="ส่วนของระบบ"></nav><nav id="steps" class="band" aria-label="ขั้นตอน"></nav><main id="app"><div class="boot">กำลังเปิดระบบ …<p class="bootx">ถ้าค้างอยู่หน้านี้นาน หรือระบบเปิดไม่ขึ้น ลองกด Ctrl+F5 ก่อน — ถ้ายังไม่ได้ <a href="https://playlist-system.github.io/playlist_system/versions/">ใช้เวอร์ชันก่อนหน้า</a></p></div></main></div></div><footer class="foot"><span id="ver"></span><span>ไฟล์ทั้งหมดประมวลผลในเครื่องนี้ ไม่ถูกส่งออกไปที่ใด</span><a id="prevv" class="prevv" href="https://playlist-system.github.io/playlist_system/versions/" title="ใช้เมื่อเวอร์ชันล่าสุดมีปัญหา เช่น เปิดไม่ขึ้น หรือเติมผิด">ใช้เวอร์ชันก่อนหน้า</a></footer></div><input type="color" id="colpick" class="sr" tabindex="-1" aria-hidden="true"><input type="file" id="picker" class="sr" tabindex="-1" aria-hidden="true" multiple><input type="file" id="pickdir" class="sr" tabindex="-1" aria-hidden="true" webkitdirectory multiple><div id="ovl"></div><div id="busy"></div><div id="tour"></div><div id="msg" role="status" aria-live="polite"></div><div id="mq"></div>
 <script>/*! xlsx.js (C) 2013-present SheetJS -- http://sheetjs.com */
@@ -1982,8 +1990,8 @@ async function shotScan(root,files,prog,wprog){
   CM.set(k,v);return v};
  const pics=async(dh,k)=>{if(CF.has(k))return CF.get(k);const fs=[];for await(const[n,x]of dh.entries())if(x.kind==='file'&&IMGX.test(n)&&!n.startsWith('.'))fs.push(x);
   fs.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const ix=[...new Set(fs.length<=6?fs.map((_,i)=>i):[0,1,Math.floor(fs.length/3),Math.floor(fs.length*2/3),fs.length-2,fs.length-1])];
-  const days=[],fdays=[];for(const i of ix){try{const f=await fs[i].getFile(),e=await exifDay(f);if(e)days.push(e);else{const d=new Date(f.lastModified);fdays.push(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))}}catch(_){}}
-  const v={n:fs.length,days,fdays};CF.set(k,v);return v}; /* รูปที่ไม่มีวันที่ถ่ายในไฟล์ (เช่น ส่งต่อทาง LINE) ไม่เดาจากวันที่ของไฟล์ */
+  const days=[],fdays=[],pd=[];for(const i of ix){try{const f=await fs[i].getFile(),e=await exifDay(f);if(e){days.push(e);pd.push([e,fs[i]])}else{const d=new Date(f.lastModified);fdays.push(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))}}catch(_){}}
+  const v={n:fs.length,days,fdays,pd};CF.set(k,v);return v}; /* 5.5.83: pd = [วันที่ถ่าย, ไฟล์รูป] ใช้แสดงรูปจริงในหน้างานโฟลเดอร์ */ /* รูปที่ไม่มีวันที่ถ่ายในไฟล์ (เช่น ส่งต่อทาง LINE) ไม่เดาจากวันที่ของไฟล์ */
  let bi=0;const tot=files.reduce((t,f)=>t+1,0);
  for(const f of files){let X;try{X=await chkRead(f)}catch(_){R.read.push(f.name);continue}
   const M=new Date(X.mx||Date.now()),y=M.getUTCFullYear(),m=M.getUTCMonth(),m0=Date.UTC(y,m,1),cut=Date.UTC(y,m,16),m1=Date.UTC(y,m+1,1),ld=new Date(m1-864e5).getUTCDate();
@@ -2009,7 +2017,7 @@ async function shotScan(root,files,prog,wprog){
      const A=await look(two);let B=null;if(late&&!okD(A.P).length)B=await look(true); /* หนังรอบ 1–15 ที่ถ่ายตอนรอบ 16 (รวมหนังชื่อซ้ำที่ต่อสัญญา) → รูปอยู่โฟลเดอร์ 16-30 / 16-31 */
      const okA=okD(A.P),okB=B?okD(B.P,isRen):[],src=okA.length?'':okB.length?'16-'+ld:'',ok=okA.length?okA:okB,day=ok.length?new Date(Math.max(...ok)).getUTCDate():0;
      const n=A.P.n+(B?B.P.n:0),days=[...A.P.days,...(B?B.P.days:[])],fdays=[...A.P.fdays,...(B?B.P.fdays:[])];
-     const fok=fdays.filter(d=>d>=g&&d<m1&&(!ed||d<=ed)),row={f:f.name,sn:x.sn,scr:C.id,nm,r,c:C.c,rnd:rn,v:val,day,n,ld,fd:fdays.length,fday:fok.length?new Date(Math.max(...fok)).getUTCDate():0, /* 5.5.54: วันที่ของไฟล์รูป (รูปไม่มีวันที่ถ่ายในไฟล์) — ใช้เมื่อผู้ใช้เลือก “ตามวันที่ของไฟล์” */nofold:!A.fh&&!(B&&B.fh),nornd:!A.rd&&!(B&&B.rd),st:C.st,src};
+     const fok=fdays.filter(d=>d>=g&&d<m1&&(!ed||d<=ed)),row={f:f.name,sn:x.sn,scr:C.id,nm,r,c:C.c,rnd:rn,v:val,day,n,ld,fd:fdays.length,fday:fok.length?new Date(Math.max(...fok)).getUTCDate():0, /* 5.5.54: วันที่ของไฟล์รูป (รูปไม่มีวันที่ถ่ายในไฟล์) — ใช้เมื่อผู้ใช้เลือก “ตามวันที่ของไฟล์” */nofold:!A.fh&&!(B&&B.fh),nornd:!A.rd&&!(B&&B.rd),st:C.st,src,ph:day?((okA.length?A.P:B.P).pd||[]).filter(q=>new Date(q[0]).getUTCDate()===day).map(q=>q[1])[0]||null:null};
      if(val!=null){if(!n)R.has.push(row);else if(day&&/^\d{1,2}$/.test(String(val).trim())&&+val!==day)R.diff.push(row)}
      else if(!n)R.none.push(row);
      else if(day){R.fill.push(row);R.n++}
@@ -4768,8 +4776,30 @@ const tvMini=(k,z)=>`<div class="tv-mini"${z?` style="zoom:${z}"`:''}>${k==='bla
  :k==='db'?`<div class="tv-mc"><span><i class="tv-dot"></i>ST-01 ตรงกัน</span><span><i class="tv-dot w"></i>ST-07 ขาดในใบเช็ค</span><span><i class="tv-dot w"></i>ST-12 อยู่ใบของคนอื่น</span></div>`
  :k==='cmp'?`<div class="tv-mc"><b>ใบเช็ค</b><span>${TVFD}แพค 1</span><span>${TVFD}แพค 2</span></div><span class="tv-ar">${IC.tvArr}</span><div class="tv-mc"><b>โฟลเดอร์</b><span>${TVFD}แพค 1</span><span>${TVFD}แพค 3</span></div>`
  :`<div class="tv-mc"><span>${IC.fillI}ใบเช็ค A.xlsm</span><span>${IC.fillI}ใบเช็ค B.xlsm</span><span>${IC.fillI}ใบเช็ค C.xlsm</span></div><span class="tv-ar">${IC.tvArr}</span><div class="tv-mc"><b>อ่านได้</b><span>ST-01 • 6 เรื่อง</span><span>ST-02 • 4 เรื่อง</span><span>รอบ 16–31</span></div>`}</div>`;
-const TVLG={pic:'<p class="tv-lg"><span><i class="tv-k new"></i>โฟลเดอร์ที่ระบบจะสร้าง</span><span><i class="tv-k old"></i>มีอยู่แล้ว ไม่แตะ</span></p>',
+const TVLG={pic:'<p class="tv-lg"><span><i class="tv-k new"></i>โฟลเดอร์ที่ระบบจะสร้าง</span><span><i class="tv-k old"></i>มีอยู่แล้ว ไม่แตะ</span></p>',zip:'<p class="tv-lg"><span><i class="tv-k old"></i>โฟลเดอร์ที่จะอยู่ในไฟล์ .zip</span></p>',shotR:'<p class="tv-lg"><span><i class="tv-k ring"></i>ระบบจะใส่ให้</span><span><i class="tv-k w"></i>ควรดูก่อน</span></p>',
  shot:'<p class="tv-lg"><span><i class="tv-k cell"></i>มีเลขอยู่แล้ว ไม่เปลี่ยน</span><span><i class="tv-k ring"></i>ระบบใส่ให้</span><span><i class="tv-k w"></i>ควรดูก่อน</span></p>'};
+let TVI=0,TVIMG=null; /* 5.5.83: จอที่แสดงในภาพโครงโฟลเดอร์ (กด “จอถัดไป”) • รูปจริงที่โหลดไว้ */
+const tvTreeX=(lv,kids,more,have)=>`<div class="tv-tree">${lv.map(([t,k],l)=>`<div class="tv-tr l${l}${k===1?' n':''}" style="--l:${l}" title="${esc(t)}">${TVFD}<span>${esc(t)}</span>${k===1?'<em>จะสร้าง</em>':''}</div>`).join('')}${kids.map(([t,k])=>`<div class="tv-tr l${lv.length}${k===1?' n':k===2?' z':''}" style="--l:${lv.length}" title="${esc(t)}">${TVFD}<span>${esc(t)}</span><em>${k===1?'จะสร้าง':k===2?'ใน .zip':'มีแล้ว'}</em></div>`).join('')}${more>0?`<div class="tv-tr more" style="--l:${lv.length}"><span>… และอีก ${more.toLocaleString()} โฟลเดอร์</span></div>`:''}${have>0?`<div class="tv-tr more" style="--l:${lv.length}"><span>มีอยู่แล้ว ${have.toLocaleString()} โฟลเดอร์ ไม่แตะ</span></div>`:''}</div>`;
+/* ภาพโครงโฟลเดอร์จากข้อมูลจริง: เลือกโฟลเดอร์แล้ว = จอที่ต้องสร้างโฟลเดอร์ (ของจริงในโฟลเดอร์ที่เลือก) • ยังไม่เลือก = โครงในไฟล์ .zip จากใบเช็ค */
+function tvPicFig(L){const P=L&&L.pic&&L.pic.P;
+ if(P&&P.plan&&P.plan.length){const W=P.plan.filter(x=>x.need.length||x.mk.length),A=W.length?W:P.plan,i=TVI%A.length,x=A[i];
+  const lv=[[P.dir,0],...String(x.bk||'').split('/').filter(Boolean).map(n=>[n,0]),...x.chain.map(([n,h])=>[n,h?0:1])];
+  return{n:A.length,cap:`จอ ${i+1} จาก ${A.length.toLocaleString()}${W.length?' ที่ต้องสร้างโฟลเดอร์':''} • <b>${esc(x.label)}</b>`,html:tvTreeX(lv,x.need.slice(0,6).map(([,f])=>[f,1]),x.need.length-6,x.have),src:'จากโฟลเดอร์ที่เลือก'}}
+ if(L&&L.res&&L.res.length){const zk=PICR+'|'+picUp();if(L.tvzk!==zk){L.tvzk=zk;try{L.tvz=pzPlan(L.W,L.res,PICR,picUp(),null)}catch(_){L.tvz=null}}const Z=L.tvz;
+  if(Z&&Z.list.length){const i=TVI%Z.list.length,x=Z.list[i];
+   return{n:Z.list.length,cap:`จอ ${i+1} จาก ${Z.list.length.toLocaleString()} • <b>${esc(x.path[x.path.length-1]||x.pack)}</b>`,html:tvTreeX([[x.pack,0],[x.rnd,0],...x.path.map(n=>[n,0])],x.sub.slice(0,7).map(n=>[n,2]),x.sub.length-7,0),src:'จากใบเช็คของคุณ',zip:true}}}
+ return null}
+/* รูปจริงของหนังเรื่องที่จะใส่วันที่ — โหลดจากไฟล์ในเครื่องครั้งเดียว (ไม่ส่งไปไหน) */
+function tvImg(x){const k=x.f+'|'+x.scr+'|'+x.nm;if(TVIMG&&TVIMG.k===k)return TVIMG;const old=TVIMG,o={k,url:'',name:x.ph&&x.ph.name||''};TVIMG=o;if(old&&old.url)URL.revokeObjectURL(old.url);
+ if(x.ph&&/\.(jpe?g|png|webp)$/i.test(o.name))Promise.resolve().then(()=>x.ph.getFile()).then(f=>{if(TVIMG!==o)return;o.url=URL.createObjectURL(f);view()}).catch(()=>{});return o}
+/* ภาพใบเช็คจากผลตรวจวันที่ถ่ายจริง: แถวจริงในใบเช็ค + รูปจริงที่อ่านวันที่ได้ */
+function tvShotFig(){const R=SHOT&&SHOT.R;if(!R)return null;const F=R.fill||[],W=[...R.has.map(x=>[x,'h']),...R.bad.map(x=>[x,'b']),...R.none.map(x=>[x,'n'])];
+ const row=F.find(x=>x.ph)||F[0];if(!row&&!W.length)return null;const b=row||W[0][0],same=x=>x.f===b.f&&x.scr===b.scr,w=W.find(([x])=>same(x));
+ const rows=[...F.filter(same).slice(0,3).map(x=>[x,'f']),...(w?[w]:[])];
+ const I=row?tvImg(row):null,ph=row?`<div class="tv-ph2"><span class="tv-pic real"${I&&I.url?` style="background-image:url('${I.url}')"`:''}>${I&&I.url?'':IC.cam}</span><span><small>${esc(I&&I.name||'ไฟล์รูป')}</small><b>ถ่ายวันที่ ${row.day}</b><em>${esc(row.nm)}</em></span></div><span class="tv-ar">${IC.tvArr}</span>`:'';
+ const tr=rows.map(([x,k])=>{const c=k==='f'?' tv-in':' tv-wn',nt=k==='f'?'ใส่ให้':k==='h'?'ไม่พบรูป':k==='b'?'รูปไม่มีวันที่':'ยังไม่มีรูป';
+  return`<tr><td class="tv-rn">${esc(x.r)}</td><td class="tv-fm" title="${esc(x.nm)}">${esc(String(x.nm).length>22?String(x.nm).slice(0,21)+'…':x.nm)}</td><td class="tv-dc${c}">${k==='f'?x.day:k==='h'?esc(x.v):''}</td><td class="tv-x${c}">${nt}</td></tr>`}).join('');
+ return{cap:`<b>${esc(b.f)}</b> • ชีต ${esc(b.sn)} • ${esc(b.scr)}`,html:`<div class="tv-sh">${ph}<table class="tv-g"><thead><tr><th></th><th>ชื่อหนัง</th><th>วันที่ถ่าย</th><th class="tv-x"></th></tr></thead><tbody>${tr}</tbody></table></div>`,src:'จากใบเช็คและรูปจริงของคุณ'}}
 const TVHINT={blank:'ทำครั้งเดียวตอนขึ้นเดือนใหม่',sdb:'ใส่ไฟล์ฐานข้อมูลครั้งเดียว ระบบจำไว้',cmp:'ใช้เมื่อมีการย้ายจอระหว่างแพค'};
 function vTools(){const n=TC.length,L=PICX,
   src=TCS==='last'?'ใบเช็คที่เพิ่งเติม (ผลการเติมล่าสุด)':TCS==='c'?'ใบเช็คที่ใส่ไว้ในขั้นที่ 3':TCS==='dir'?`ใบเช็คทั้งโฟลเดอร์ “${esc(TCN)}”`:'ไฟล์ที่เพิ่มในหน้านี้',
@@ -4791,11 +4821,11 @@ function vTools(){const n=TC.length,L=PICX,
   pic:{t:'สร้างโฟลเดอร์แยกรูป',d:'ทำโฟลเดอร์ว่างให้หนังทุกเรื่องในใบเช็ค ช่างภาพวางรูปลงโฟลเดอร์ของหนังเรื่องนั้นได้เลย',st:S.pic,
    how:[['เลือกรอบ (ปกติคือรอบนี้)',pk],['เลือกโฟลเดอร์แยกรูปที่ใช้อยู่ หรือดาวน์โหลดโครงโฟลเดอร์ (.zip)',pk],['ดูรายการที่จะสร้าง แล้วกด “สร้าง … โฟลเดอร์”',S.pic[0]==='ok']],
    faq:[['เลือกโฟลเดอร์แล้วไม่มีอะไรเกิดขึ้น','กด “ดาวน์โหลดโครงโฟลเดอร์ (.zip)” แทน แล้วคัดลอกโฟลเดอร์ Pic @ ไปวางในโฟลเดอร์ Gallary โฟลเดอร์ที่มีอยู่จะรวมกัน รูปเดิมไม่หาย'],['ชื่อจอใน .zip ไม่ตรงกับโฟลเดอร์ในไดรฟ์','ที่ “ชื่อโฟลเดอร์จอใน .zip” เลือก “ตามโฟลเดอร์ที่มีอยู่”'],['อยากสร้างเฉพาะหนังที่ขึ้นจอแล้ว','เลือกวันที่ที่ “หนังที่ขึ้นจอถึงวันที่”']],
-   fig:tvTree(rnN),lg:TVLG.pic,dl:[['Pic @ แพค','แพคของจอ'],[esc(rnN),'เดือนและรอบที่เลือก'],['ST-01 …','จอแต่ละจอ ชื่อจากใบเช็คของแต่ละคน'],['#Fast Ads • #Module','โฟลเดอร์ที่มีในทุกจอ'],['A_30s …','หนังแต่ละเรื่องของรอบ ช่างภาพวางรูปไว้ที่นี่']]},
+   fig:tvTree(rnN),lg:TVLG.pic,real:K==='pic'?tvPicFig(L):null,ex:'เลือกใบเช็คแล้ว ภาพตรงนี้จะเป็นโครงโฟลเดอร์ของจอจริง',dl:[['Pic @ …','แพคของจอ'],[esc(rnN),'เดือนและรอบที่เลือก'],['ชื่อจอ','จอแต่ละจอ ชื่อจากใบเช็คของแต่ละคน'],['#Fast Ads • #Module','โฟลเดอร์ที่มีในทุกจอ'],['ชื่อหนัง','หนังแต่ละเรื่องของรอบ ช่างภาพวางรูปไว้ที่นี่']]},
   shot:{t:'ใส่วันที่ถ่าย',d:'อ่านวันที่ถ่ายจากไฟล์รูป ใส่ลงช่องหลังชื่อหนังที่ยังว่าง เป็นพื้นดำ ตัวเลขขาว ช่องที่มีเลขแล้วไม่เปลี่ยนเลข',st:S.shot,
    how:[['เลือกโฟลเดอร์แยกรูปของรอบนี้',!!Rs],['ดูช่องที่จะใส่ และช่องที่ระบบให้ดูก่อน',!!Ds],['กดใส่วันที่ แล้วบันทึกทับในโฟลเดอร์ใบเช็ค (ไฟล์เดิมเก็บไว้ในโฟลเดอร์สำรอง)',!!(Ds&&Ds.saved)]],
    faq:[['รูปที่ส่งต่อทาง LINE (วันที่ถ่ายหายไป)','เปิดหัวข้อ “มีรูป แต่ใส่วันที่ให้ไม่ได้” แล้วเลือกวันที่ถ่ายของจอนั้นเอง'],['เลือกโฟลเดอร์บนไดรฟ์เครือข่ายแล้วไม่มีอะไรเกิดขึ้น','กด “เลือกแบบอัปโหลดโฟลเดอร์” แทน'],['ช่องที่มีเลขอยู่แล้ว','ระบบไม่เปลี่ยนเลข ถ้ายังไม่เป็นพื้นดำ ตัวเลขขาว ระบบแก้สีให้']],
-   fig:tvSheet(),lg:TVLG.shot,dl:[['ตัวเลข','วันที่ถ่ายที่อ่านจากไฟล์รูปในโฟลเดอร์ของหนังเรื่องนั้น'],['มีเลขแล้ว','ไม่เปลี่ยนเลข'],['ไม่มีรูป','ไม่ใส่ ไม่เดา ระบบบอกให้ดู']]},
+   fig:tvSheet(),lg:TVLG.shot,real:K==='shot'?tvShotFig():null,ex:'เลือกโฟลเดอร์แยกรูปแล้ว ภาพตรงนี้จะเป็นแถวจริงในใบเช็คและรูปจริงของคุณ',dl:[['ตัวเลข','วันที่ถ่ายที่อ่านจากไฟล์รูปในโฟลเดอร์ของหนังเรื่องนั้น'],['มีเลขแล้ว','ไม่เปลี่ยนเลข'],['ไม่มีรูป','ไม่ใส่ ไม่เดา ระบบบอกให้ดู']]},
   blank:{t:'ใบเปล่าเดือนใหม่',d:'ทำใบเปล่าของเดือนใหม่จากใบเช็คเดือนล่าสุด ไฟล์เดิมไม่ถูกแก้',st:S.blank,
    how:[['เลือกใบเช็คเดือนล่าสุดของทุกคนในขั้นที่ 1 “ใบเช็คที่ใช้”',ok1],['กดทำใบเปล่า แล้วดูรายการ',!!(B0&&B0.ok)],['บันทึกลงโฟลเดอร์ของเดือนใหม่ หรือดาวน์โหลด .zip',!!(B0&&B0.sv)]],
    faq:[['มีจอย้ายคน หรือจอใหม่','ใส่ไฟล์ฐานข้อมูลจอที่ “ตรวจจอกับฐานข้อมูล” ระบบจะบอกและเพิ่มจอที่ใบเปล่ายังขาดให้ได้ก่อนบันทึก'],['ไฟล์เดิมจะหายไหม','ไม่หาย ระบบทำสำเนาใหม่ ถ้าบันทึกทับ ไฟล์เดิมเก็บไว้ในโฟลเดอร์สำรอง']],
@@ -4815,7 +4845,7 @@ function vTools(){const n=TC.length,L=PICX,
  <div class="tv-cols"><div class="tv-l"><h3 class="tv-cap">ทำอย่างไร</h3><ol class="tv-how">${M.how.map(([t,d],i)=>`<li${d?' class="tv-ok"':''}><span class="tv-sn" aria-hidden="true">${d?IC.check:i+1}</span><span>${t}${d?'<span class="sr"> (ทำแล้ว)</span>':''}</span></li>`).join('')}</ol>
  <div class="tv-work">${work}</div>
  <details class="tv-faq"${TVFAQ?' open':''}><summary>${IC.tvChv}ถ้าเจอปัญหา<small>${M.faq.length} เรื่อง</small></summary><ul>${M.faq.map(([q,x])=>`<li><b>${q}</b><span>${x}</span></li>`).join('')}</ul></details></div>
- <figure class="tv-fig"><figcaption class="tv-cap">จะได้แบบนี้<small>ภาพตัวอย่าง</small></figcaption><div class="tv-box">${M.fig}</div>${M.lg||''}<dl class="tv-dl">${M.dl.map(([x,y])=>`<dt>${x}</dt><dd>${y}</dd>`).join('')}</dl></figure></div></section>`;
+ <figure class="tv-fig"><figcaption class="tv-cap">จะได้แบบนี้<small>${M.real?M.real.src:'ภาพตัวอย่าง'}</small></figcaption>${M.real?`<p class="tv-cap2"><span>${M.real.cap}</span>${M.real.n>1?'<button class="linkb" data-a="tvnext">จอถัดไป</button>':''}</p>`:''}<div class="tv-box">${M.real?M.real.html:M.fig}</div>${M.real?(K==='shot'?TVLG.shotR:M.real.zip?TVLG.zip:M.lg||''):(M.lg||'')}${!M.real&&M.ex?`<p class="tv-note">${M.ex}</p>`:''}<dl class="tv-dl">${M.dl.map(([x,y])=>`<dt>${x}</dt><dd>${y}</dd>`).join('')}</dl></figure></div></section>`;
  const oc=(k,t,d,fig,st)=>`<article class="tv-card${K===k?' on':''}"><div class="tv-ill" aria-hidden="true">${fig}</div><div class="tv-cb"><h3>${t}</h3><p>${d}</p><div class="tv-st st-${st[0]}">${st[0]==='ok'?IC.okc:st[0]==='mu'?IC.info:IC.warn}<span><b>${tvSt(st)}</b><small>${st[1]==='—'?TVHINT[k]:st[3]}</small></span></div>${n?`<button class="btn ${K===k?'primary':'secondary'}" data-a="toolv" data-k="${k}" aria-controls="tdetail">${K===k?'เปิดอยู่ด้านบน':'เปิด'}</button>`:''}</div></article>`;
  return`${shead('งานโฟลเดอร์และรูป','หลังเติมใบเช็คแต่ละวัน ทำ 3 ขั้นนี้ตามลำดับ กดที่ขั้นเพื่อดูวิธีทำและภาพตัวอย่าง • ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
  ${FSA?'':alertHTML('wr','ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์','<p>เครื่องมือในหน้านี้ต้องเปิดโฟลเดอร์ในเครื่อง ซึ่งเบราว์เซอร์นี้ทำไม่ได้</p>')}${steps}${K!=='src'&&qb?`<div class="tv-qb"><span>มีใบเช็คชุดอื่นให้เลือก</span>${qb}</div>`:''}${pnl}
@@ -5672,6 +5702,7 @@ const ACT={fb:()=>{FBK=!FBK;HELP=HOW=FIND=false;if(FBK)FBS=''},fbpick:()=>{const
   const fs=[];for await(const [n,x] of d.entries())if(x.kind==='file'&&/\.xls[xm]$/i.test(n)&&!n.startsWith('~$'))fs.push(await x.getFile());
   if(!fs.length){note=`ไม่พบไฟล์ใบเช็ค (.xlsm / .xlsx) ในโฟลเดอร์ “${d.name}”`;return}if(!tcOk())return;CKDIR=d;HDB.set('ck',d).catch(()=>{});
   fs.sort((a,b)=>a.name.localeCompare(b.name,'th'));const L=[];for(const f of fs)L.push({name:f.name,buf:await f.arrayBuffer()});TC=L;tcMark('dir',d.name);SHOT=null;await tcRead();MQN=PICX&&PICX.res.length?'catch':'warn'},
+ tvnext:()=>{TVI++}, /* 5.5.83: ภาพโครงโฟลเดอร์ — ดูจอถัดไป */
  tcclear:()=>{if(!tcOk())return;TC=[];TCS='';TCK=TCL=null;TCN='';PICX=null;SHOT=null;note='ล้างรายการใบเช็คของหน้านี้แล้ว'},
  piczip:async()=>{const L=picS();if(!L||!L.res.length)return;let X=null; /* 5.5 */
   if(PZM==='fd'&&FSA){let d=PZN; /* 5.5.1: อ่านชื่อจอจากโฟลเดอร์ที่มีอยู่ (อ่านอย่างเดียว) */
