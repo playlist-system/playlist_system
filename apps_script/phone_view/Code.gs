@@ -6,9 +6,7 @@
  * - เก็บแยกตามคน (ชื่อไฟล์ใบเช็ค เช่น คุณ_A.xlsm → “คุณ_A”) เป็นไฟล์ .json ในโฟลเดอร์ Drive ของเจ้าของสคริปต์
  * - หน้าเว็บมือถือ (doGet): แต่ละคนเห็นเฉพาะใบเช็คที่มีอีเมลตัวเองในแท็บ “ผู้ใช้และสิทธิ์”
  *   เจ้าของชีต และอีเมลในช่อง “ผู้ดูแล / หัวหน้า” เห็นทุกคน และส่งข้อมูลจาก PHOTO CHECK STUDIO ได้
- * - แอปในมือถือ (5.5.86, เปิดได้แม้ไม่มีเน็ต): หน้าแอปอยู่ที่ playlist-system.github.io/playlist_system/phone/ (ไม่มีข้อมูลในหน้า)
- *   แอปขอข้อมูลจากสคริปต์นี้ด้วยลิงก์ส่วนตัว (doGet ?k=รหัส → JSON) แล้วเก็บไว้ในมือถือ
- *   ต้องทำให้ใช้งานได้อีกรายการหนึ่งแบบ “ผู้มีสิทธิ์เข้าถึง: ทุกคน” (ข้อมูลออกได้เฉพาะคนที่มีรหัสของใบนั้น)
+ * - 5.5.87: เมนูลิงก์หน้ามือถือให้ลิงก์สำหรับ LINE (?openExternalBrowser=1) • หน้ามือถือไม่โหลดฟอนต์จากเน็ต (เปิดเร็วขึ้น)
  * ไม่มีการใช้ AI ในการทำงาน — เป็นสคริปต์ธรรมดา
  */
 const CFG = {
@@ -18,8 +16,6 @@ const CFG = {
   studioOrigin: 'https://playlist-system.github.io',   // เว็บ PHOTO CHECK STUDIO ที่ส่งข้อมูลมาได้
   tz: 'Asia/Bangkok',
   maxPeople: 80,
-  appUrl: 'https://playlist-system.github.io/playlist_system/phone/',   // หน้าแอปในมือถือ (ไม่มีข้อมูลในหน้า)
-  linkCol: 6,                                     // คอลัมน์ลิงก์แอปส่วนตัวในแท็บผู้ใช้ (F)
 };
 const P_ = () => PropertiesService.getScriptProperties();
 
@@ -28,9 +24,6 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('หน้ามือถือ')
     .addItem('ตั้งค่าครั้งแรก', 'setup')
     .addItem('ลิงก์หน้ามือถือ', 'showPhoneLink')
-    .addSeparator()
-    .addItem('ตั้งค่าแอปในมือถือ (ลิงก์ส่วนตัว)', 'setupApp')
-    .addItem('เปลี่ยนลิงก์ส่วนตัวของแถวที่เลือก', 'renewLink')
     .addToUi();
 }
 
@@ -54,8 +47,8 @@ function setup() {
 function showPhoneLink() {
   const url = ScriptApp.getService().getUrl(), ui = SpreadsheetApp.getUi();
   ui.alert('หน้ามือถือคนถ่ายรูป', url
-    ? url + '\n\n• วางลิงก์นี้ใน PHOTO CHECK STUDIO ครั้งแรกครั้งเดียว\n• ส่งใน LINE ให้ต่อท้ายด้วย ?openExternalBrowser=1 (เปิดใน Chrome ทันที ไม่ต้องล็อกอินซ้ำ):\n' + url + '?openExternalBrowser=1' +
-      '\n• เปิดได้เฉพาะอีเมลบริษัท แต่ละคนเห็นเฉพาะของตัวเอง • อยากให้เปิดได้แม้ไม่มีเน็ต ใช้เมนู ตั้งค่าแอปในมือถือ'
+    ? url + '\n\n• วางลิงก์นี้ใน PHOTO CHECK STUDIO ครั้งแรกครั้งเดียว\n• ส่งใน LINE ให้ใช้ลิงก์นี้ (ต่อท้ายด้วย ?openExternalBrowser=1 — LINE เปิดใน Chrome ทันที ไม่ต้องล็อกอินซ้ำ):\n' + url + '?openExternalBrowser=1' +
+      '\n• เปิดได้เฉพาะอีเมลบริษัท แต่ละคนเห็นเฉพาะของตัวเอง'
     : 'ยังไม่ได้เผยแพร่เป็นเว็บแอป — ทำตามคู่มือข้อ "เผยแพร่หน้ามือถือ" ก่อน', ui.ButtonSet.OK);
 }
 
@@ -79,8 +72,8 @@ function usersSheet_(ss) {
   sh.getRange('B2').setBackground('#FFF2CC');
   sh.getRange('A3').setValue('ใส่อีเมลบริษัทของคนถ่ายรูปในช่องสีเหลือง (หลายคนคั่นด้วย ,) • ชื่อใบเช็คขึ้นเองเมื่อส่งข้อมูลจาก PHOTO CHECK STUDIO • เจ้าของชีตเห็นทุกคนเสมอ');
   sh.getRange('A3').setFontColor('#52525B');
-  sh.getRange(5, 1, 1, 6).setValues([['ใบเช็ค', 'อีเมลคนถ่ายรูป', 'ส่งล่าสุด', 'จอ', 'ถ่ายแล้ว', 'ลิงก์แอปส่วนตัว (ส่งให้คนนั้นคนเดียว)']]).setFontWeight('bold').setBackground('#EEF2F8');
-  [180, 320, 150, 60, 80, 420].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+  sh.getRange(5, 1, 1, 5).setValues([['ใบเช็ค', 'อีเมลคนถ่ายรูป', 'ส่งล่าสุด', 'จอ', 'ถ่ายแล้ว']]).setFontWeight('bold').setBackground('#EEF2F8');
+  [180, 320, 150, 60, 80].forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.setFrozenRows(5);
   return sh;
 }
@@ -202,7 +195,6 @@ function recvSave(pay) {
       sh.getRange(r, 3).setNumberFormat('d mmm yyyy HH:mm');
       sh.getRange(r, 5).setNumberFormat('0%');
     }
-    if (P_().getProperty('APP_ID')) writeLinks_(sh);
     CacheService.getScriptCache().remove('users');
     const U = users_();
     const noMail = U.rows.filter(r => !r.emails.length && people.some(p => p.name === r.name)).map(r => r.name);
@@ -212,89 +204,10 @@ function recvSave(pay) {
   }
 }
 
-
-// ===================== แอปในมือถือ (ลิงก์ส่วนตัว) =====================
-// ลิงก์ส่วนตัว = หน้าแอปบน GitHub Pages + #k=รหัสสุ่ม 64 ตัว&a=รหัสเว็บแอป (อยู่หลัง # จึงไม่ถูกส่งไปที่ GitHub)
-// รหัสเก็บใน Script Properties: K:<รหัส> → ชื่อใบเช็ค, T:<ชื่อใบเช็ค> → รหัส • เปลี่ยนลิงก์ = ลบรหัสเดิม (แอปที่ใช้รหัสเดิมลบข้อมูลในเครื่องเอง)
-
-function newToken_() { return (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '').toLowerCase(); }
-
-function tokenOf_(name, renew) {
-  const P = P_(), old = P.getProperty('T:' + name);
-  if (old && !renew) return old;
-  if (old) P.deleteProperty('K:' + old);
-  const t = newToken_();
-  P.setProperty('K:' + t, name);
-  P.setProperty('T:' + name, t);
-  return t;
-}
-
-function appLink_(name, renew) {
-  const id = P_().getProperty('APP_ID');
-  return id ? CFG.appUrl + '?openExternalBrowser=1#k=' + tokenOf_(name, renew) + '&a=' + id : '';
-}
-
-/** เขียนลิงก์แอปส่วนตัวในคอลัมน์ F ของทุกแถวที่มีชื่อใบเช็ค */
-function writeLinks_(sh) {
-  sh.getRange(5, CFG.linkCol).setValue('ลิงก์แอปส่วนตัว (ส่งให้คนนั้นคนเดียว)').setFontWeight('bold').setBackground('#EEF2F8');
-  const n = Math.max(0, sh.getLastRow() - CFG.firstRow + 1);
-  if (!n) return 0;
-  const names = sh.getRange(CFG.firstRow, 1, n, 1).getValues();
-  const links = names.map(r => [String(r[0]).trim() ? appLink_(String(r[0]).trim()) : '']);
-  sh.getRange(CFG.firstRow, CFG.linkCol, n, 1).setValues(links);
-  return links.filter(r => r[0]).length;
-}
-
-function setupApp() {
-  const ui = SpreadsheetApp.getUi();
-  const r = ui.prompt('ตั้งค่าแอปในมือถือ',
-    'วาง URL ของเว็บแอปที่ทำให้ใช้งานได้แบบ “ผู้มีสิทธิ์เข้าถึง: ทุกคน”\n(คนละรายการกับลิงก์หน้ามือถือเดิม — ดูคู่มือข้อ “แอปในมือถือ”)', ui.ButtonSet.OK_CANCEL);
-  if (r.getSelectedButton() !== ui.Button.OK) return;
-  const m = r.getResponseText().trim().match(/^https:\/\/script\.google\.com\/(?:a\/macros\/[^/]+|macros)\/s\/([A-Za-z0-9_-]{20,})\/exec/);
-  if (!m) { ui.alert('ตั้งค่าแอปในมือถือ', 'ลิงก์ไม่ถูกต้อง — ต้องขึ้นต้นด้วย https://script.google.com/ และลงท้ายด้วย /exec', ui.ButtonSet.OK); return; }
-  const ss = SpreadsheetApp.getActive();
-  P_().setProperty('SHEET_ID', ss.getId());
-  P_().setProperty('APP_ID', m[1]);
-  const n = writeLinks_(usersSheet_(ss));
-  ui.alert('ตั้งค่าแอปในมือถือ', 'เรียบร้อย — ลิงก์แอปส่วนตัว ' + n + ' ลิงก์ อยู่ในคอลัมน์ F ของแท็บ “' + CFG.usersSheet + '”\n\n' +
-    '• ส่งลิงก์ของแต่ละคนให้คนนั้นทาง LINE แบบแชทส่วนตัว (ไม่ส่งในกลุ่ม)\n• ใครได้ลิงก์ไปก็เห็นใบเช็คนั้น — ถ้าลิงก์หลุด เลือกแถวแล้วกดเมนู เปลี่ยนลิงก์ส่วนตัวของแถวที่เลือก' +
-    (n ? '' : '\n\nยังไม่มีชื่อใบเช็ค — ส่งข้อมูลจาก PHOTO CHECK STUDIO ก่อน แล้วลิงก์จะขึ้นเอง'), ui.ButtonSet.OK);
-}
-
-function renewLink() {
-  const ui = SpreadsheetApp.getUi(), sh = SpreadsheetApp.getActiveSheet(), row = sh.getActiveCell().getRow();
-  if (sh.getName() !== CFG.usersSheet || row < CFG.firstRow) { ui.alert('เปลี่ยนลิงก์ส่วนตัว', 'คลิกแถวของใบเช็คในแท็บ “' + CFG.usersSheet + '” ก่อน แล้วกดเมนูนี้อีกครั้ง', ui.ButtonSet.OK); return; }
-  const name = String(sh.getRange(row, 1).getValue()).trim();
-  if (!name) return;
-  if (!P_().getProperty('APP_ID')) { ui.alert('เปลี่ยนลิงก์ส่วนตัว', 'ยังไม่ได้ตั้งค่าแอปในมือถือ — กดเมนู ตั้งค่าแอปในมือถือ ก่อน', ui.ButtonSet.OK); return; }
-  if (ui.alert('เปลี่ยนลิงก์ส่วนตัวของ “' + name + '”?', 'ลิงก์เดิมจะใช้ไม่ได้ทันที (แอปที่ใช้ลิงก์เดิมลบข้อมูลในเครื่องเอง) แล้วต้องส่งลิงก์ใหม่ให้คนถ่ายรูป', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
-  sh.getRange(row, CFG.linkCol).setValue(appLink_(name, true));
-  ui.alert('เปลี่ยนลิงก์ส่วนตัว', 'เปลี่ยนแล้ว — ส่งลิงก์ใหม่ในคอลัมน์ F ให้คนถ่ายรูป', ui.ButtonSet.OK);
-}
-
-/** แอปขอข้อมูล: ?k=รหัส [&since=เวลาข้อมูลที่มีในเครื่อง] → JSON */
-function api_(prm) {
-  const out = s => ContentService.createTextOutput(s).setMimeType(ContentService.MimeType.JSON);
-  const bad = (code, err) => out(JSON.stringify({ ok: false, code, err }));
-  const k = String(prm.k || '').toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(k)) return bad('key', 'ลิงก์ไม่ถูกต้อง — ขอลิงก์ใหม่จากผู้ดูแล');
-  let name, json;
-  try {
-    name = P_().getProperty('K:' + k);
-    if (!name) return bad('key', 'ลิงก์นี้ใช้ไม่ได้แล้ว — ขอลิงก์ใหม่จากผู้ดูแล');
-    json = personJson_(name);
-  } catch (err) { return bad('err', 'อ่านข้อมูลไม่ได้ — ลองใหม่อีกครั้ง'); }
-  if (!json) return out(JSON.stringify({ ok: true, name, data: null }));
-  const at = (json.match(/"at":(\d+)/) || [])[1];    // เวลาข้อมูล (ฟิลด์แรกที่ชื่อ at คือของทั้งคน)
-  if (prm.since && at && String(prm.since) === at) return out(JSON.stringify({ ok: true, same: true, name }));
-  return out('{"ok":true,"name":' + JSON.stringify(name) + ',"data":' + json + '}');
-}
-
 // ===================== หน้ามือถือ =====================
 function doGet(e) {
   const prm = (e && e.parameter) || {};
   if (prm.recv === 'studio') return recvPage_();
-  if (prm.k) return api_(prm);
   let D;
   try {
     const A = access_(whoAmI_());
