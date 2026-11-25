@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* หน้ามือถือคนถ่ายรูป (5.5.85) — โทนกลาง ใช้สีเฉพาะที่มีความหมาย: น้ำเงิน = ความคืบหน้า / ที่เลือก • แดง = วันที่หนังออก */
+  :root {
+    --background: #F6F6F7; --surface: #FFFFFF; --surface-muted: #EFEFF1;
+    --foreground: #18181B; --text-secondary: #52525B; --text-muted: #71717A;
+    --border: #E4E4E7; --border-subtle: #EEEEF0;
+    --accent: #1F4FD8; --success: #1B7F4B; --danger: #C62828; --danger-subtle: #FDECEC;
+    --shadow-on: 0 1px 3px rgba(24,24,27,.10);
+    --font: "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #111113; --surface: #1C1C1F; --surface-muted: #2A2A2E;
+      --foreground: #F4F4F5; --text-secondary: #C4C4CC; --text-muted: #9A9AA3;
+      --border: #2E2E33; --border-subtle: #26262A;
+      --accent: #7FA2FF; --success: #6FD39C; --danger: #FF8A80; --danger-subtle: #3A1F1F;
+      --shadow-on: 0 1px 3px rgba(0,0,0,.5);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--background); color: var(--foreground); font: 400 15px/1.45 var(--font); letter-spacing: -0.01em; -webkit-text-size-adjust: 100%; }
+  button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
+  button { background: none; border: 0; cursor: pointer; text-align: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
+  .page { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; display: flex; flex-direction: column; gap: 24px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .head h1 { font-size: 28px; font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+  .head p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  .pick { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); }
+  .pick select { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); font-size: 16px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; }
+  .sum { padding: 20px; display: flex; align-items: center; gap: 20px; }
+  .ring { width: 136px; height: 136px; position: relative; flex: none; }
+  .ring svg { width: 100%; height: 100%; display: block; }
+  .ring .v { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 4px; }
+  .ring .v b { font-size: 34px; font-weight: 500; line-height: 1; letter-spacing: -0.03em; }
+  .ring .v span { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
+  .track { stroke: var(--surface-muted); } .fillc { stroke: var(--accent); }
+  .stats { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 0; }
+  .stat b { display: block; font-size: 22px; font-weight: 500; line-height: 1.15; letter-spacing: -0.02em; }
+  .stat span { font-size: 13px; color: var(--text-secondary); }
+
+  .grp { display: flex; flex-direction: column; gap: 12px; }
+  .sec { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .sec h2 { font-size: 17px; font-weight: 500; }
+  .sec span { font-size: 13px; color: var(--text-muted); }
+
+  .list { overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px 10px 16px; min-height: 60px; border-top: 1px solid var(--border-subtle); }
+  .row:first-child { border-top: 0; }
+  .row:active { background: var(--surface-muted); }
+  .row .m { flex: 1; min-width: 0; }
+  .row .m b { display: block; font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+  .row .m span { display: block; font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+  .row .r { width: 84px; flex: none; text-align: right; }
+  .row .r b { display: block; font-size: 15px; font-weight: 500; }
+  .row .r b.ok { color: var(--success); }
+  .bar { height: 4px; border-radius: 99px; background: var(--surface-muted); margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+  .chev { width: 16px; height: 16px; color: var(--text-muted); flex: none; }
+
+  .back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: -8px 0 -4px -6px; padding: 0 6px; font-size: 15px; color: var(--accent); }
+  .back svg { width: 18px; height: 18px; }
+  .prog .t { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; margin-bottom: 8px; }
+  .prog .t b { font-weight: 500; }
+  .prog .bar { height: 8px; margin: 0; }
+  .ctl { display: flex; flex-direction: column; gap: 12px; }
+  .seg { display: flex; background: var(--surface-muted); border-radius: 14px; padding: 4px; height: 44px; }
+  .seg button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; color: var(--text-secondary); border-radius: 10px; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--foreground); font-weight: 500; box-shadow: var(--shadow-on); }
+  .seg em { font-style: normal; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+  .seg button[aria-pressed="true"] em { color: var(--accent); }
+  .search { height: 44px; border: 1px solid var(--border); background: var(--surface); border-radius: 14px; display: flex; align-items: center; gap: 8px; padding: 0 4px 0 14px; color: var(--text-muted); }
+  .search svg { width: 18px; height: 18px; flex: none; }
+  .search input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; font-size: 16px; color: var(--foreground); }
+  .search input::placeholder { color: var(--text-muted); }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .clr { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex: none; }
+  .clr[hidden] { display: none; }
+  .film { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-height: 52px; border-top: 1px solid var(--border-subtle); }
+  .film:first-child { border-top: 0; }
+  .film .fn { flex: 1; min-width: 0; font-size: 15px; overflow-wrap: anywhere; }
+  .tag { flex: none; font-size: 13px; font-weight: 500; color: var(--danger); background: var(--danger-subtle); border-radius: 99px; padding: 3px 10px; white-space: nowrap; }
+  .tag.gone { color: var(--text-muted); background: var(--surface-muted); font-weight: 400; }
+  .day { flex: none; font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+  .more { padding: 14px 16px; font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border-subtle); }
+  .empty { padding: 20px 16px; font-size: 15px; color: var(--text-secondary); text-align: center; }
+  .note { padding: 20px; font-size: 15px; color: var(--text-secondary); }
+  .note b { display: block; font-size: 17px; font-weight: 500; color: var(--foreground); margin-bottom: 4px; }
+  .busy { opacity: .5; pointer-events: none; }
+</style>
+</head>
+<body>
+<main id="app" class="page" aria-live="polite"></main>
+<script>
+var B = <?!= boot ?>;
+var TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+var ST = { view: 'home', si: 0, tab: 'todo', q: '', loading: false, err: '', scr: [] };
+var app = document.getElementById('app');
+var H = (window.google && google.script && google.script.history) || null, pushed = 0;
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+function pct(a, n) { return n ? Math.round(100 * a / n) : 100; }
+function bkk(ms) { return new Date(ms + 7 * 3600e3); }   // วันเวลาไทย (อ่านด้วย getUTC…)
+function today0() { var d = bkk(Date.now()); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }
+function dayMon(ms) { var d = new Date(ms); return d.getUTCDate() + ' ' + TH_MON[d.getUTCMonth()]; }
+function stamp(ms) {
+  if (!ms) return '';
+  var d = bkk(ms), hh = ('0' + d.getUTCHours()).slice(-2), mm = ('0' + d.getUTCMinutes()).slice(-2);
+  return 'ข้อมูลวันที่ ' + d.getUTCDate() + ' ' + TH_MON[d.getUTCMonth()] + ' ' + (d.getUTCFullYear() + 543) + ' เวลา ' + hh + ':' + mm;
+}
+var ICON = {
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>'
+};
+
+// จอเรียงจากถ่ายน้อยสุด (จอที่ครบแล้วอยู่ล่าง)
+function setData(d) {
+  B.data = d;
+  ST.scr = (d && d.screens || []).map(function (c, i) { return { c: c, i: i, p: c.n ? c.s / c.n : 1 }; })
+    .sort(function (a, b) { return a.p - b.p || (b.c.n - b.c.s) - (a.c.n - a.c.s) || a.i - b.i; });
+}
+
+function picker() {
+  if (!B.names || B.names.length < 2) return '';
+  return '<label class="pick"><span>ใบเช็คของ</span><select id="pick" aria-label="เลือกใบเช็ค">' +
+    B.names.map(function (n) { return '<option' + (n === B.cur ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>';
+}
+function ring(p) {
+  var C = 2 * Math.PI * 58, arc = C * 0.75, v = Math.max(0, Math.min(1, p)) * arc;
+  return '<svg viewBox="0 0 136 136" aria-hidden="true"><circle class="track" cx="68" cy="68" r="58" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + arc.toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(135 68 68)"/>' +
+    (v > 0 ? '<circle class="fillc" cx="68" cy="68" r="58" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + v.toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(135 68 68)"/>' : '') + '</svg>';
+}
+function mine() { return B.admin ? 'ทุกจอ' : 'จอของคุณ'; }
+
+function vNote(t, sub) { return '<section class="card note"><b>' + t + '</b>' + (sub || '') + '</section>'; }
+
+function vHome() {
+  var d = B.data, N = 0, S = 0;
+  ST.scr.forEach(function (x) { N += x.c.n; S += x.c.s; });
+  var p = N ? S / N : 1;
+  var h = '<header class="head">' + picker() + '<h1>' + esc(d.name || B.cur) + '</h1><p>' + esc(stamp(d.at)) + '</p></header>';
+  h += '<section class="card sum" aria-label="ภาพรวม"><div class="ring" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct(S, N) + '" aria-valuetext="ถ่ายแล้ว ' + pct(S, N) + '%">' + ring(p) +
+    '<div class="v" aria-hidden="true"><b class="num">' + pct(S, N) + '%</b><span>ถ่ายแล้ว</span></div></div>' +
+    '<div class="stats"><div class="stat"><b class="num">' + fmt(S) + '</b><span>ถ่ายแล้ว</span></div><div class="stat"><b class="num">' + fmt(N - S) + '</b><span>ยังไม่ถ่าย</span></div>' +
+    '<div class="stat"><b class="num">' + fmt(ST.scr.length) + '</b><span>จอ</span></div></div></section>';
+  h += '<section class="grp"><div class="sec"><h2>' + mine() + '</h2><span>ถ่ายน้อยอยู่บน</span></div><div class="card list">';
+  ST.scr.forEach(function (x, k) {
+    var c = x.c, left = c.n - c.s;
+    h += '<button class="row" data-s="' + k + '"><div class="m"><b>' + esc(c.c) + '</b><span>' + esc(c.p) + '</span></div>' +
+      '<div class="r">' + (left ? '<b class="num">ค้าง ' + fmt(left) + '</b>' : '<b class="ok">ครบ</b>') + '<div class="bar"><i style="width:' + pct(c.s, c.n) + '%"></i></div></div>' + ICON.chev + '</button>';
+  });
+  if (!ST.scr.length) h += '<p class="empty">ใบเช็คนี้ยังไม่มีจอ</p>';
+  return h + '</div></section>';
+}
+
+function filmRows() {
+  var c = ST.scr[ST.si].c, q = ST.q.trim().toLowerCase(), t0 = today0(), out = [], MAX = 400;
+  var src = ST.tab === 'todo' ? c.t : c.d;
+  var rows = src.filter(function (r) { return !q || String(r[0]).toLowerCase().indexOf(q) >= 0; });
+  if (ST.tab === 'todo') {   // หนังที่ออกไปแล้ว (ถ่ายไม่ได้แล้ว) ไว้ท้ายรายการ
+    var on = rows.filter(function (r) { return !r[1] || r[1] >= t0; }), gone = rows.filter(function (r) { return r[1] && r[1] < t0; });
+    rows = on.concat(gone);
+  }
+  rows.slice(0, MAX).forEach(function (r) {
+    var right = '';
+    if (ST.tab === 'todo') { if (r[1]) right = r[1] < t0 ? '<em class="tag gone" style="font-style:normal">ออกแล้ว ' + dayMon(r[1]) + '</em>' : '<em class="tag" style="font-style:normal">ออก ' + dayMon(r[1]) + '</em>'; }
+    else right = '<span class="day">' + (r[1] ? 'วันที่ ' + r[1] : 'ถ่ายแล้ว') + '</span>';
+    out.push('<div class="film"><span class="fn">' + esc(r[0]) + '</span>' + right + '</div>');
+  });
+  if (rows.length > MAX) out.push('<p class="more">แสดง ' + MAX + ' จาก ' + fmt(rows.length) + ' เรื่อง — พิมพ์ค้นหาเพื่อหาเรื่องที่ต้องการ</p>');
+  if (!rows.length) out.push('<p class="empty">' + (q ? 'ไม่พบหนังที่ชื่อมีคำว่า “' + esc(ST.q.trim()) + '”' : ST.tab === 'todo' ? 'ถ่ายครบทุกเรื่องแล้ว' : 'ยังไม่มีเรื่องที่ถ่ายแล้ว') + '</p>');
+  return out.join('');
+}
+
+function vScreen() {
+  var c = ST.scr[ST.si].c;
+  var h = '<div><button class="back" data-a="home">' + ICON.back + mine() + '</button><header class="head"><h1>' + esc(c.c) + '</h1><p style="font-size:15px;color:var(--text-secondary)">' +
+    esc(c.p) + (c.l ? ' • ' + esc(c.l) : '') + '</p></header></div>';
+  h += '<div class="prog"><div class="t"><span>ถ่ายแล้ว <b class="num">' + fmt(c.s) + '</b> จาก <b class="num">' + fmt(c.n) + '</b></span><b class="num">' + pct(c.s, c.n) + '%</b></div>' +
+    '<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct(c.s, c.n) + '" aria-label="ถ่ายแล้ว"><i style="width:' + pct(c.s, c.n) + '%"></i></div></div>';
+  h += '<div class="ctl"><div class="seg" role="group" aria-label="รายการหนัง">' +
+    '<button data-t="todo" aria-pressed="' + (ST.tab === 'todo') + '">ยังไม่ถ่าย <em class="num">' + fmt(c.t.length) + '</em></button>' +
+    '<button data-t="done" aria-pressed="' + (ST.tab === 'done') + '">ถ่ายแล้ว <em class="num">' + fmt(c.d.length) + '</em></button></div>' +
+    '<label class="search">' + ICON.search + '<input id="q" type="search" placeholder="ค้นหาชื่อหนัง" aria-label="ค้นหาชื่อหนัง" autocomplete="off" value="' + esc(ST.q) + '">' +
+    '<button class="clr" data-a="clr" aria-label="ล้างคำค้น"' + (ST.q ? '' : ' hidden') + '>' + ICON.x + '</button></label></div>';
+  h += '<div class="card list" id="films">' + filmRows() + '</div>';
+  return h;
+}
+
+function render() {
+  var h;
+  if (B.err) h = vNote('เปิดหน้ามือถือไม่ได้', '<p>' + esc(B.err) + '</p>');
+  else if (!B.names || !B.names.length) h = vNote('ยังไม่มีใบเช็คที่เปิดดูได้', '<p>อีเมล ' + esc(B.me || '(ไม่ทราบ)') + ' ยังไม่มีชื่อในแท็บ “ผู้ใช้และสิทธิ์” — ให้ผู้ดูแลใส่อีเมลนี้ที่ใบเช็คของคุณ แล้วเปิดลิงก์นี้อีกครั้ง</p>');
+  else if (!B.data) h = '<header class="head">' + picker() + '<h1>' + esc(B.cur) + '</h1></header>' + vNote('ยังไม่มีข้อมูล', '<p>ส่งข้อมูลจาก PHOTO CHECK STUDIO (หน้าผลการเติม → ส่งเข้าหน้ามือถือ) ก่อน</p>');
+  else h = ST.view === 'scr' && ST.scr[ST.si] ? vScreen() : vHome();
+  if (ST.err) h = vNote('โหลดไม่สำเร็จ', '<p>' + esc(ST.err) + '</p>') + h;
+  app.innerHTML = h;
+  app.classList.toggle('busy', ST.loading);
+}
+
+function openScreen(k) {
+  ST.view = 'scr'; ST.si = k; ST.tab = 'todo'; ST.q = '';
+  render(); window.scrollTo(0, 0);
+  if (H) { try { H.push({ s: String(k) }, {}); pushed++; } catch (e) { /* ไม่มีประวัติก็กดปุ่มกลับได้ */ } }
+}
+function goHome(fromHistory) {
+  if (!fromHistory && pushed && H) { pushed--; try { history.back(); } catch (e) { /* ใช้แบบด้านล่าง */ } setTimeout(function () { if (ST.view !== 'home') goHome(true); }, 350); return; }
+  var k = ST.si; ST.view = 'home'; render();
+  var b = app.querySelector('[data-s="' + k + '"]'); if (b) { b.scrollIntoView({ block: 'center' }); b.focus({ preventScroll: true }); }
+}
+if (H) { try { H.setChangeHandler(function (e) { var s = e && e.state && e.state.s; if (s == null || !ST.scr[+s]) { if (ST.view !== 'home') goHome(true); } else { ST.view = 'scr'; ST.si = +s; render(); } }); } catch (e) { H = null; } }
+
+function loadPerson(name) {
+  if (!name || name === B.cur || ST.loading) return;
+  ST.loading = true; ST.err = ''; render();
+  google.script.run.withFailureHandler(function (e) { ST.loading = false; ST.err = (e && e.message) || String(e); render(); })
+    .withSuccessHandler(function (d) { ST.loading = false; B.cur = name; ST.view = 'home'; setData(d); try { localStorage.setItem('ph-cur', name); } catch (x) { /* ไม่จำก็ได้ */ } render(); })
+    .getPerson(name);
+}
+
+app.addEventListener('click', function (e) {
+  var t = e.target.closest ? e.target.closest('[data-s],[data-a],[data-t]') : null;
+  if (!t) return;
+  if (t.hasAttribute('data-s')) return openScreen(+t.getAttribute('data-s'));
+  if (t.hasAttribute('data-t')) { ST.tab = t.getAttribute('data-t'); render(); return; }
+  var a = t.getAttribute('data-a');
+  if (a === 'home') goHome(false);
+  if (a === 'clr') { ST.q = ''; var q = document.getElementById('q'); q.value = ''; document.getElementById('films').innerHTML = filmRows(); t.hidden = true; q.focus(); }
+});
+app.addEventListener('input', function (e) {
+  if (e.target.id !== 'q') return;
+  ST.q = e.target.value;
+  document.getElementById('films').innerHTML = filmRows();
+  var c = app.querySelector('.clr'); if (c) c.hidden = !ST.q;
+});
+app.addEventListener('change', function (e) { if (e.target.id === 'pick') loadPerson(e.target.value); });
+
+setData(B.data);
+render();
+// ผู้ดูแลที่เคยเลือกดูใบเช็คของคนอื่น เปิดครั้งหน้าเห็นคนเดิม
+try { var last = localStorage.getItem('ph-cur'); if (B.admin && last && last !== B.cur && B.names.indexOf(last) >= 0) loadPerson(last); } catch (e) { /* ไม่เป็นไร */ }
+</script>
+</body>
+</html>
