@@ -187,6 +187,7 @@
  *   เวอร์ชัน 5.5.82: หน้างานโฟลเดอร์และรูปแบบใหม่ (แถบ 3 ขั้น • วิธีทำ + ภาพตัวอย่าง • การ์ดเครื่องมืออื่น) แค่หน้าตา
  *   เวอร์ชัน 5.5.83: ภาพ “จะได้แบบนี้” ใช้ข้อมูลจริง (โครงโฟลเดอร์ของจอจริง • รูปจริง + แถวจริงในใบเช็ค)
  *   เวอร์ชัน 5.5.84: เครื่องมือสีใบเช็ค — เปลี่ยนชุดสีแถบทุกไฟล์ จดชุดสีในไฟล์ให้การเติม/ใบเปล่าใช้
+ *   เวอร์ชัน 5.5.85: หน้ามือถือคนถ่ายรูป — ปุ่มส่งเข้าหน้ามือถือ (phSnap / phCard / PHW)
  * ======================================================================
  */
 
@@ -11851,7 +11852,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.84 (25 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.85 (25 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -15766,7 +15767,7 @@ function vRes() {
   }
   ${nn ? `<div class="r5sec"><h2><i class="h5d nt" aria-hidden="true"></i>แจ้งให้ทราบ ${nn} เรื่อง<small>· ไม่ต้องแก้</small></h2><div class="r5ng">${NG.map(([t, v]) => `<span class="r5nc">${t}<b>${v}</b></span>`).join('')}</div><p class="hint">ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น — ดูทีละจอได้ในแต่ละไฟล์ด้านล่าง</p></div>` : ''}</article>
  <aside class="r5side"><section class="hcard r5do"><h2>${last.days ? 'เติมทีละวัน' : 'เติมแต่ละไฟล์'}</h2><small class="h5lt">${last.sec ? 'รวม ' + last.sec + ' วินาที' : ''}</small><ol class="r5bars">${bars.map(([q, b, w]) => `<li><span class="r5bl"><b title="${esc(q)}">${esc(q)}</b><small>${b}</small></span><span class="r5bt"><i style="width:${Math.max(3, Math.round(w * 100))}%"></i></span></li>`).join('')}</ol></section>
-  <section class="hcard r5next"><h2>ทำต่อ</h2>${mrtCard()}<div class="r5nx"><button class="h5s" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button>${FSA ? '<button class="h5s" data-a="tools" data-k="last" data-tour="tlink">งานโฟลเดอร์และรูป</button>' : ''}<button class="h5s" data-a="tab" data-k="fl">กลับไปเติมใหม่</button></div></section></aside></div>
+  <section class="hcard r5next"><h2>ทำต่อ</h2>${mrtCard()}${phCard()}<div class="r5nx"><button class="h5s" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button>${FSA ? '<button class="h5s" data-a="tools" data-k="last" data-tour="tlink">งานโฟลเดอร์และรูป</button>' : ''}<button class="h5s" data-a="tab" data-k="fl">กลับไปเติมใหม่</button></div></section></aside></div>
  ${vArr()}<h2 class="r5lh">ไฟล์ทั้งหมด<small>${last.res.length} ไฟล์</small></h2><div class="rlist" data-tour="rlist">${last.res
    .map((r, i) => {
      const o = R[i],
@@ -16581,6 +16582,145 @@ const mrtCard = () => {
     return `<div class="mrtc"><b>ส่งเข้าใบเช็ค MRT (Google Sheets)</b><small>วางลิงก์หน้ามือถือ MRT ครั้งเดียว — ในชีตใบเช็ค MRT กดเมนู ใบเช็ครูป → ลิงก์หน้ามือถือคนถ่ายรูป แล้วคัดลอกมาวาง</small><label class="fld"><input id="mrturl" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/…/exec" value="${esc(u)}" aria-label="ลิงก์หน้ามือถือ MRT"></label><div class="mrtb"><button class="btn primary" data-a="mrtsave">บันทึกลิงก์</button>${u ? '<button class="btn secondary" data-a="mrtset">ยกเลิก</button>' : ''}</div></div>`;
   const ok = m && !m.err && !m.cancel;
   return `<div class="mrtc"><button class="btn ${ok ? 'secondary' : 'primary'}" data-a="mrtsend" ${busy ? 'disabled' : ''}>${busy ? (MRTW.stage === 'ask' ? 'รอตอบในหน้าใบเช็ค MRT…' : 'กำลังส่ง…') : ok ? 'ส่งเข้าใบเช็ค MRT อีกครั้ง' : 'ส่งเข้าใบเช็ค MRT'}</button>${ok ? `<p class="mrtok"><b aria-hidden="true">✓</b><span><b>ส่งแล้ว ${new Date(m.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</b> — นำเข้า ${m.files} ไฟล์ ${m.stations} สถานี${m.fresh ? ' • เริ่ม' + esc(m.label || 'รอบใหม่') : ' • หนังใหม่ ' + m.newFilms + ' เรื่อง'}</span></p>` : m && m.err ? `<p class="mrter">ส่งไม่สำเร็จ — ${esc(m.err)}</p><button class="mrtl" data-a="mrtset">เปลี่ยนลิงก์ใบเช็ค MRT</button>` : `<small>ส่งใบเช็ค MRT ที่เติมแล้ว ${fs.length} ไฟล์ เข้า Google Sheets “ใบเช็ครูป MRT (ทดลอง)” • วันที่ที่คนคัดรูปพิมพ์ไว้ไม่หาย</small>`}</div>`;
+};
+/* 5.5.85: หน้ามือถือคนถ่ายรูป — ส่งสรุปใบเช็คที่เติมแล้วเข้าเว็บแอป “หน้ามือถือคนถ่ายรูป” (apps_script/phone_view) แบบเดียวกับส่งเข้าใบเช็ค MRT
+   ส่งเฉพาะรายชื่อหนังต่อจอ (ถ่ายแล้ว + วันที่ถ่าย / ยังไม่ถ่าย + วันที่ออก) ไม่ส่งไฟล์ • นับแบบเดียวกับสูตรในใบเช็ค: หนังแถว 21 ลงไป (COUNTA), ถ่ายแล้ว = ช่องจอเป็นตัวเลข (COUNT)
+   บล็อกที่หลายจอใช้รายชื่อเดียวกัน (BKJ / Metro / MRT) แยกจอละรายการตามคอลัมน์ • ชื่อคน = ชื่อไฟล์ใบเช็ค • เว็บแอปให้แต่ละคนเห็นเฉพาะของตัวเอง */
+let PHW = null,
+  PHSET = false; /* PHW = {w, t, stage: open / send, iv, snap} */
+const phUrl = () => store.get('ps_phurl') || '',
+  phFiles = () => (last && last.res ? last.res.filter(r => r.blob) : []);
+async function phSnap(fs) {
+  const people = [];
+  for (const r of fs) {
+    let X;
+    try {
+      X = await chkRead({
+        name: r.name,
+        buf: r.blob.buffer.slice(r.blob.byteOffset, r.blob.byteOffset + r.blob.byteLength),
+      });
+    } catch (_) {
+      continue;
+    }
+    const screens = [];
+    for (const x of X.sheets) {
+      const ws = x.ws,
+        v = (c, rw) => {
+          const q = ws[c + rw];
+          return q ? cl(q.v) : '';
+        },
+        crow = x.blocks.some(b => b.cs.some(c => v(n2col(c), 10))) ? 10 : 11;
+      for (const b of x.blocks) {
+        const its = b.items.filter(i => i[2] >= 21);
+        for (const c of b.cs) {
+          const L = n2col(c),
+            code = v(L, crow);
+          if (!code && !its.length) continue;
+          let loc = '';
+          for (let rw = crow + 1; rw < 17; rw++) {
+            const t = v(L, rw);
+            if (t && !/^\(?[\p{L}\p{N}_-]{1,8}\)?$/u.test(t)) {
+              loc = t;
+              break;
+            }
+          } /* สถานที่ = ข้อความยาวใต้รหัสจอ (ข้ามป้ายสั้น ๆ เช่น (A) / LED) */
+          const t = [],
+            d = [];
+          for (const i of its) {
+            const q = ws[L + i[2]];
+            if (q && typeof q.v === 'number')
+              d.push([i[0], Number.isInteger(q.v) && q.v >= 1 && q.v <= 31 ? q.v : 0]);
+            else t.push([i[0], i[3] || 0]);
+          }
+          screens.push({ c: code || '—', p: x.sn.trim(), l: loc, n: its.length, s: d.length, t, d });
+        }
+      }
+    }
+    people.push({
+      name: r.name.replace(/\.xls[xm]$/i, '').trim(),
+      file: r.name,
+      at: Date.now(),
+      mx: X.mx || 0,
+      screens,
+    });
+  }
+  return { v: 1, at: Date.now(), ver: VERTXT, people };
+}
+function phEnd(msg) {
+  if (!PHW) return;
+  clearInterval(PHW.iv);
+  PHW = null;
+  if (msg) {
+    MQN = 'warn';
+    note = msg;
+  }
+  view();
+}
+addEventListener('message', e => {
+  const d = e.data;
+  if (!d || !d.psPH || !PHW || !mrtOrg(e.origin)) return;
+  if (d.t === 'ready') {
+    if (PHW.stage !== 'open') return;
+    PHW.stage = 'send';
+    PHW.t = Date.now();
+    view();
+    const src = e.source,
+      org = e.origin;
+    PHW.snap.then(
+      snap => {
+        if (!PHW) return;
+        if (!snap.people.length) {
+          phEnd('อ่านใบเช็คที่เติมแล้วไม่ได้ — เติมใหม่แล้วกดส่งอีกครั้ง');
+          return;
+        }
+        try {
+          src.postMessage({ psPH: 1, t: 'data', snap }, org);
+        } catch (x) {
+          phEnd('ส่งข้อมูลให้หน้ามือถือไม่ได้ (' + ((x && x.message) || x) + ') — กดส่งอีกครั้ง');
+        }
+      },
+      x => phEnd('อ่านใบเช็คที่เติมแล้วไม่ได้ (' + errN(x) + ')'),
+    );
+    return;
+  }
+  if (d.t === 'done') {
+    const w = PHW.w;
+    clearInterval(PHW.iv);
+    PHW = null;
+    if (last)
+      last.ph = d.ok
+        ? {
+            at: Date.now(),
+            people: +d.people || 0,
+            screens: +d.screens || 0,
+            noMail: Array.isArray(d.noMail) ? d.noMail.map(String) : [],
+          }
+        : { at: Date.now(), err: String(d.err || 'ไม่ทราบสาเหตุ') };
+    if (d.ok) {
+      MQN = 'party';
+      note = `ส่งเข้าหน้ามือถือแล้ว — ${+d.people || 0} คน ${+d.screens || 0} จอ • คนถ่ายรูปเปิดลิงก์เดิมเห็นข้อมูลใหม่ทันที`;
+      setTimeout(() => {
+        try {
+          w && !w.closed && w.close();
+        } catch (_) {}
+      }, 3000);
+    } else {
+      MQN = 'warn';
+      note = 'ส่งเข้าหน้ามือถือไม่สำเร็จ — ' + (d.err || 'ดูรายละเอียดในหน้าต่างหน้ามือถือ');
+    }
+    view();
+  }
+});
+const phCard = () => {
+  const fs = phFiles();
+  if (!fs.length) return '';
+  const u = phUrl(),
+    m = last.ph,
+    busy = !!PHW;
+  if (!u || PHSET)
+    return `<div class="mrtc"><b>ส่งเข้าหน้ามือถือคนถ่ายรูป</b><small>วางลิงก์หน้ามือถือครั้งเดียว — ในชีต “หน้ามือถือคนถ่ายรูป” กดเมนู หน้ามือถือ → ลิงก์หน้ามือถือ แล้วคัดลอกมาวาง</small><label class="fld"><input id="phurl" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/…/exec" value="${esc(u)}" aria-label="ลิงก์หน้ามือถือคนถ่ายรูป"></label><div class="mrtb"><button class="btn primary" data-a="phsave">บันทึกลิงก์</button>${u ? '<button class="btn secondary" data-a="phset">ยกเลิก</button>' : ''}</div></div>`;
+  const ok = m && !m.err;
+  return `<div class="mrtc"><button class="btn ${ok ? 'secondary' : 'primary'}" data-a="phsend" ${busy ? 'disabled' : ''}>${busy ? (PHW.stage === 'open' ? 'กำลังเปิดหน้ามือถือ…' : 'กำลังส่ง…') : ok ? 'ส่งเข้าหน้ามือถืออีกครั้ง' : 'ส่งเข้าหน้ามือถือ'}</button>${ok ? `<p class="mrtok"><b aria-hidden="true">✓</b><span><b>ส่งแล้ว ${new Date(m.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</b> — ${m.people} คน ${m.screens} จอ${m.noMail.length ? ` • ยังไม่มีอีเมลคนถ่ายรูปของ ${esc(m.noMail.join(', '))} (ใส่ในแท็บ ผู้ใช้และสิทธิ์)` : ''}</span></p>` : m && m.err ? `<p class="mrter">ส่งไม่สำเร็จ — ${esc(m.err)}</p><button class="mrtl" data-a="phset">เปลี่ยนลิงก์หน้ามือถือ</button>` : `<small>ส่งสรุปใบเช็คที่เติมแล้ว ${fs.length} ไฟล์ให้คนถ่ายรูปดูในมือถือ (จอ • หนังที่ยังไม่ได้ถ่าย • วันที่หนังออก) — ส่งเฉพาะรายชื่อ ไม่ส่งไฟล์</small>`}</div>`;
 };
 function plpEnd(msg) {
   if (!PLP) return;
@@ -17906,6 +18046,64 @@ const ACT = {
     MRTSET = false;
     MQN = 'done';
     note = 'จำลิงก์ใบเช็ค MRT แล้ว — กด “ส่งเข้าใบเช็ค MRT” ได้เลย';
+  },
+  phsend: () => {
+    if (PHW || FILLING || BUSY) return;
+    const u = phUrl();
+    if (!u) {
+      PHSET = true;
+      return;
+    }
+    const fs = phFiles();
+    if (!fs.length) return;
+    const w = window.open(
+      u + (u.includes('?') ? '&' : '?') + 'recv=studio',
+      'psph',
+      'popup,width=480,height=720',
+    );
+    if (!w) {
+      say(
+        'เบราว์เซอร์บล็อกหน้าต่างใหม่ — กดอนุญาตป๊อปอัปของหน้านี้ (ไอคอนที่ช่องที่อยู่เว็บ) แล้วกดอีกครั้ง',
+      );
+      return;
+    }
+    PHW = { w, t: Date.now(), stage: 'open', snap: phSnap(fs) };
+    PHW.snap.catch(() => {});
+    if (last) last.ph = null;
+    PHW.iv = setInterval(() => {
+      if (!PHW) return;
+      const s = (Date.now() - PHW.t) / 1000;
+      if (PHW.w.closed)
+        phEnd(
+          PHW.stage === 'open'
+            ? 'หน้าต่างหน้ามือถือปิดก่อนรับข้อมูล — กดส่งอีกครั้ง'
+            : 'หน้าต่างหน้ามือถือปิดก่อนเสร็จ — กดส่งอีกครั้ง',
+        );
+      else if (PHW.stage === 'open' && s > 180)
+        phEnd(
+          'รอนานเกิน 3 นาที — ถ้าหน้าต่างขึ้นหน้าล็อกอิน ให้ล็อกอินบัญชีบริษัทแล้วกดส่งอีกครั้ง หรือลิงก์อาจผิด (กด “เปลี่ยนลิงก์หน้ามือถือ”)',
+        );
+      else if (PHW.stage === 'send' && s > 300) phEnd('รอนานเกิน 5 นาที — กดส่งอีกครั้ง');
+    }, 1000);
+    say(`กำลังส่งสรุปใบเช็ค ${fs.length} ไฟล์เข้าหน้ามือถือ … หน้าต่างใหม่จะเปิดแล้วปิดเอง`);
+  },
+  phset: () => {
+    PHSET = !PHSET;
+    if (PHSET) FOCUSSEL = '#phurl';
+  },
+  phsave: () => {
+    const v = (($('#phurl') || {}).value || '').trim();
+    if (!/^https:\/\/script\.google\.com\/\S+\/exec$/.test(v)) {
+      MQN = 'warn';
+      note =
+        'ลิงก์ไม่ถูกต้อง — ใช้ลิงก์หน้ามือถือที่ขึ้นต้นด้วย https://script.google.com และลงท้ายด้วย /exec';
+      FOCUSSEL = '#phurl';
+      return;
+    }
+    store.set('ps_phurl', v);
+    PHSET = false;
+    MQN = 'done';
+    note = 'จำลิงก์หน้ามือถือแล้ว — กด “ส่งเข้าหน้ามือถือ” ได้เลย';
   },
   pick: k => {
     if (BUSY || FILLING) return;
