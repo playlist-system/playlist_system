@@ -186,6 +186,7 @@
  *   เวอร์ชัน 5.5.81: กล่องบอกสถานะตอนกดบันทึก + สาเหตุที่บันทึกไม่ได้
  *   เวอร์ชัน 5.5.82: หน้างานโฟลเดอร์และรูปแบบใหม่ (แถบ 3 ขั้น • วิธีทำ + ภาพตัวอย่าง • การ์ดเครื่องมืออื่น) แค่หน้าตา
  *   เวอร์ชัน 5.5.83: ภาพ “จะได้แบบนี้” ใช้ข้อมูลจริง (โครงโฟลเดอร์ของจอจริง • รูปจริง + แถวจริงในใบเช็ค)
+ *   เวอร์ชัน 5.5.84: เครื่องมือสีใบเช็ค — เปลี่ยนชุดสีแถบทุกไฟล์ จดชุดสีในไฟล์ให้การเติม/ใบเปล่าใช้
  * ======================================================================
  */
 
@@ -1069,10 +1070,11 @@ const MARK = {
     return (
       /^(8AEDFE|82ECFE|002060|375623|FFFF00|4472C4|2F5597|203864|1F4E79)$/.test(h) ||
       this.x.has(h) ||
-      !!(this.p && this.p.has(h))
+      !!(this.p && this.p.has(h)) ||
+      !!(this.q && this.q.has(h))
     );
   },
-}; /* สีที่ถือว่าเป็นแถบ/ไฮไลต์ รวมสีที่ผู้ใช้เลือก */
+}; /* 5.5.84: q = สีของชุดสีที่จดไว้ในไฟล์ */ /* สีที่ถือว่าเป็นแถบ/ไฮไลต์ รวมสีที่ผู้ใช้เลือก */
 const modeF = (sh, col, a, b, f, ST, inc) => {
   const c = new Map();
   for (let r = a; r <= b; r++) {
@@ -1115,6 +1117,14 @@ const s2d = v => new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 864e5);
 const CONT = /ไฟล์เดิม|ต่อสัญญา|อัปเดต/,
   NEWST = /ขึ้นใหม่/;
 function layoutChk(sh, jobs, o, ST, W, wsv) {
+  const PAL = o.pal || null,
+    NAVYo = PAL ? 'FF' + PAL.m : NAVY,
+    DKBo = PAL ? new RegExp('^(FF)?(002060|375623|' + PAL.m + '|' + PAL.g + ')$', 'i') : DKB,
+    ISGo = PAL ? new RegExp(PAL.g + '$', 'i') : ISG,
+    YELo = PAL ? 'FF' + PAL.y : 'FFFFFF00',
+    YELk = PAL ? 'yel' + PAL.y : 'yel',
+    YELRo = PAL ? new RegExp('(FFFF00|' + PAL.y + ')$', 'i') : /FFFF00$/i;
+  MARK.q = palSet(PAL); /* 5.5.84: ชุดสีของไฟล์ (สีหลัก / แถบรอบ 2 / ไฮไลต์ / ช่องว่าง) */
   jobs.sort((x, y) => col2n(x[1]) - col2n(y[1]));
   const pv = c => n2col(col2n(c) - 1),
     nx = c => n2col(col2n(c) + 1);
@@ -1171,6 +1181,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       ...new Set([
         '8AEDFE',
         '82ECFE',
+        ...(PAL ? [PAL.p] : []),
         ...PADS.slice(1).map(x => x[0].slice(-6)),
         ...(o.padh || []).map(c => String(c).slice(-6).toUpperCase()),
       ]),
@@ -1209,9 +1220,9 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
     for (const b of B) if (b.bl == null) b.bl = any != null ? any : b.be || sh.getS(b.lc, hr + 1) || '0';
     for (const b of B) if (!ST.hasBorder(b.bl)) b.bl = ST.derive(b.bl, 'bord', { border: true });
     for (const b of B)
-      if (/FFFF00$/i.test(ST.fillOf(b.bl) || '')) b.bl = ST.derive(b.bl, 'nofill', { nofill: true });
+      if (YELRo.test(ST.fillOf(b.bl) || '')) b.bl = ST.derive(b.bl, 'nofill', { nofill: true });
   } /* 5.5.13 */
-  var PADC = PADO || 'FF8AEDFE';
+  var PADC = PADO || (PAL ? 'FF' + PAL.p : 'FF8AEDFE');
   if (!PADO) {
     padscan: for (const b of B)
       for (let r = hr + 1; r <= hr + 400; r++)
@@ -1324,7 +1335,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   const isBar = r => {
     if (barD(r)) return true;
     const st = sh.getS(b0.lc, r);
-    return st != null && DKB.test(ST.fillOf(st));
+    return st != null && DKBo.test(ST.fillOf(st));
   };
   const bars = [];
   let last = hr;
@@ -1945,7 +1956,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       row,
       r.nm,
     );
-    if (r.hash) sh.setS(b.lc, row, ST.derive(b.bl, 'yel', { fill: 'FFFFFF00' }));
+    if (r.hash) sh.setS(b.lc, row, ST.derive(b.bl, YELk, { fill: YELo }));
     else sh.setS(b.lc, row, b.bl);
     if (b.kind !== 'keep') note(b, r, row);
     else if (r.raw) {
@@ -2011,7 +2022,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
         const r = b.sp[i];
         if (r)
           (sh.setText(b.lc, FIRST + i, '#' + r.ad),
-            sh.setS(b.lc, FIRST + i, ST.derive(b.bl, 'yel', { fill: 'FFFFFF00' })));
+            sh.setS(b.lc, FIRST + i, ST.derive(b.bl, YELk, { fill: YELo })));
       }
   }
   /* แถบหัววันที่ให้ยาวเท่าแถบเดิมของชีต (เช่น Metro ที่มีช่องนับหลายจอ) */
@@ -2022,7 +2033,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
   for (let c = c0; c <= c1; c++) {
     const L = n2col(c),
       st = sh.getS(L, hr);
-    if (!own.has(L) && st != null && DKB.test(ST.fillOf(st))) HX.push([L, st]);
+    if (!own.has(L) && st != null && DKBo.test(ST.fillOf(st))) HX.push([L, st]);
   }
   for (const [L] of HX) {
     const base = modeF(sh, L, hr + 1, hr + 400, null, ST);
@@ -2041,7 +2052,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       for (const [L] of HX) R2[L] = SNAP[L];
     }
   }
-  const C2 = o.col2 || 'FF4472C4',
+  const C2 = o.col2 || (PAL ? 'FF' + PAL.g : 'FF4472C4'),
     fx = (st, c, k) =>
       String(ST.fillOf(st) || '')
         .toUpperCase()
@@ -2055,7 +2066,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       return !o.col2 && L && R2[L] != null ? R2[L] : fx(st, C2, 'c2');
     }
     if (o.col1) return fx(st, o.col1, 'c1');
-    return ISG.test(ST.fillOf(st)) ? ST.derive(st, 'nvy', { fill: NAVY }) : st;
+    return ISGo.test(ST.fillOf(st)) ? ST.derive(st, PAL ? 'nvy' + PAL.m : 'nvy', { fill: NAVYo }) : st;
   };
   const HXA = [...HX, ...B.flatMap(b => b.pcs.slice(1).map((L, i) => [L, b.hss[i + 1]]))].sort(
     (x, y) => col2n(x[0]) - col2n(y[0]),
@@ -2075,7 +2086,7 @@ function layoutChk(sh, jobs, o, ST, W, wsv) {
       sh.clear(b.pc, row);
       if (b.hs[2] != null) sh.setS(b.pc, row, hsx(b.hs[2], b.pc, r2));
       if (b.hs[0] == null) {
-        const bc = two || r2 ? C2 : o.col1 || NAVY;
+        const bc = two || r2 ? C2 : o.col1 || NAVYo;
         sh.setS(b.nc, row, ST.derive(sh.getS(b.nc, row) || 0, 'bkd' + bc, { numFmt: 14, fill: bc }));
         for (const L of [b.lc, ...b.pcs])
           if (L) sh.setS(L, row, ST.derive(sh.getS(L, row) || 0, 'bkf' + bc, { fill: bc }));
@@ -6100,6 +6111,10 @@ async function fillWb(f, on, metro, o) {
     await zip.file('xl/workbook.xml').async('string'),
     'application/xml',
   );
+  {
+    const pal = palOf(wx);
+    if (pal) o = { ...o, pal };
+  } /* 5.5.84: ชุดสีที่จดไว้ในไฟล์ */
   const rels = new DOMParser().parseFromString(
     await zip.file('xl/_rels/workbook.xml.rels').async('string'),
     'application/xml',
@@ -6711,6 +6726,7 @@ async function blankWb(f, d1f) {
   let n = 0,
     mx = 0,
     d1n = 0;
+  MARK.q = palSet(palOf(wx)); /* 5.5.84: สีของชุดสีในไฟล์ = สีแถบ / ไฮไลต์ ล้างออกในใบเปล่า */
   let mxP = 0;
   for (const sn of wb.SheetNames) {
     const ws = wb.Sheets[sn];
@@ -11835,7 +11851,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.83 (24 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.84 (25 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -12523,7 +12539,7 @@ function busyDone() {
 /* 5.5.81: ปุ่มบันทึก (บันทึกทับไฟล์เดิม / วันที่ถ่าย / ใบเปล่า / ย้ายจอ) — เดิมระหว่างรอ Chrome ถามสิทธิ์ เลือกโฟลเดอร์ หรือเขียนไฟล์ หน้าจอไม่เปลี่ยนเลย ดูเหมือนกดแล้วไม่มีอะไรเกิดขึ้น
    → ขึ้นกล่องบอกทันทีว่ากำลังทำขั้นไหน • ค้างนานบอกวิธีแก้ • กดยกเลิกได้ • บันทึกไม่ได้บอกสาเหตุตามชนิดข้อผิดพลาด */
 let SVW = null;
-const SVA = new Set(['savedir', 'shotsave', 'blksave', 'sdbsave']);
+const SVA = new Set(['savedir', 'shotsave', 'blksave', 'sdbsave', 'clrsave']);
 const SVTXT = {
   start: ['กำลังเตรียมบันทึก …', ''],
   perm: [
@@ -14065,7 +14081,7 @@ const tlinkHTML = (k, t, p, cls) =>
    • การ์ดเครื่องมืออื่น (ต้นเดือน / ครั้งคราว) • ภาพตัวอย่างใช้ชื่อสมมุติ (A_30s, ST-01) ไม่ใช่ข้อมูลจริง ===== */
 IC.tvArr = '<svg viewBox="0 0 24 24"><path d="M4 12h15M14 7l5 5-5 5"/></svg>';
 IC.tvChv = '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
-const TVK = ['src', 'pic', 'shot', 'blank', 'sdb', 'cmp'];
+const TVK = ['src', 'pic', 'shot', 'blank', 'sdb', 'cmp', 'clr'];
 let TVFAQ = false; /* เปิด “ถ้าเจอปัญหา” ค้างไว้ระหว่างวาดหน้าใหม่ */
 const tvSt = x =>
   x[1] === '—'
@@ -14240,6 +14256,7 @@ function tvShotFig() {
   };
 }
 const TVHINT = {
+  clr: 'เปลี่ยนเมื่อไหร่ก็ได้ กลับเป็นสีเดิมได้',
   blank: 'ทำครั้งเดียวตอนขึ้นเดือนใหม่',
   sdb: 'ใส่ไฟล์ฐานข้อมูลครั้งเดียว ระบบจำไว้',
   cmp: 'ใช้เมื่อมีการย้ายจอระหว่างแพค',
@@ -14446,6 +14463,39 @@ function vTools() {
         ['โฟลเดอร์', 'โฟลเดอร์แพคที่จอนั้นอยู่ในเครื่อง ต้องตรงกัน'],
       ],
     },
+    clr: {
+      t: 'สีใบเช็ค',
+      d: 'เปลี่ยนสีแถบต่าง ๆ ในใบเช็คทุกไฟล์ของชุดนี้ให้เป็นชุดเดียวกัน ทุกชีตรวมหน้า Analysis ไฟล์เดิมเก็บไว้ในโฟลเดอร์สำรอง',
+      st: clrSt(),
+      how: [
+        ['เลือกใบเช็คในขั้นที่ 1 “ใบเช็คที่ใช้”', ok1],
+        ['เลือกชุดสี หรือกดที่ช่องสีเพื่อเลือกเอง ดูภาพด้านขวา', !!(CLR.done && CLR.sig === ckSig())],
+        [
+          'กด “เปลี่ยนสีใบเช็ค” แล้วบันทึกทับ (ไฟล์เดิมอยู่ในโฟลเดอร์สำรอง) หรือดาวน์โหลด .zip',
+          !!(CLR.done && CLR.sig === ckSig() && CLR.done.saved),
+        ],
+      ],
+      faq: [
+        [
+          'อยากกลับเป็นสีเดิม',
+          'เลือก “ตามใบเช็คเดิม” แล้วกดเปลี่ยนสีอีกครั้ง หรือเอาไฟล์จากโฟลเดอร์ สำรองก่อนเปลี่ยนสี กลับมา',
+        ],
+        [
+          'ทำไมช่องถ่ายแล้วเปลี่ยนสีไม่ได้',
+          'ระบบใช้ช่องดำเลขขาวนับว่าจอไหนถ่ายแล้ว ถ้าเปลี่ยนสี ตัวเลขถ่ายแล้วจะนับผิด',
+        ],
+        [
+          'ปุ่มเปลี่ยนสีกดไม่ได้',
+          'ดูข้อความสีแดงใต้รายการสี เช่น แถบวันที่ต้องเป็นสีเข้ม แถบอื่นต้องเป็นสีอ่อน และสีต้องไม่ซ้ำกัน',
+        ],
+      ],
+      fig: tvClrFig(CLR.P || CLR0),
+      dl: [
+        ['เปลี่ยน', 'สีพื้นของแถบทุกชีต รวมหน้า Analysis'],
+        ['ไม่เปลี่ยน', 'ชื่อหนัง ตัวเลข สูตร วันที่ถ่าย ช่องดำ และตัวแดง “ออกวันที่”'],
+        ['เติมครั้งต่อไป', 'แถบวันที่ใหม่ใช้สีชุดนี้ ระบบอ่านชุดสีจากไฟล์'],
+      ],
+    },
   }[K];
   const work =
     K === 'src'
@@ -14453,15 +14503,17 @@ function vTools() {
         (ok1
           ? `<div class="tsb"><button class="btn primary" data-a="toolv" data-k="pic">${IC.folder}ไปขั้นที่ 2 สร้างโฟลเดอร์แยกรูป</button></div>`
           : '')
-      : K === 'shot'
-        ? vShot()
-        : K === 'cmp'
-          ? vCmp()
-          : K === 'blank'
-            ? vBlank()
-            : K === 'sdb'
-              ? vSdb()
-              : vPicCk();
+      : K === 'clr'
+        ? vClr()
+        : K === 'shot'
+          ? vShot()
+          : K === 'cmp'
+            ? vCmp()
+            : K === 'blank'
+              ? vBlank()
+              : K === 'sdb'
+                ? vSdb()
+                : vPicCk();
   const steps = `<ol class="tv-steps" data-tour="tsteps" aria-label="งานประจำวัน 3 ขั้น">${stp('src', 1, 'ใบเช็คที่ใช้', n ? s1[1] + '<br>' + s1[3] : 'ยังไม่ได้เลือก', ok1)}${stp('pic', 2, 'สร้างโฟลเดอร์แยกรูป', n ? tvSt(S.pic) : 'ทำหลังเลือกใบเช็ค', S.pic[0] === 'ok')}${stp('shot', 3, 'ใส่วันที่ถ่าย', n ? tvSt(S.shot) : 'ทำหลังช่างภาพวางรูปครบ', S.shot[0] === 'ok')}</ol>`;
   const pnl = `<section class="tv-pnl" id="tdetail" data-tour="tguide" aria-labelledby="tvh"><div class="tv-ph"><div><h2 id="tvh">${M.t}</h2><p>${M.d}</p></div><span class="tv-bd st-${M.st[0]}">${tvSt(M.st).split(' — ')[0]}</span></div>
  <div class="tv-cols"><div class="tv-l"><h3 class="tv-cap">ทำอย่างไร</h3><ol class="tv-how">${M.how.map(([t, d], i) => `<li${d ? ' class="tv-ok"' : ''}><span class="tv-sn" aria-hidden="true">${d ? IC.check : i + 1}</span><span>${t}${d ? '<span class="sr"> (ทำแล้ว)</span>' : ''}</span></li>`).join('')}</ol>
@@ -14472,7 +14524,7 @@ function vTools() {
     `<article class="tv-card${K === k ? ' on' : ''}"><div class="tv-ill" aria-hidden="true">${fig}</div><div class="tv-cb"><h3>${t}</h3><p>${d}</p><div class="tv-st st-${st[0]}">${st[0] === 'ok' ? IC.okc : st[0] === 'mu' ? IC.info : IC.warn}<span><b>${tvSt(st)}</b><small>${st[1] === '—' ? TVHINT[k] : st[3]}</small></span></div>${n ? `<button class="btn ${K === k ? 'primary' : 'secondary'}" data-a="toolv" data-k="${k}" aria-controls="tdetail">${K === k ? 'เปิดอยู่ด้านบน' : 'เปิด'}</button>` : ''}</div></article>`;
   return `${shead('งานโฟลเดอร์และรูป', 'หลังเติมใบเช็คแต่ละวัน ทำ 3 ขั้นนี้ตามลำดับ กดที่ขั้นเพื่อดูวิธีทำและภาพตัวอย่าง • ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
  ${FSA ? '' : alertHTML('wr', 'ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์', '<p>เครื่องมือในหน้านี้ต้องเปิดโฟลเดอร์ในเครื่อง ซึ่งเบราว์เซอร์นี้ทำไม่ได้</p>')}${steps}${K !== 'src' && qb ? `<div class="tv-qb"><span>มีใบเช็คชุดอื่นให้เลือก</span>${qb}</div>` : ''}${pnl}
- <h2 class="tv-h2">เครื่องมืออื่น<small>ต้นเดือน และตรวจเป็นครั้งคราว</small></h2><div class="tv-grid" data-tour="tother">${oc('blank', 'ใบเปล่าเดือนใหม่', 'ล้างรายชื่อหนังและวันที่ เก็บหัวตาราง จอ และสูตรไว้', tvMini('blank'), S.blank)}${oc('sdb', 'ตรวจจอกับฐานข้อมูล', 'ดูว่าใบเช็คของแต่ละคนขาดจอไหน หรือมีจอของคนอื่น', tvMini('db'), S.sdq)}${oc('cmp', 'ตรวจโฟลเดอร์เทียบจอ', 'เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ ว่าอยู่ถูกแพคไหม', tvMini('cmp'), S.cmp)}</div>
+ <h2 class="tv-h2">เครื่องมืออื่น<small>ต้นเดือน และตรวจเป็นครั้งคราว</small></h2><div class="tv-grid" data-tour="tother">${oc('blank', 'ใบเปล่าเดือนใหม่', 'ล้างรายชื่อหนังและวันที่ เก็บหัวตาราง จอ และสูตรไว้', tvMini('blank'), S.blank)}${oc('sdb', 'ตรวจจอกับฐานข้อมูล', 'ดูว่าใบเช็คของแต่ละคนขาดจอไหน หรือมีจอของคนอื่น', tvMini('db'), S.sdq)}${oc('clr', 'สีใบเช็ค', 'เปลี่ยนสีแถบของใบเช็คทุกไฟล์ในชุดนี้ เป็นชุดเดียวกัน', tvClrMini(), clrSt())}${oc('cmp', 'ตรวจโฟลเดอร์เทียบจอ', 'เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ ว่าอยู่ถูกแพคไหม', tvMini('cmp'), S.cmp)}</div>
  <p class="hint tsafe">ไม่ลบ ไม่ย้ายรูปหรือโฟลเดอร์ที่มีอยู่ • บันทึกทับใบเช็คเมื่อไหร่ เก็บไฟล์เดิมไว้ในโฟลเดอร์สำรองเสมอ • กลับไปเติมใบเช็ค กด “เติมใบเช็ครูป” ด้านบน งานที่ค้างไว้ไม่หาย</p>`;
 }
 /* ===== น้องโฟกัส (3.14): ผู้ช่วยตัวการ์ตูน (ออกแบบใหม่สำหรับระบบนี้) — โผล่มุมขวาล่างตอนรับไฟล์ ตอนเสร็จ และตอนมีเรื่องต้องดู แล้วหายเอง
@@ -14566,6 +14618,282 @@ function busyPaint() {
   else b.innerHTML = vBusy();
 }
 
+/* ===== 5.5.84: สีใบเช็ค — ชุดสีแถบในใบเช็ค (6 สี) • เปลี่ยนสีทุกไฟล์ในชุด • จดชุดสีไว้ในไฟล์ (ชื่อ PCS_COLORS) ให้การเติม / ใบเปล่ารู้สี (ทุกเครื่อง)
+   ไม่เปลี่ยน: ช่องถ่ายแล้ว (ดำ เลขขาว — ระบบใช้นับว่าถ่ายแล้ว) และ “ออกวันที่” ตัวแดง • เปลี่ยนเฉพาะสีพื้น / สีตัวอักษรใน styles.xml และสีในข้อความหลายสี (บรรทัดวิธีอ่าน) ===== */
+IC.pal =
+  '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.2-1-1.5-1-2.6 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/></svg>';
+const CLRK6 = ['m', 'g', 'c', 'l', 'y', 'p'];
+const CLRR = [
+  ['m', 'สีหลัก', 'แถบชื่อชีต และแถบวันที่ 1–15 (สีเข้ม ตัวหนังสือขาว)'],
+  ['g', 'แถบวันที่ 16 ขึ้นไป', 'แถบวันที่ของรอบ 2 (สีเข้ม ตัวหนังสือขาว)'],
+  ['c', 'แถบรหัสจอ', 'รหัสจอ และแถวรูปแบบจอ (อ่อนลงให้เอง)'],
+  ['l', 'แถบสถานที่', 'แถวใต้รหัสจอ'],
+  ['y', 'แถวไฮไลต์', 'Content / เวลาการจราจร และสภาพอากาศ'],
+  ['p', 'ช่องว่างท้ายรายการ', 'จอที่หนังน้อยกว่า ก่อนถึงแถบวันที่ถัดไป'],
+];
+const CLR0 = { m: '002060', g: '375623', c: '82ECFE', l: 'D6DCE4', y: 'FFFF00', p: '8AEDFE' };
+const CLRS = {
+  orig: { t: 'ตามใบเช็คเดิม', ...CLR0 },
+  ocean: { t: 'ฟ้าทะเล', m: '1F4E79', g: '0E6E74', c: 'BDD7EE', l: 'E3E8EE', y: 'FFE699', p: 'DDEBF7' },
+  forest: { t: 'เขียวป่า', m: '1E4D2B', g: '1F4E79', c: 'C6E8CF', l: 'E2E8E3', y: 'FFEB84', p: 'E2F0D9' },
+  plum: { t: 'ม่วง', m: '3E2A6E', g: '7A2E46', c: 'D9CFF2', l: 'E6E2EC', y: 'FFF2A8', p: 'EEE8F7' },
+  slate: { t: 'เทาเข้ม', m: '2F3A48', g: '1F6F5C', c: 'CDE2F2', l: 'E3E6EA', y: 'FFF59D', p: 'E8EEF4' },
+};
+const clrTint = (h, k) => {
+  const n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    .map(c =>
+      Math.round(c + (255 - c) * k)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')
+    .toUpperCase();
+};
+const clrLum = h => {
+  const n = parseInt(h, 16);
+  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+};
+const palC2 = P => (P.c === CLR0.c ? 'C5F6FF' : clrTint(P.c, 0.55)); /* แถวรูปแบบจอ (ใบแบบ B ใช้ C5F6FF) */
+const palY2 = P =>
+  P.y === CLR0.y ? 'E6D200' : P.y; /* ช่องสีเหลืองในบรรทัดวิธีอ่าน (เข้มกว่าเล็กน้อยให้เห็นบนพื้นขาว) */
+const palEq = (a, b) => !!a && !!b && CLRK6.every(k => a[k] === b[k]);
+const palName = P => {
+  const k = Object.keys(CLRS).find(k => palEq(CLRS[k], P));
+  return k ? CLRS[k].t : 'สีที่เลือกเอง';
+};
+const palParse = t => {
+  const o = {};
+  String(t || '')
+    .replace(/^\s*=?"?|"?\s*$/g, '')
+    .split(';')
+    .forEach(kv => {
+      const [k, v] = kv.split('=');
+      if (CLRK6.includes(k) && /^[0-9A-Fa-f]{6}$/.test(v || '')) o[k] = v.toUpperCase();
+    });
+  return CLRK6.every(k => o[k]) ? o : null;
+};
+const palOf = wx => {
+  if (!wx) return null;
+  for (const d of wx.getElementsByTagNameNS(NS, 'definedName'))
+    if (d.getAttribute('name') === 'PCS_COLORS') return palParse(d.textContent);
+  return null;
+};
+const palSet = P =>
+  P
+    ? new Set([...CLRK6.map(k => P[k]), palC2(P), palY2(P)])
+    : new Set(); /* สีของชุดนี้ถือเป็นสีแถบ / ไฮไลต์ (ตอนเติมและทำใบเปล่า) */
+const clrBad = P => {
+  const B = [],
+    nm = k => (CLRR.find(r => r[0] === k) || [0, k])[1];
+  for (const k of ['m', 'g'])
+    if (clrLum(P[k]) >= 140) B.push(`${nm(k)} ต้องเป็นสีเข้ม — ตัวเลขวันที่สีขาวจะอ่านไม่ออก`);
+  for (const k of ['c', 'l', 'y', 'p'])
+    if (clrLum(P[k]) < 150) B.push(`${nm(k)} ต้องเป็นสีอ่อน — ตัวหนังสือสีเข้มจะอ่านไม่ออก`);
+  const seen = new Map([
+    ['000000', 'สีช่องถ่ายแล้ว (ดำ)'],
+    ['FFFFFF', 'สีขาว'],
+    ['FF0000', 'สีแดงของ “ออกวันที่”'],
+  ]);
+  for (const k of CLRK6) {
+    const v = P[k];
+    if (seen.has(v)) B.push(`${nm(k)} ซ้ำกับ${seen.get(v)} — เลือกสีอื่น ระบบจะแยกแถบไม่ได้`);
+    else seen.set(v, nm(k));
+  }
+  return B;
+};
+/* เปลี่ยนสีไฟล์ใบเช็คหนึ่งไฟล์: สีเดิม (ตามชุดที่จดไว้ในไฟล์ ไม่มี = ชุดเดิมของใบเช็ค) → สีใหม่ • คืน {buf, n = จำนวนจุดสีที่เปลี่ยน, from = ชุดเดิม} */
+async function clrWb(buf, NP) {
+  const zip = await JSZip.loadAsync(buf.slice(0)),
+    P = new DOMParser(),
+    wxs = await zip.file('xl/workbook.xml').async('string'),
+    wx = P.parseFromString(wxs, 'application/xml'),
+    OP0 = palOf(wx) || CLR0;
+  const mk = inl => {
+      const M = new Map(),
+        add = (a, b) => {
+          if (a && b && a !== b && !M.has(a)) M.set(a, b);
+        };
+      if (inl) {
+        add(palY2(OP0), palY2(NP));
+        add(OP0.y, palY2(NP));
+      }
+      for (const k of CLRK6) add(OP0[k], NP[k]);
+      add(palC2(OP0), palC2(NP));
+      return M;
+    },
+    MS = mk(0),
+    MI = mk(1); /* ในข้อความหลายสี สีเหลืองคือช่องสีในบรรทัดวิธีอ่าน (เข้มกว่าแถวไฮไลต์) */
+  let n = 0;
+  const sub = M => x =>
+    x.replace(/(rgb=")(?:FF)?([0-9A-Fa-f]{6})"/g, (w, a, h) => {
+      const v = M.get(h.toUpperCase());
+      if (!v) return w;
+      n++;
+      return a + 'FF' + v + '"';
+    });
+  {
+    const sx = await zip.file('xl/styles.xml').async('string');
+    const y = sx.replace(/<(fonts|fills)\b[^>]*>[\s\S]*?<\/\1>/g, sub(MS));
+    if (y !== sx) zip.file('xl/styles.xml', y, { createFolders: false });
+  }
+  for (const f of Object.keys(zip.files)) {
+    if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(f)) continue;
+    const x = await zip.file(f).async('string');
+    const y = x.replace(/<is>[\s\S]*?<\/is>/g, sub(MI)).replace(/<tabColor\b[^>]*\/>/g, sub(MS));
+    if (y !== x) zip.file(f, y, { createFolders: false });
+  } /* ข้อความหลายสี (บรรทัดวิธีอ่าน) และสีแท็บชีต */
+  {
+    let dn = wx.getElementsByTagNameNS(NS, 'definedNames')[0];
+    if (dn)
+      for (const d of [...dn.getElementsByTagNameNS(NS, 'definedName')])
+        if (d.getAttribute('name') === 'PCS_COLORS') dn.removeChild(d);
+    if (!palEq(NP, CLR0)) {
+      if (!dn) {
+        dn = wx.createElementNS(NS, 'definedNames');
+        const sh = wx.getElementsByTagNameNS(NS, 'sheets')[0];
+        sh.parentNode.insertBefore(dn, sh.nextSibling);
+      }
+      const d = wx.createElementNS(NS, 'definedName');
+      d.setAttribute('name', 'PCS_COLORS');
+      d.setAttribute('hidden', '1');
+      d.textContent = '"' + CLRK6.map(k => k + '=' + NP[k]).join(';') + '"';
+      dn.appendChild(d);
+    } else if (dn && !dn.getElementsByTagNameNS(NS, 'definedName').length) dn.parentNode.removeChild(dn);
+    zip.file(
+      'xl/workbook.xml',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+        new XMLSerializer().serializeToString(wx.documentElement),
+      { createFolders: false },
+    );
+  }
+  return { buf: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }), n, from: OP0 };
+}
+/* ชุดสีที่ใบเช็คในชุด “ใบเช็คที่ใช้” ใช้อยู่ (อ่านจากไฟล์) */
+let CLR = { P: null, k: 'orig', cur: null, done: null, sig: '' };
+async function clrScan() {
+  const sig = ckSig();
+  if (CLR.cur && CLR.cur.sig === sig) return;
+  const L = [];
+  for (const f of TC) {
+    let P0 = null;
+    try {
+      const z = await JSZip.loadAsync(f.buf.slice(0)),
+        x = z.file('xl/workbook.xml');
+      if (x) P0 = palOf(new DOMParser().parseFromString(await x.async('string'), 'application/xml'));
+    } catch (_) {}
+    L.push({ name: f.name, P: P0 || CLR0 });
+  }
+  CLR.cur = { sig, L };
+  const g = new Map();
+  for (const x of L) {
+    const k = CLRK6.map(r => x.P[r]).join('');
+    if (!g.has(k)) g.set(k, { P: x.P, n: 0 });
+    g.get(k).n++;
+  }
+  CLR.cur.g = [...g.values()].sort((a, b) => b.n - a.n);
+  if (!CLR.P) {
+    const P0 = CLR.cur.g.length ? CLR.cur.g[0].P : CLR0;
+    CLR.P = { ...P0 };
+    CLR.k = Object.keys(CLRS).find(k => palEq(CLRS[k], P0)) || 'custom';
+  }
+}
+const clrSt = () => {
+  const n = TC.length,
+    D = CLR.done && CLR.sig === ckSig() ? CLR.done : null;
+  if (!n) return ['mu', '—', '', 'ยังไม่ได้เลือกใบเช็ค'];
+  if (D) return ['ok', `${D.files.length} ไฟล์`, 'เปลี่ยนสีแล้ว', D.saved ? 'บันทึกแล้ว' : 'ยังไม่ได้บันทึก'];
+  const g = CLR.cur && CLR.cur.sig === ckSig() ? CLR.cur.g : null;
+  return [
+    'mu',
+    '—',
+    '',
+    g
+      ? g.length === 1
+        ? 'ใช้สี' +
+          (palEq(g[0].P, CLR0)
+            ? 'ตามใบเช็คเดิม'
+            : palName(g[0].P) === 'สีที่เลือกเอง'
+              ? 'ที่เลือกเอง'
+              : ' “' + palName(g[0].P) + '”')
+        : `ใช้สี ${g.length} แบบ`
+      : 'ใช้สีตามใบเช็คเดิม',
+  ];
+};
+function tvClrFig(P) {
+  const c2 = palC2(P),
+    row = (e, nm, d, y) =>
+      `<tr class="r"><td class="e">${e}</td><td class="n"${y ? ` style="background:#${P.y}"` : ''}>${nm}</td><td class="${d ? 'd' : 'o'}">${d || ''}</td></tr>`;
+  return `<table class="pcf" aria-label="ตัวอย่างใบเช็คในชุดสีที่เลือก"><colgroup><col style="width:66px"><col><col style="width:66px"></colgroup>
+ <tr class="t"><td colspan="3" style="background:#${P.m}">PBTV 40Blue<small>คุณ A</small></td></tr>
+ <tr class="s"><td></td><td>ถ่ายแล้ว 74 จาก 102 &nbsp; คงเหลือ 28</td><td class="p" style="color:#${P.m}">73%</td></tr>
+ <tr class="k"><td colspan="3" style="background:#${P.c};color:#${P.m}">DGT000</td></tr>
+ <tr><td colspan="3" style="background:#${c2};color:#1F3C66;text-align:right;font-size:10px">(4-3)</td></tr>
+ <tr><td colspan="3" style="background:#${P.l};text-align:right;font-size:10px">สถานที่ตัวอย่าง</td></tr>
+ <tr class="h"><td style="text-align:right">ออก</td><td>ชื่อหนัง</td><td style="text-align:center">วันที่ถ่าย</td></tr>
+ <tr class="b" style="background:#${P.m}"><td style="text-align:right">1/11/2026</td><td></td><td></td></tr>
+ ${row('', '#Content_A_15s', '3', 1)}${row('ออกวันที่ 10', 'A_30s', '1')}${row('', 'B_15s', '1')}${row('ออกวันที่ 16', 'C_30s', '')}
+ <tr><td></td><td class="n" style="background:#${P.p}"></td><td style="background:#${P.p}"></td></tr>
+ <tr class="b" style="background:#${P.g}"><td style="text-align:right">16/11/2026</td><td></td><td></td></tr>
+ ${row('', 'D_30s', '17')}${row('ออกวันที่ 23', 'E_15s', '')}</table>`;
+}
+const tvClrMini = () => {
+  const P = CLR.P || CLR0;
+  return `<span class="pc-chips" style="transform:scale(1.6)">${CLRK6.map(r => `<i style="background:#${P[r]}"></i>`).join('')}</span>`;
+};
+function vClr() {
+  if (TC.length && !(CLR.cur && CLR.cur.sig === ckSig()) && !CLR.scan) {
+    CLR.scan = 1;
+    clrScan()
+      .catch(() => {})
+      .finally(() => {
+        CLR.scan = 0;
+        view();
+      });
+  }
+  const n = TC.length,
+    P = CLR.P || CLR0,
+    D = CLR.done && CLR.sig === ckSig() ? CLR.done : null,
+    bad = clrBad(P),
+    g = CLR.cur && CLR.cur.sig === ckSig() ? CLR.cur.g : null;
+  if (!n) return '<p class="hint">เลือกใบเช็คในขั้นที่ 1 “ใบเช็คที่ใช้” ก่อน แล้วกลับมาเลือกสีที่นี่</p>';
+  const cur = g
+    ? `<p class="pc-cur">ใบเช็คชุดนี้ตอนนี้: ${g.map(x => `<span><span class="pc-chips">${CLRK6.map(r => `<i style="background:#${x.P[r]}"></i>`).join('')}</span>${esc(palName(x.P))} ${x.n} ไฟล์</span>`).join('')}</p>`
+    : '';
+  let res = '';
+  if (D) {
+    const sv = D.sv;
+    res = D.bad
+      ? alertHTML('er', 'บันทึกไม่ได้', `<p>${esc(D.bad)}</p>`)
+      : alertHTML(
+          'ok',
+          `เปลี่ยนสีแล้ว ${D.files.length} ไฟล์ — ชุดสี “${esc(palName(D.P))}”`,
+          `<p>${D.saved && sv ? `<b>บันทึกลงโฟลเดอร์ “${esc(sv.dir)}” แล้ว</b> (ทับ ${sv.ok - sv.neu} ไฟล์${sv.neu ? ` • ไฟล์ใหม่ ${sv.neu} ไฟล์` : ''}) — ไฟล์ก่อนเปลี่ยนสีอยู่ในโฟลเดอร์ สำรองก่อนเปลี่ยนสี/${esc(sv.day)}` : 'ยังไม่ได้บันทึก — กดบันทึกทับในโฟลเดอร์ใบเช็ค หรือดาวน์โหลด .zip'} • ใบเช็คชุดนี้ในระบบเป็นฉบับที่เปลี่ยนสีแล้ว</p>`,
+        ) +
+        `<div class="picb"><button class="btn primary" data-a="clrdl">${IC.dl}ดาวน์โหลดใบเช็คที่เปลี่ยนสีแล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="clrsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="clrsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="clrsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}</div>`;
+  }
+  const same = g && g.length === 1 && palEq(g[0].P, P);
+  return `${res}${cur}<p class="pc-l">ชุดสี</p><div class="pc-sets" role="group" aria-label="ชุดสี">${Object.entries(
+    CLRS,
+  )
+    .map(
+      ([k, x]) =>
+        `<button class="pc-set${CLR.k === k ? ' on' : ''}" data-a="clrset" data-k="${k}" aria-pressed="${CLR.k === k}"><span class="pc-chips" aria-hidden="true">${['m', 'g', 'c', 'y'].map(r => `<i style="background:#${x[r]}"></i>`).join('')}</span><b>${x.t}</b>${k === 'orig' ? '<small>ค่าเริ่มต้น</small>' : ''}</button>`,
+    )
+    .join('')}</div>
+ <p class="pc-l">ปรับทีละสี<small>กดที่ช่องสีเพื่อเลือกเอง</small></p>
+ <ul class="pc-roles">${CLRR.map(([r, t, d]) => `<li><label class="pc-sw" style="background:#${P[r]}"><input type="color" class="pc-in" data-k="${r}" value="#${P[r].toLowerCase()}" aria-label="เลือก${t}"></label><span><b>${t}</b><small>${d}</small></span><code>#${P[r]}</code></li>`).join('')}
+ <li class="pc-fix"><span class="pc-lk" aria-hidden="true"><i style="background:#000"></i><i style="background:#fff"></i><i style="background:#E00000"></i></span><span><b>ไม่เปลี่ยน: ช่องถ่ายแล้ว (ดำ เลขขาว) และ “ออกวันที่” ตัวแดง</b><small>ระบบใช้ช่องดำเลขขาวนับว่าจอไหนถ่ายแล้ว</small></span><span class="pc-x">ล็อกไว้</span></li></ul>
+ ${bad.length ? `<ul class="pc-bad" role="alert">${bad.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+ <div class="tsb"><button class="btn ${D ? 'secondary' : 'primary'}" data-a="clrapply" ${bad.length || same ? 'disabled' : ''}>${IC.pal}${same ? 'ใบเช็คชุดนี้ใช้สีนี้อยู่แล้ว' : `เปลี่ยนสีใบเช็ค ${n} ไฟล์`}</button></div>
+ <p class="hint">กดแล้วระบบเปลี่ยนสีในใบเช็คชุดนี้ก่อน แล้วค่อยเลือกบันทึกทับ (ไฟล์เดิมเก็บไว้ในโฟลเดอร์ “สำรองก่อนเปลี่ยนสี”) หรือดาวน์โหลด .zip • ระบบจดชุดสีไว้ในไฟล์ด้วย เติมครั้งต่อไป แถบวันที่ใหม่ใช้สีเดียวกัน ทุกเครื่อง • ชื่อหนัง ตัวเลข สูตร และวันที่ถ่ายไม่เปลี่ยน</p>`;
+}
+const clrTxt = D =>
+  [
+    'รายงานเปลี่ยนสีใบเช็ค',
+    'ชุดสี: ' + palName(D.P) + ' (' + CLRK6.map(k => k + '=#' + D.P[k]).join(' ') + ')',
+    ...D.files.map(x => `${x.name}: จาก “${palName(x.from)}” เปลี่ยน ${x.n} จุด`),
+  ].join('\n');
 /* ===== 4.8: หน้ารายละเอียด ใบเปล่าเดือนใหม่ / ตรวจจอกับฐานข้อมูล ===== */
 function vBlank() {
   const B = BLK && BLK.sig === ckSig() ? BLK : null;
@@ -15056,6 +15384,7 @@ function vSide() {
       '<p class="sgrp">ต้นเดือน</p>' +
       it('blank', 'toolv', 'ใบเปล่าเดือนใหม่', sv(S.blank), IC.fillI, TOOLV === 'blank') +
       it('sdb', 'toolv', 'ตรวจจอกับฐานข้อมูล', sv(S.sdq), IC.clip, TOOLV === 'sdb') +
+      it('clr', 'toolv', 'สีใบเช็ค', sv(clrSt()), IC.pal, TOOLV === 'clr') +
       '<p class="sgrp">ตรวจเป็นครั้งคราว</p>' +
       it('cmp', 'toolv', 'ตรวจโฟลเดอร์เทียบจอ', sv(S.cmp), IC.cmpi, TOOLV === 'cmp') +
       sideFoot()
@@ -16682,7 +17011,16 @@ document.addEventListener('input', e => {
     FLQ = e.target.value;
     flApply();
   }
-}); /* 5.5.59 */
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t && t.classList && t.classList.contains('pc-in')) {
+    const sw = t.closest('.pc-sw');
+    if (sw) sw.style.background = t.value;
+    const cd = sw && sw.parentNode.querySelector('code');
+    if (cd) cd.textContent = t.value.toUpperCase();
+  }
+}); /* 5.5.84 */ /* 5.5.59 */
 document.addEventListener('input', e => {
   if (e.target && e.target.id === 'fq') {
     const r = $('#fres');
@@ -18027,6 +18365,204 @@ const ACT = {
         ? `ใส่วันที่ถ่ายแล้ว ${SHOT.done.n.toLocaleString()} ช่อง`
         : `แก้สีช่องวันที่ถ่ายแล้ว ${SHOT.done.ns.toLocaleString()} ช่อง`;
   },
+  clrset: k => {
+    if (!CLRS[k]) return;
+    CLR.P = { ...CLRS[k] };
+    delete CLR.P.t;
+    CLR.k = k;
+  },
+  clrapply: async () => {
+    const P = CLR.P;
+    if (!TC.length || !P || clrBad(P).length) return;
+    note = 'กำลังเปลี่ยนสีใบเช็ค …';
+    view();
+    const out = [];
+    for (const f of TC) {
+      try {
+        const r = await clrWb(f.buf, P);
+        out.push({ name: f.name, blob: r.buf, n: r.n, from: r.from });
+      } catch (e) {
+        MQN = 'err';
+        note = `เปลี่ยนสีไฟล์ ${f.name} ไม่ได้ (${errN(e)}) — ยังไม่ได้เปลี่ยนไฟล์ใด`;
+        return;
+      }
+    }
+    const by = new Map(out.map(x => [x.name, x])),
+      orig = new Map(TC.map(f => [f.name, f.buf])),
+      upd = A =>
+        A.map(f => {
+          const x = by.get(f.name);
+          return x
+            ? { ...f, buf: x.blob.buffer.slice(x.blob.byteOffset, x.blob.byteOffset + x.blob.byteLength) }
+            : f;
+        });
+    TC = upd(TC);
+    if (TCS === 'c') {
+      C = upd(C);
+      TCK = sigOf(C);
+    } else if (TCS === 'last' && last && TCK === last) {
+      for (const r of last.res) {
+        const x = by.get(r.name);
+        if (x && r.blob) r.blob = x.blob;
+      }
+      const z = new JSZip();
+      for (const r of last.res) if (r.blob) z.file(r.name, r.blob, { createFolders: false });
+      z.file('รายงาน.txt', last.txt || '');
+      last.zip = await z.generateAsync({ type: 'blob' });
+    }
+    if (PICX) PICX.sig = ckSig(); /* สีไม่เปลี่ยนรายชื่อหนัง → ผลที่อ่านไว้ใช้ต่อได้ */
+    CLR.done = { files: out, P: { ...P }, saved: false, orig, sv: null };
+    CLR.sig = ckSig();
+    CLR.cur = null;
+    await clrScan();
+    MQN = 'done';
+    note = `เปลี่ยนสีแล้ว ${out.length} ไฟล์ — ยังไม่ได้บันทึก`;
+  },
+  clrdl: async () => {
+    const D = CLR.done;
+    if (!D) return;
+    const z = new JSZip();
+    for (const x of D.files) z.file(x.name, x.blob, { createFolders: false });
+    z.file('รายงานเปลี่ยนสี.txt', clrTxt(D));
+    saveBlob(
+      'ใบเช็ครูป_เปลี่ยนสี.zip',
+      await z.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
+    );
+  },
+  clrsave: async k => {
+    const D = CLR.done;
+    if (!D) return;
+    if (!FSA) {
+      MQN = 'warn';
+      note = NOFSA;
+      return;
+    }
+    let d = k === 'pick' ? null : CKDIR;
+    const t0 = Date.now();
+    try {
+      if (d && (await d.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        svSt('perm');
+        if ((await d.requestPermission({ mode: 'readwrite' })) !== 'granted') d = null;
+      }
+      if (svX()) return;
+      if (!d) {
+        svSt('pick');
+        d = await showDirectoryPicker({ id: 'ck', mode: 'readwrite', startIn: 'desktop' });
+      }
+    } catch (e) {
+      if (svX()) return;
+      if (e && e.name === 'AbortError') {
+        MQN = 'warn';
+        note =
+          'ยังไม่ได้บันทึก — ยังไม่ได้เลือกโฟลเดอร์ หรือ Chrome ไม่ได้ให้แก้ไฟล์ • ใช้ปุ่มดาวน์โหลด .zip แทนได้';
+        return;
+      }
+      MQN = 'err';
+      note = svPick(e);
+      return;
+    }
+    if (svX()) return;
+    svSt('xl');
+    if (
+      !(await xlAsk(
+        d,
+        D.files.map(x => x.name),
+      ))
+    ) {
+      note = 'ยังไม่ได้บันทึก — ปิดไฟล์ใน Excel ก่อน แล้วกดบันทึกอีกครั้ง';
+      return;
+    }
+    const has = async (dir, n) => {
+        try {
+          return await (await dir.getFileHandle(n)).getFile();
+        } catch (_) {
+          return null;
+        }
+      },
+      same = async (f, b) => {
+        if (!f || !b || f.size !== b.byteLength) return false;
+        const u = new Uint8Array(await f.arrayBuffer()),
+          v = new Uint8Array(b);
+        for (let i = 0; i < u.length; i++) if (u[i] !== v[i]) return false;
+        return true;
+      };
+    const dif = [];
+    for (const x of D.files) {
+      try {
+        const old = await has(d, x.name);
+        if (
+          old &&
+          !(await same(old, D.orig && D.orig.get(x.name))) &&
+          !(await same(old, x.blob.buffer.slice(x.blob.byteOffset, x.blob.byteOffset + x.blob.byteLength)))
+        )
+          dif.push(x.name);
+      } catch (e) {
+        MQN = 'err';
+        note = `อ่านไฟล์ ${x.name} ในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ถ้าไฟล์เปิดอยู่ใน Excel ให้ปิดก่อน แล้วกดบันทึกอีกครั้ง (ยังไม่ได้บันทึก)`;
+        return;
+      }
+    }
+    if (
+      dif.length &&
+      !confirm(
+        `ไฟล์ในโฟลเดอร์ “${d.name}” ไม่ใช่ฉบับเดียวกับที่เปลี่ยนสี (อาจถูกแก้ทีหลัง หรือเป็นคนละไฟล์):\n${dif.join('\n')}\n\nบันทึกทับไหม? ไฟล์เดิมจะเก็บไว้ในโฟลเดอร์ สำรองก่อนเปลี่ยนสี`,
+      )
+    ) {
+      note =
+        'ยังไม่ได้บันทึก — ถ้าจะเปลี่ยนสีไฟล์ในโฟลเดอร์นั้น กด “เปิดใบเช็คทั้งโฟลเดอร์” เลือกโฟลเดอร์นั้น แล้วเปลี่ยนสีอีกครั้ง';
+      return;
+    }
+    CKDIR = d;
+    HDB.set('ck', d).catch(() => {});
+    const day = isoD(new Date(Date.now() + 7 * 36e5));
+    let bk;
+    try {
+      bk = await (
+        await d.getDirectoryHandle('สำรองก่อนเปลี่ยนสี', { create: true })
+      ).getDirectoryHandle(day, { create: true });
+    } catch (e) {
+      MQN = 'err';
+      note = `สร้างโฟลเดอร์สำรองในโฟลเดอร์ “${d.name}” ไม่ได้ (${errN(e)}) — ยังไม่ได้บันทึก${SVWHY[e && e.name] ? ' • ' + SVWHY[e.name] : ''}`;
+      return;
+    }
+    const bad = [],
+      W = [];
+    let neu = 0,
+      si = 0;
+    for (const x of D.files) {
+      if (svX()) break;
+      svSt('write', ++si, D.files.length, x.name);
+      try {
+        const old = await has(d, x.name);
+        if (!old) neu++;
+        if (old && !(await has(bk, x.name))) {
+          const w = await (await bk.getFileHandle(x.name, { create: true })).createWritable();
+          await w.write(await old.arrayBuffer());
+          await w.close();
+        }
+        const w = await (await d.getFileHandle(x.name, { create: true })).createWritable();
+        await w.write(x.blob);
+        await w.close();
+      } catch (e) {
+        bad.push(x.name);
+        W.push([x.name, errN(e)]);
+      }
+    }
+    try {
+      const w = await (await bk.getFileHandle('รายงานเปลี่ยนสี.txt', { create: true })).createWritable();
+      await w.write(clrTxt(D));
+      await w.close();
+    } catch (_) {}
+    if (bad.length) {
+      MQN = 'err';
+      note = `บันทึกไม่ได้ ${bad.length} ไฟล์${xlWhy(W)} — ${svWhy(W)}`;
+      return;
+    }
+    D.saved = true;
+    D.sv = { dir: d.name, ok: D.files.length, neu, day };
+    MQN = 'done';
+    note = `บันทึกลงโฟลเดอร์ “${d.name}” แล้ว ${D.files.length} ไฟล์`;
+  },
   shotdl: async () => {
     const D = SHOT && SHOT.done;
     if (!D) return;
@@ -18850,6 +19386,11 @@ const ACT = {
   toolv: k => {
     if (!TVK.includes(k)) return;
     TOOLV = k;
+    if (k === 'clr' && TC.length)
+      clrScan().then(
+        () => view(),
+        () => view(),
+      );
     if (k === 'sdb')
       (sdb() ? sdbRun() : anaRun()).then(
         () => view(),
@@ -19516,6 +20057,15 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.classList && t.classList.contains('pc-in')) {
+    const v = t.value.slice(1).toUpperCase();
+    if (/^[0-9A-F]{6}$/.test(v) && CLR.P) {
+      CLR.P[t.dataset.k] = v;
+      CLR.k = Object.keys(CLRS).find(k => palEq(CLRS[k], CLR.P)) || 'custom';
+    }
+    view();
+    return;
+  } /* 5.5.84 */
   if (t.id === 'o_base') {
     const raw = t.value.trim();
     if (!raw) {
