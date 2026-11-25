@@ -1,18 +1,19 @@
 /**
  * หน้ามือถือคนถ่ายรูป — ส่วนหนึ่งของ PHOTO CHECK STUDIO (ตั้งแต่ 5.5.85)
  *
- * - PHOTO CHECK STUDIO ส่งสรุปใบเช็คที่เติมแล้วมาที่หน้านี้ (หน้าผลการเติม → ปุ่ม “ส่งเข้าหน้ามือถือ” → doGet ?recv=studio)
- *   ส่งเฉพาะรายชื่อหนังต่อจอ: ถ่ายแล้ว / ยังไม่ถ่าย / วันที่หนังออก — ไม่ส่งไฟล์ใบเช็ค
+ * - PHOTO CHECK STUDIO ส่งสรุปใบเช็คมาที่หน้านี้ (หน้างานโฟลเดอร์และรูป → ขั้นที่ 4 “ส่งเข้าหน้ามือถือ” → doGet ?recv=studio)
+ *   ส่งเฉพาะรายชื่อหนังต่อจอ (รหัส • TYPE • ชื่อจอ): ถ่ายแล้ว / ยังไม่ถ่าย / วันที่หนังออก — ไม่ส่งไฟล์ใบเช็ค
  * - เก็บแยกตามคน (ชื่อไฟล์ใบเช็ค เช่น คุณ_A.xlsm → “คุณ_A”) เป็นไฟล์ .json ในโฟลเดอร์ Drive ของเจ้าของสคริปต์
- * - หน้าเว็บมือถือ (doGet): แต่ละคนเห็นเฉพาะใบเช็คที่มีอีเมลตัวเองในแท็บ “ผู้ใช้และสิทธิ์”
- *   เจ้าของชีต และอีเมลในช่อง “ผู้ดูแล / หัวหน้า” เห็นทุกคน และส่งข้อมูลจาก PHOTO CHECK STUDIO ได้
+ * - หน้าเว็บมือถือ (doGet) — สิทธิ์ตามแท็บ “ผู้ใช้และสิทธิ์”:
+ *   หัวหน้า (แถว 2) และเจ้าของชีต = เห็นทุกใบ ส่งได้ทุกใบ • คนคัดรูป (คอลัมน์ C) = เห็นและส่งได้เฉพาะใบที่มีอีเมลตัวเอง
+ *   คนถ่ายรูป (คอลัมน์ B) = เห็นเฉพาะใบของตัวเอง ดูอย่างเดียว
  * - 5.5.87: เมนูลิงก์หน้ามือถือให้ลิงก์สำหรับ LINE (?openExternalBrowser=1) • หน้ามือถือไม่โหลดฟอนต์จากเน็ต (เปิดเร็วขึ้น)
  * ไม่มีการใช้ AI ในการทำงาน — เป็นสคริปต์ธรรมดา
  */
 const CFG = {
   usersSheet: 'ผู้ใช้และสิทธิ์',
   folderName: 'หน้ามือถือคนถ่ายรูป (ข้อมูล)',   // โฟลเดอร์ใน Drive ที่เก็บข้อมูลของแต่ละคน
-  firstRow: 6,                                    // แถวแรกของรายชื่อใบเช็คในแท็บผู้ใช้
+  firstRow: 6,                                    // แถวแรกของรายชื่อใบเช็คในแท็บผู้ใช้ (A ใบเช็ค • B คนถ่ายรูป • C คนคัดรูป • D ส่งล่าสุด • E จอ • F ถ่ายแล้ว)
   studioOrigin: 'https://playlist-system.github.io',   // เว็บ PHOTO CHECK STUDIO ที่ส่งข้อมูลมาได้
   tz: 'Asia/Bangkok',
   maxPeople: 80,
@@ -40,7 +41,7 @@ function setup() {
   CacheService.getScriptCache().remove('users');
   const url = ScriptApp.getService().getUrl();
   SpreadsheetApp.getUi().alert('หน้ามือถือคนถ่ายรูป', 'ตั้งค่าแล้ว\n\n' + (url
-    ? 'ลิงก์หน้ามือถือ:\n' + url + '\n\nวางลิงก์นี้ใน PHOTO CHECK STUDIO (หน้าผลการเติม → ส่งเข้าหน้ามือถือ) แล้วกดส่ง'
+    ? 'ลิงก์หน้ามือถือ:\n' + url + '\n\nวางลิงก์นี้ใน PHOTO CHECK STUDIO (หน้างานโฟลเดอร์และรูป → ขั้นที่ 4 ส่งเข้าหน้ามือถือ) แล้วกดส่ง'
     : 'ขั้นต่อไป: กด ทำให้ใช้งานได้ → การทำให้ใช้งานได้รายการใหม่ → เว็บแอป (ดูคู่มือ)'), SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
@@ -67,13 +68,13 @@ function usersSheet_(ss) {
   const all = ss.getSheets();
   sh = all.length === 1 && all[0].getLastRow() === 0 ? all[0].setName(CFG.usersSheet) : ss.insertSheet(CFG.usersSheet, 0);
   sh.getRange('A1').setValue('ผู้ใช้และสิทธิ์ — หน้ามือถือคนถ่ายรูป').setFontSize(14).setFontWeight('bold');
-  sh.getRange('A2:C2').setValues([['ผู้ดูแล / หัวหน้า', '', '← อีเมลบริษัท คั่นด้วย , • เห็นใบเช็คทุกคน และส่งข้อมูลจาก PHOTO CHECK STUDIO ได้']]);
+  sh.getRange('A2:C2').setValues([['หัวหน้า', '', '← อีเมลบริษัท คั่นด้วย , • เห็นใบเช็คทุกคน และส่งข้อมูลได้ทุกใบ']]);
   sh.getRange('A2').setFontWeight('bold');
   sh.getRange('B2').setBackground('#FFF2CC');
-  sh.getRange('A3').setValue('ใส่อีเมลบริษัทของคนถ่ายรูปในช่องสีเหลือง (หลายคนคั่นด้วย ,) • ชื่อใบเช็คขึ้นเองเมื่อส่งข้อมูลจาก PHOTO CHECK STUDIO • เจ้าของชีตเห็นทุกคนเสมอ');
+  sh.getRange('A3').setValue('ใส่อีเมลบริษัทในช่องสีเหลือง (หลายคนคั่นด้วย ,) • คนถ่ายรูป = ดูได้อย่างเดียว • คนคัดรูป = ดูและส่งข้อมูลได้เฉพาะใบนั้น • ชื่อใบเช็คขึ้นเองเมื่อหัวหน้าส่งข้อมูลครั้งแรก • เจ้าของชีตเห็นทุกคนเสมอ');
   sh.getRange('A3').setFontColor('#52525B');
-  sh.getRange(5, 1, 1, 5).setValues([['ใบเช็ค', 'อีเมลคนถ่ายรูป', 'ส่งล่าสุด', 'จอ', 'ถ่ายแล้ว']]).setFontWeight('bold').setBackground('#EEF2F8');
-  [180, 320, 150, 60, 80].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+  sh.getRange(5, 1, 1, 6).setValues([['ใบเช็ค', 'อีเมลคนถ่ายรูป (ดูอย่างเดียว)', 'อีเมลคนคัดรูป (ดู + ส่งได้)', 'ส่งล่าสุด', 'จอ', 'ถ่ายแล้ว']]).setFontWeight('bold').setBackground('#EEF2F8');
+  [180, 300, 300, 150, 60, 80].forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.setFrozenRows(5);
   return sh;
 }
@@ -85,19 +86,21 @@ function users_() {
   if (hit) { try { return JSON.parse(hit); } catch (err) { /* อ่านจากชีตใหม่ */ } }
   const sh = usersSheet_(ssOf_());
   const n = Math.max(0, sh.getLastRow() - CFG.firstRow + 1);
-  const rows = n ? sh.getRange(CFG.firstRow, 1, n, 2).getValues()
-    .filter(r => String(r[0]).trim()).map(r => ({ name: String(r[0]).trim(), emails: emails_(r[1]) })) : [];
+  const rows = n ? sh.getRange(CFG.firstRow, 1, n, 3).getValues()
+    .filter(r => String(r[0]).trim()).map(r => ({ name: String(r[0]).trim(), emails: emails_(r[1]), checkers: emails_(r[2]) })) : [];
   const U = { admins: emails_(sh.getRange(2, 2).getValue()), rows, owner: (Session.getEffectiveUser().getEmail() || '').toLowerCase() };
   cache.put('users', JSON.stringify(U), 120);
   return U;
 }
 
-/** สิทธิ์ของอีเมลนี้ → { me, admin, names: ใบเช็คที่เปิดดูได้ } */
+/** สิทธิ์ของอีเมลนี้ → { me, admin, names: ใบเช็คที่เปิดดูได้, send: ใบเช็คที่ส่งข้อมูลได้ (หัวหน้า = ทุกใบ) } */
 function access_(email) {
   const U = users_(), me = String(email || '').trim().toLowerCase();
   const admin = !!me && (me === U.owner || U.admins.indexOf(me) >= 0);
-  const names = U.rows.filter(r => admin || (me && r.emails.indexOf(me) >= 0)).map(r => r.name);
-  return { me, admin, names };
+  const mine = r => !!me && (r.emails.indexOf(me) >= 0 || (r.checkers || []).indexOf(me) >= 0);
+  const names = U.rows.filter(r => admin || mine(r)).map(r => r.name);
+  const send = U.rows.filter(r => admin || (!!me && (r.checkers || []).indexOf(me) >= 0)).map(r => r.name);
+  return { me, admin, names, send };
 }
 const whoAmI_ = () => { try { return Session.getActiveUser().getEmail() || ''; } catch (err) { return ''; } };
 
@@ -151,9 +154,9 @@ function cleanPerson_(x) {
   const name = s(x && x.name, 80).trim();
   if (!name) return null;
   const screens = (Array.isArray(x.screens) ? x.screens : []).slice(0, 400).map(c => ({
-    c: s(c.c, 40), p: s(c.p, 60), l: s(c.l, 120), n: num(c.n), s: num(c.s),
+    c: s(c.c, 40), y: s(c.y, 20), p: s(c.p, 60), l: s(c.l, 120), n: num(c.n), s: num(c.s),
     t: (Array.isArray(c.t) ? c.t : []).slice(0, 3000).map(r => [s(r[0]), num(r[1])]),
-    d: (Array.isArray(c.d) ? c.d : []).slice(0, 3000).map(r => [s(r[0]), num(r[1])]),
+    d: (Array.isArray(c.d) ? c.d : []).slice(0, 3000).map(r => [s(r[0]), num(r[1]), num(r[2])]),
   }));
   return { name, file: s(x.file, 120), at: num(x.at) || Date.now(), mx: num(x.mx), screens };
 }
@@ -164,7 +167,7 @@ function cleanPerson_(x) {
 
 function recvPage_() {
   let ok = false, me = '';
-  try { me = whoAmI_(); ok = access_(me).admin; } catch (err) { ok = false; }
+  try { me = whoAmI_(); const A = access_(me); ok = A.admin || A.send.length > 0; } catch (err) { ok = false; }
   const d = JSON.stringify({ ok, studio: CFG.studioOrigin, me }).replace(/</g, '\\u003c');
   return HtmlService.createHtmlOutput(RECV_HTML.replace('__DATA__', () => d))
     .setTitle('รับข้อมูลจาก PHOTO CHECK STUDIO').addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -172,9 +175,14 @@ function recvPage_() {
 
 /** เก็บข้อมูลที่ส่งมา {v, at, ver, people:[{name, file, at, mx, screens}]} → สรุปผล */
 function recvSave(pay) {
-  if (!access_(whoAmI_()).admin) throw new Error('ส่งได้เฉพาะเจ้าของชีต และอีเมลในช่อง “ผู้ดูแล / หัวหน้า” ของแท็บผู้ใช้และสิทธิ์');
-  const people = (pay && Array.isArray(pay.people) ? pay.people : []).slice(0, CFG.maxPeople).map(cleanPerson_).filter(Boolean);
-  if (!people.length) throw new Error('ไม่ได้รับข้อมูลใบเช็ค');
+  const A = access_(whoAmI_());
+  if (!A.admin && !A.send.length) throw new Error('ส่งได้เฉพาะเจ้าของชีต หัวหน้า และคนคัดรูป (อีเมลในแท็บผู้ใช้และสิทธิ์)');
+  const all = (pay && Array.isArray(pay.people) ? pay.people : []).slice(0, CFG.maxPeople).map(cleanPerson_).filter(Boolean);
+  if (!all.length) throw new Error('ไม่ได้รับข้อมูลใบเช็ค');
+  // คนคัดรูปส่งได้เฉพาะใบที่มีอีเมลตัวเองในคอลัมน์ C • ใบที่ยังไม่มีในแท็บ (ชื่อใหม่) หัวหน้าส่งครั้งแรก
+  const people = A.admin ? all : all.filter(p => A.send.indexOf(p.name) >= 0);
+  const skipped = all.filter(p => people.indexOf(p) < 0).map(p => p.name);
+  if (!people.length) throw new Error('ใบเช็คที่ส่งมา (' + skipped.join(', ') + ') ไม่มีอีเมลของคุณในช่องคนคัดรูป — ให้หัวหน้าใส่อีเมลในแท็บผู้ใช้และสิทธิ์ หรือให้หัวหน้าส่ง');
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -190,15 +198,15 @@ function recvSave(pay) {
       const N = p.screens.reduce((a, c) => a + c.n, 0), S = p.screens.reduce((a, c) => a + c.s, 0);
       const vals = [new Date(p.at), p.screens.length, N ? S / N : 0];
       let r = rowOf[p.name];
-      if (r == null) { r = next++; sh.getRange(r, 1, 1, 2).setValues([[p.name, '']]); sh.getRange(r, 2).setBackground('#FFF2CC'); fresh.push(p.name); }
-      sh.getRange(r, 3, 1, 3).setValues([vals]);
-      sh.getRange(r, 3).setNumberFormat('d mmm yyyy HH:mm');
-      sh.getRange(r, 5).setNumberFormat('0%');
+      if (r == null) { r = next++; sh.getRange(r, 1, 1, 3).setValues([[p.name, '', '']]); sh.getRange(r, 2, 1, 2).setBackground('#FFF2CC'); fresh.push(p.name); }
+      sh.getRange(r, 4, 1, 3).setValues([vals]);
+      sh.getRange(r, 4).setNumberFormat('d mmm yyyy HH:mm');
+      sh.getRange(r, 6).setNumberFormat('0%');
     }
     CacheService.getScriptCache().remove('users');
     const U = users_();
     const noMail = U.rows.filter(r => !r.emails.length && people.some(p => p.name === r.name)).map(r => r.name);
-    return { people: people.length, screens: people.reduce((a, p) => a + p.screens.length, 0), fresh, noMail };
+    return { people: people.length, screens: people.reduce((a, p) => a + p.screens.length, 0), fresh, noMail, skipped };
   } finally {
     lock.releaseLock();
   }
@@ -259,7 +267,8 @@ function draw() {
   h += step(p.length ? 'ok' : S.step === 'err' ? 'bad' : 'run', p.length ? 'รับข้อมูล ' + p.length + ' คน ' + ns + ' จอ' : 'รอข้อมูลจาก PHOTO CHECK STUDIO', p.length ? esc(p.map(function (x) { return x.name; }).join(', ')) : '');
   if (p.length) h += step(S.res ? 'ok' : S.step === 'save' ? 'run' : S.step === 'err' ? 'bad' : 'wait', 'บันทึกให้หน้ามือถือ', S.step === 'save' ? 'อย่าเพิ่งปิดหน้านี้' : '');
   if (S.step === 'done') h += '<div class="msg ok">เสร็จแล้ว<small>คนถ่ายรูปเปิดลิงก์เดิมเห็นข้อมูลใหม่ทันที' +
-    (S.res.noMail && S.res.noMail.length ? ' • ยังไม่มีอีเมลคนถ่ายรูปของ ' + esc(S.res.noMail.join(', ')) + ' — ใส่ในแท็บ “ผู้ใช้และสิทธิ์”' : '') + ' • หน้าต่างนี้ปิดเองใน 3 วินาที</small></div>';
+    (S.res.noMail && S.res.noMail.length ? ' • ยังไม่มีอีเมลคนถ่ายรูปของ ' + esc(S.res.noMail.join(', ')) + ' — ใส่ในแท็บ “ผู้ใช้และสิทธิ์”' : '') +
+    (S.res.skipped && S.res.skipped.length ? ' • ไม่ได้ส่ง ' + esc(S.res.skipped.join(', ')) + ' (ไม่ใช่ใบที่คุณเป็นคนคัดรูป)' : '') + ' • หน้าต่างนี้ปิดเองใน 3 วินาที</small></div>';
   if (S.step === 'err') h += '<div class="msg bad">ส่งไม่สำเร็จ<small>' + esc(S.err) + '</small></div>';
   document.getElementById('b').innerHTML = h;
 }
@@ -270,10 +279,10 @@ window.addEventListener('message', function (e) {
   if (!S.pay || !S.pay.people || !S.pay.people.length) { fail({ message: 'ไม่ได้รับข้อมูลใบเช็ค' }); return; }
   S.step = 'save'; draw();
   google.script.run.withFailureHandler(fail).withSuccessHandler(function (r) {
-    S.res = r; S.step = 'done'; draw(); tell({ t: 'done', ok: true, people: r.people, screens: r.screens, fresh: r.fresh, noMail: r.noMail });
+    S.res = r; S.step = 'done'; draw(); tell({ t: 'done', ok: true, people: r.people, screens: r.screens, fresh: r.fresh, noMail: r.noMail, skipped: r.skipped });
   }).recvSave(S.pay);
 });
-if (!D.ok) { S.step = 'err'; S.err = (D.me ? D.me + ' ' : '') + 'ส่งข้อมูลเข้าหน้ามือถือไม่ได้ — ส่งได้เฉพาะเจ้าของชีต และอีเมลในช่อง “ผู้ดูแล / หัวหน้า” ของแท็บผู้ใช้และสิทธิ์'; draw(); tell({ t: 'done', ok: false, err: S.err }); }
-else if (!op()) { S.step = 'err'; S.err = 'เปิดหน้านี้จากปุ่ม “ส่งเข้าหน้ามือถือ” ในหน้าผลการเติมของ PHOTO CHECK STUDIO'; draw(); }
+if (!D.ok) { S.step = 'err'; S.err = (D.me ? D.me + ' ' : '') + 'ส่งข้อมูลเข้าหน้ามือถือไม่ได้ — ส่งได้เฉพาะเจ้าของชีต หัวหน้า และคนคัดรูป (อีเมลในแท็บผู้ใช้และสิทธิ์)'; draw(); tell({ t: 'done', ok: false, err: S.err }); }
+else if (!op()) { S.step = 'err'; S.err = 'เปิดหน้านี้จากปุ่ม “ส่งเข้าหน้ามือถือ” (หน้างานโฟลเดอร์และรูป ขั้นที่ 4) ของ PHOTO CHECK STUDIO'; draw(); }
 else { draw(); tell({ t: 'ready' }); }
 </script></body></html>`;
