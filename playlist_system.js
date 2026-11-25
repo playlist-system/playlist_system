@@ -190,6 +190,7 @@
  *   เวอร์ชัน 5.5.85: หน้ามือถือคนถ่ายรูป — ปุ่มส่งเข้าหน้ามือถือ (phSnap / phCard / PHW)
  *   เวอร์ชัน 5.5.86: แอปในมือถือ (phone/) — โค้ดระบบไม่เปลี่ยน นอกจากเลขเวอร์ชัน
  *   เวอร์ชัน 5.5.87: หน้ามือถือแบบลิงก์อย่างเดียว — โค้ดระบบไม่เปลี่ยน นอกจากเลขเวอร์ชัน
+ *   เวอร์ชัน 5.5.88: ขั้นที่ 4 ส่งเข้าหน้ามือถือ (vPh / phSt / phFig) • phSnap มี TYPE จอ และวันที่ออกของหนังที่ถ่ายแล้ว
  * ======================================================================
  */
 
@@ -11854,7 +11855,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.87 (25 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.88 (25 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -13897,7 +13898,7 @@ const vShot = () => {
  ${badH}
  ${grp('ยังไม่มีรูป (ช่องยังว่าง)', R.none, `รอบ 1–15: ${n1} ช่อง • รอบ 16–สิ้นเดือน: ${n2} ช่อง`, x => x.nm + (x.nornd ? ' (ยังไม่มีโฟลเดอร์รอบ ' + x.rnd + ')' : x.nofold ? ' (ไม่มีโฟลเดอร์)' : ''))}
  ${R.miss.length ? `<details class="picd"><summary><b>หาโฟลเดอร์จอไม่เจอ</b> ${R.miss.length} จอ</summary><ul>${R.miss.map(x => `<li><b>${esc(x.id)}</b><small>${esc(x.f)} • ชีต ${esc(x.sn)}</small></li>`).join('')}</ul></details>` : ''}</div>
- <div class="picb">${D ? `<button class="btn primary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="shotsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}` : NF || NS ? `<button class="btn primary" data-a="shotapply">${NF && NS ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง + แก้สี ${NS.toLocaleString()} ช่อง` : NF ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค` : `แก้สีช่องวันที่ถ่าย ${NS.toLocaleString()} ช่อง`}</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button><button class="linkb" data-a="shotup">เลือกแบบอัปโหลดโฟลเดอร์</button></div>${SHOTSLOW ? shotSlowH() : ''}`;
+ ${D && !D.bad ? `<div class="tsb"><button class="btn primary" data-a="toolv" data-k="ph">ไปขั้นที่ 4 ส่งเข้าหน้ามือถือ</button></div>` : ''}<div class="picb">${D ? `<button class="btn secondary" data-a="shotdl">ดาวน์โหลดใบเช็คที่ใส่แล้ว (.zip)</button>${D.saved ? '' : CKDIR ? `<button class="btn secondary" data-a="shotsave">${IC.folder}บันทึกทับในโฟลเดอร์ “${esc(CKDIR.name)}”</button>` : `<button class="btn secondary" data-a="shotsave" data-k="pick">${IC.folder}บันทึกลงโฟลเดอร์ใบเช็ค…</button>`}${D.saved || CKDIR ? `<button class="linkb" data-a="shotsave" data-k="pick">${D.saved ? 'บันทึกไปโฟลเดอร์อื่นด้วย…' : 'บันทึกลงโฟลเดอร์อื่น…'}</button>` : ''}` : NF || NS ? `<button class="btn primary" data-a="shotapply">${NF && NS ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่อง + แก้สี ${NS.toLocaleString()} ช่อง` : NF ? `ใส่วันที่ถ่าย ${NF.toLocaleString()} ช่องลงใบเช็ค` : `แก้สีช่องวันที่ถ่าย ${NS.toLocaleString()} ช่อง`}</button>` : ''}<button class="btn secondary" data-a="shotscan" data-k="again">ตรวจอีกครั้ง</button><button class="linkb" data-a="shotscan" data-k="pick">เลือกโฟลเดอร์อื่น</button><button class="linkb" data-a="shotup">เลือกแบบอัปโหลดโฟลเดอร์</button></div>${SHOTSLOW ? shotSlowH() : ''}`;
   }
   return `<section class="pic" data-tour="tshot"><h3>${IC.folder}ใส่วันที่ถ่ายจากโฟลเดอร์แยกรูป</h3>${b}</section>`;
 };
@@ -14084,7 +14085,7 @@ const tlinkHTML = (k, t, p, cls) =>
    • การ์ดเครื่องมืออื่น (ต้นเดือน / ครั้งคราว) • ภาพตัวอย่างใช้ชื่อสมมุติ (A_30s, ST-01) ไม่ใช่ข้อมูลจริง ===== */
 IC.tvArr = '<svg viewBox="0 0 24 24"><path d="M4 12h15M14 7l5 5-5 5"/></svg>';
 IC.tvChv = '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
-const TVK = ['src', 'pic', 'shot', 'blank', 'sdb', 'cmp', 'clr'];
+const TVK = ['src', 'pic', 'shot', 'ph', 'blank', 'sdb', 'cmp', 'clr'];
 let TVFAQ = false; /* เปิด “ถ้าเจอปัญหา” ค้างไว้ระหว่างวาดหน้าใหม่ */
 const tvSt = x =>
   x[1] === '—'
@@ -14259,6 +14260,7 @@ function tvShotFig() {
   };
 }
 const TVHINT = {
+  ph: 'ทำหลังใส่วันที่ถ่าย',
   clr: 'เปลี่ยนเมื่อไหร่ก็ได้ กลับเป็นสีเดิมได้',
   blank: 'ทำครั้งเดียวตอนขึ้นเดือนใหม่',
   sdb: 'ใส่ไฟล์ฐานข้อมูลครั้งเดียว ระบบจำไว้',
@@ -14466,6 +14468,35 @@ function vTools() {
         ['โฟลเดอร์', 'โฟลเดอร์แพคที่จอนั้นอยู่ในเครื่อง ต้องตรงกัน'],
       ],
     },
+    ph: {
+      t: 'ส่งเข้าหน้ามือถือ',
+      d: 'คัดรูปและใส่วันที่ถ่ายเสร็จแล้ว ส่งใบเช็คชุดนี้ให้คนถ่ายรูปดูในมือถือ ว่าถ่ายไปแล้วกี่ % และเรื่องไหนยังไม่ได้ถ่าย',
+      st: phSt(),
+      how: [
+        [
+          'ใส่วันที่ถ่ายในขั้นที่ 3 ให้เสร็จก่อน (ถ้ามีรูปใหม่)',
+          !!(SHOT && SHOT.done && SHOT.sig === ckSig()),
+        ],
+        ['ครั้งแรก: วางลิงก์หน้ามือถือ แล้วกดบันทึกลิงก์', !!phUrl()],
+        ['กด “ส่งเข้าหน้ามือถือ” — หน้าต่างเล็กเปิดขึ้นแล้วปิดเอง', phSt()[0] === 'ok'],
+      ],
+      faq: [
+        ['หน้าต่างขึ้นหน้าล็อกอิน Google', 'ล็อกอินอีเมลบริษัท แล้วกดส่งอีกครั้ง'],
+        [
+          'ขึ้นว่าส่งไม่ได้',
+          'คนกดส่งต้องเป็นเจ้าของชีตหน้ามือถือ หัวหน้า หรือคนคัดรูปของใบเช็คนั้น (อีเมลในแท็บ ผู้ใช้และสิทธิ์)',
+        ],
+        ['Chrome กันหน้าต่างเด้ง', 'กดอนุญาตป๊อปอัปของหน้านี้ ที่ไอคอนในช่องที่อยู่เว็บ แล้วกดส่งอีกครั้ง'],
+      ],
+      fig: '<p class="hint">เลือกใบเช็คแล้ว ภาพตรงนี้จะเป็นหน้ามือถือจากใบเช็คจริง</p>',
+      real: K === 'ph' ? phFig() : null,
+      dl: [
+        ['ภาพรวม', '% ที่ถ่ายแล้วของใบเช็คนั้น'],
+        ['รายชื่อจอ', 'จอที่ถ่ายน้อยอยู่บนสุด'],
+        ['กดที่จอ', 'หนังที่ยังไม่ถ่าย / ถ่ายแล้ว ค้นหาชื่อหนังได้'],
+        ['ใครเห็น', 'แต่ละคนเห็นเฉพาะใบเช็คของตัวเอง หัวหน้าเห็นทุกคน'],
+      ],
+    },
     clr: {
       t: 'สีใบเช็ค',
       d: 'เปลี่ยนสีแถบต่าง ๆ ในใบเช็คทุกไฟล์ของชุดนี้ให้เป็นชุดเดียวกัน ทุกชีตรวมหน้า Analysis ไฟล์เดิมเก็บไว้ในโฟลเดอร์สำรอง',
@@ -14508,24 +14539,26 @@ function vTools() {
           : '')
       : K === 'clr'
         ? vClr()
-        : K === 'shot'
-          ? vShot()
-          : K === 'cmp'
-            ? vCmp()
-            : K === 'blank'
-              ? vBlank()
-              : K === 'sdb'
-                ? vSdb()
-                : vPicCk();
-  const steps = `<ol class="tv-steps" data-tour="tsteps" aria-label="งานประจำวัน 3 ขั้น">${stp('src', 1, 'ใบเช็คที่ใช้', n ? s1[1] + '<br>' + s1[3] : 'ยังไม่ได้เลือก', ok1)}${stp('pic', 2, 'สร้างโฟลเดอร์แยกรูป', n ? tvSt(S.pic) : 'ทำหลังเลือกใบเช็ค', S.pic[0] === 'ok')}${stp('shot', 3, 'ใส่วันที่ถ่าย', n ? tvSt(S.shot) : 'ทำหลังช่างภาพวางรูปครบ', S.shot[0] === 'ok')}</ol>`;
+        : K === 'ph'
+          ? vPh()
+          : K === 'shot'
+            ? vShot()
+            : K === 'cmp'
+              ? vCmp()
+              : K === 'blank'
+                ? vBlank()
+                : K === 'sdb'
+                  ? vSdb()
+                  : vPicCk();
+  const steps = `<ol class="tv-steps" data-tour="tsteps" aria-label="งานประจำวัน 4 ขั้น">${stp('src', 1, 'ใบเช็คที่ใช้', n ? s1[1] + '<br>' + s1[3] : 'ยังไม่ได้เลือก', ok1)}${stp('pic', 2, 'สร้างโฟลเดอร์แยกรูป', n ? tvSt(S.pic) : 'ทำหลังเลือกใบเช็ค', S.pic[0] === 'ok')}${stp('shot', 3, 'ใส่วันที่ถ่าย', n ? tvSt(S.shot) : 'ทำหลังช่างภาพวางรูปครบ', S.shot[0] === 'ok')}${stp('ph', 4, 'ส่งเข้าหน้ามือถือ', n ? tvSt(phSt()) : 'ทำหลังใส่วันที่ถ่าย', phSt()[0] === 'ok')}</ol>`;
   const pnl = `<section class="tv-pnl" id="tdetail" data-tour="tguide" aria-labelledby="tvh"><div class="tv-ph"><div><h2 id="tvh">${M.t}</h2><p>${M.d}</p></div><span class="tv-bd st-${M.st[0]}">${tvSt(M.st).split(' — ')[0]}</span></div>
  <div class="tv-cols"><div class="tv-l"><h3 class="tv-cap">ทำอย่างไร</h3><ol class="tv-how">${M.how.map(([t, d], i) => `<li${d ? ' class="tv-ok"' : ''}><span class="tv-sn" aria-hidden="true">${d ? IC.check : i + 1}</span><span>${t}${d ? '<span class="sr"> (ทำแล้ว)</span>' : ''}</span></li>`).join('')}</ol>
  <div class="tv-work">${work}</div>
  <details class="tv-faq"${TVFAQ ? ' open' : ''}><summary>${IC.tvChv}ถ้าเจอปัญหา<small>${M.faq.length} เรื่อง</small></summary><ul>${M.faq.map(([q, x]) => `<li><b>${q}</b><span>${x}</span></li>`).join('')}</ul></details></div>
- <figure class="tv-fig"><figcaption class="tv-cap">จะได้แบบนี้<small>${M.real ? M.real.src : 'ภาพตัวอย่าง'}</small></figcaption>${M.real ? `<p class="tv-cap2"><span>${M.real.cap}</span>${M.real.n > 1 ? '<button class="linkb" data-a="tvnext">จอถัดไป</button>' : ''}</p>` : ''}<div class="tv-box">${M.real ? M.real.html : M.fig}</div>${M.real ? (K === 'shot' ? TVLG.shotR : M.real.zip ? TVLG.zip : M.lg || '') : M.lg || ''}${!M.real && M.ex ? `<p class="tv-note">${M.ex}</p>` : ''}<dl class="tv-dl">${M.dl.map(([x, y]) => `<dt>${x}</dt><dd>${y}</dd>`).join('')}</dl></figure></div></section>`;
+ <figure class="tv-fig"><figcaption class="tv-cap">จะได้แบบนี้<small>${M.real ? M.real.src : 'ภาพตัวอย่าง'}</small></figcaption>${M.real ? `<p class="tv-cap2"><span>${M.real.cap}</span>${M.real.n > 1 ? `<button class="linkb" data-a="${M.real.ph ? 'phnext' : 'tvnext'}">${M.real.ph ? 'คนถัดไป' : 'จอถัดไป'}</button>` : ''}</p>` : ''}<div class="tv-box">${M.real ? M.real.html : M.fig}</div>${M.real ? (K === 'shot' ? TVLG.shotR : M.real.zip ? TVLG.zip : M.lg || '') : M.lg || ''}${!M.real && M.ex ? `<p class="tv-note">${M.ex}</p>` : ''}<dl class="tv-dl">${M.dl.map(([x, y]) => `<dt>${x}</dt><dd>${y}</dd>`).join('')}</dl></figure></div></section>`;
   const oc = (k, t, d, fig, st) =>
     `<article class="tv-card${K === k ? ' on' : ''}"><div class="tv-ill" aria-hidden="true">${fig}</div><div class="tv-cb"><h3>${t}</h3><p>${d}</p><div class="tv-st st-${st[0]}">${st[0] === 'ok' ? IC.okc : st[0] === 'mu' ? IC.info : IC.warn}<span><b>${tvSt(st)}</b><small>${st[1] === '—' ? TVHINT[k] : st[3]}</small></span></div>${n ? `<button class="btn ${K === k ? 'primary' : 'secondary'}" data-a="toolv" data-k="${k}" aria-controls="tdetail">${K === k ? 'เปิดอยู่ด้านบน' : 'เปิด'}</button>` : ''}</div></article>`;
-  return `${shead('งานโฟลเดอร์และรูป', 'หลังเติมใบเช็คแต่ละวัน ทำ 3 ขั้นนี้ตามลำดับ กดที่ขั้นเพื่อดูวิธีทำและภาพตัวอย่าง • ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
+  return `${shead('งานโฟลเดอร์และรูป', 'หลังเติมใบเช็คแต่ละวัน ทำ 4 ขั้นนี้ตามลำดับ กดที่ขั้นเพื่อดูวิธีทำและภาพตัวอย่าง • ใช้ใบเช็คที่เติมแล้ว ไม่ต้องใส่ Playlist ทุกเครื่องมือให้ดูรายการก่อน แล้วค่อยกดยืนยัน')}
  ${FSA ? '' : alertHTML('wr', 'ใช้ได้ใน Chrome / Edge บนคอมพิวเตอร์', '<p>เครื่องมือในหน้านี้ต้องเปิดโฟลเดอร์ในเครื่อง ซึ่งเบราว์เซอร์นี้ทำไม่ได้</p>')}${steps}${K !== 'src' && qb ? `<div class="tv-qb"><span>มีใบเช็คชุดอื่นให้เลือก</span>${qb}</div>` : ''}${pnl}
  <h2 class="tv-h2">เครื่องมืออื่น<small>ต้นเดือน และตรวจเป็นครั้งคราว</small></h2><div class="tv-grid" data-tour="tother">${oc('blank', 'ใบเปล่าเดือนใหม่', 'ล้างรายชื่อหนังและวันที่ เก็บหัวตาราง จอ และสูตรไว้', tvMini('blank'), S.blank)}${oc('sdb', 'ตรวจจอกับฐานข้อมูล', 'ดูว่าใบเช็คของแต่ละคนขาดจอไหน หรือมีจอของคนอื่น', tvMini('db'), S.sdq)}${oc('clr', 'สีใบเช็ค', 'เปลี่ยนสีแถบของใบเช็คทุกไฟล์ในชุดนี้ เป็นชุดเดียวกัน', tvClrMini(), clrSt())}${oc('cmp', 'ตรวจโฟลเดอร์เทียบจอ', 'เทียบจอในใบเช็คกับโฟลเดอร์เทียบจอ ว่าอยู่ถูกแพคไหม', tvMini('cmp'), S.cmp)}</div>
  <p class="hint tsafe">ไม่ลบ ไม่ย้ายรูปหรือโฟลเดอร์ที่มีอยู่ • บันทึกทับใบเช็คเมื่อไหร่ เก็บไฟล์เดิมไว้ในโฟลเดอร์สำรองเสมอ • กลับไปเติมใบเช็ค กด “เติมใบเช็ครูป” ด้านบน งานที่ค้างไว้ไม่หาย</p>`;
@@ -15769,7 +15802,7 @@ function vRes() {
   }
   ${nn ? `<div class="r5sec"><h2><i class="h5d nt" aria-hidden="true"></i>แจ้งให้ทราบ ${nn} เรื่อง<small>· ไม่ต้องแก้</small></h2><div class="r5ng">${NG.map(([t, v]) => `<span class="r5nc">${t}<b>${v}</b></span>`).join('')}</div><p class="hint">ระบบตั้งใจไม่ใส่ / ยังไม่ถึงวันเริ่ม / กันตกหล่น — ดูทีละจอได้ในแต่ละไฟล์ด้านล่าง</p></div>` : ''}</article>
  <aside class="r5side"><section class="hcard r5do"><h2>${last.days ? 'เติมทีละวัน' : 'เติมแต่ละไฟล์'}</h2><small class="h5lt">${last.sec ? 'รวม ' + last.sec + ' วินาที' : ''}</small><ol class="r5bars">${bars.map(([q, b, w]) => `<li><span class="r5bl"><b title="${esc(q)}">${esc(q)}</b><small>${b}</small></span><span class="r5bt"><i style="width:${Math.max(3, Math.round(w * 100))}%"></i></span></li>`).join('')}</ol></section>
-  <section class="hcard r5next"><h2>ทำต่อ</h2>${mrtCard()}${phCard()}<div class="r5nx"><button class="h5s" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button>${FSA ? '<button class="h5s" data-a="tools" data-k="last" data-tour="tlink">งานโฟลเดอร์และรูป</button>' : ''}<button class="h5s" data-a="tab" data-k="fl">กลับไปเติมใหม่</button></div></section></aside></div>
+  <section class="hcard r5next"><h2>ทำต่อ</h2>${mrtCard()}<div class="r5nx"><button class="h5s" data-a="next" ${nf ? '' : 'disabled'}>ใช้ผลนี้เติมวันถัดไป</button>${FSA ? '<button class="h5s" data-a="tools" data-k="last" data-tour="tlink">งานโฟลเดอร์และรูป</button>' : ''}<button class="h5s" data-a="tab" data-k="fl">กลับไปเติมใหม่</button></div></section></aside></div>
  ${vArr()}<h2 class="r5lh">ไฟล์ทั้งหมด<small>${last.res.length} ไฟล์</small></h2><div class="rlist" data-tour="rlist">${last.res
    .map((r, i) => {
      const o = R[i],
@@ -16589,9 +16622,12 @@ const mrtCard = () => {
    ส่งเฉพาะรายชื่อหนังต่อจอ (ถ่ายแล้ว + วันที่ถ่าย / ยังไม่ถ่าย + วันที่ออก) ไม่ส่งไฟล์ • นับแบบเดียวกับสูตรในใบเช็ค: หนังแถว 21 ลงไป (COUNTA), ถ่ายแล้ว = ช่องจอเป็นตัวเลข (COUNT)
    บล็อกที่หลายจอใช้รายชื่อเดียวกัน (BKJ / Metro / MRT) แยกจอละรายการตามคอลัมน์ • ชื่อคน = ชื่อไฟล์ใบเช็ค • เว็บแอปให้แต่ละคนเห็นเฉพาะของตัวเอง */
 let PHW = null,
-  PHSET = false; /* PHW = {w, t, stage: open / send, iv, snap} */
+  PHSET = false,
+  PHD = null,
+  PHS =
+    null; /* PHW = {w, t, stage: open / send, iv, snap} • PHD = ผลส่งล่าสุด {sig, at, people, screens, noMail | err} • PHS = ข้อมูลภาพตัวอย่าง {sig, snap} */
 const phUrl = () => store.get('ps_phurl') || '',
-  phFiles = () => (last && last.res ? last.res.filter(r => r.blob) : []);
+  phFiles = () => TC;
 async function phSnap(fs) {
   const people = [];
   for (const r of fs) {
@@ -16599,7 +16635,9 @@ async function phSnap(fs) {
     try {
       X = await chkRead({
         name: r.name,
-        buf: r.blob.buffer.slice(r.blob.byteOffset, r.blob.byteOffset + r.blob.byteLength),
+        buf: r.buf
+          ? r.buf.slice(0)
+          : r.blob.buffer.slice(r.blob.byteOffset, r.blob.byteOffset + r.blob.byteLength),
       });
     } catch (_) {
       continue;
@@ -16618,23 +16656,23 @@ async function phSnap(fs) {
           const L = n2col(c),
             code = v(L, crow);
           if (!code && !its.length) continue;
-          let loc = '';
-          for (let rw = crow + 1; rw < 17; rw++) {
-            const t = v(L, rw);
-            if (t && !/^\(?[\p{L}\p{N}_-]{1,8}\)?$/u.test(t)) {
-              loc = t;
-              break;
-            }
-          } /* สถานที่ = ข้อความยาวใต้รหัสจอ (ข้ามป้ายสั้น ๆ เช่น (A) / LED) */
+          const r1 = v(L, crow + 1),
+            r2 = v(L, crow + 2);
+          let typ = '',
+            loc = r1;
+          if (crow === 11 && r2) {
+            typ = r1.replace(/^\((.*)\)$/, '$1').trim();
+            loc = r2;
+          } /* รหัสแถว 11: แถว 12 = TYPE จอ เช่น (4-3) (16-9) AT 4-3 • แถว 13 = ชื่อจอ (แถว 13 ว่าง → แถว 12 เป็นชื่อจอ) • รหัสแถว 10 (BKJ / Metro): แถว 11 = ชื่อจอ ไม่มี TYPE */
           const t = [],
             d = [];
           for (const i of its) {
             const q = ws[L + i[2]];
             if (q && typeof q.v === 'number')
-              d.push([i[0], Number.isInteger(q.v) && q.v >= 1 && q.v <= 31 ? q.v : 0]);
+              d.push([i[0], Number.isInteger(q.v) && q.v >= 1 && q.v <= 31 ? q.v : 0, i[3] || 0]);
             else t.push([i[0], i[3] || 0]);
           }
-          screens.push({ c: code || '—', p: x.sn.trim(), l: loc, n: its.length, s: d.length, t, d });
+          screens.push({ c: code || '—', y: typ, p: x.sn.trim(), l: loc, n: its.length, s: d.length, t, d });
         }
       }
     }
@@ -16686,18 +16724,20 @@ addEventListener('message', e => {
     return;
   }
   if (d.t === 'done') {
-    const w = PHW.w;
+    const w = PHW.w,
+      PHW0 = PHW.sig;
     clearInterval(PHW.iv);
     PHW = null;
-    if (last)
-      last.ph = d.ok
-        ? {
-            at: Date.now(),
-            people: +d.people || 0,
-            screens: +d.screens || 0,
-            noMail: Array.isArray(d.noMail) ? d.noMail.map(String) : [],
-          }
-        : { at: Date.now(), err: String(d.err || 'ไม่ทราบสาเหตุ') };
+    PHD = d.ok
+      ? {
+          sig: PHW0,
+          at: Date.now(),
+          people: +d.people || 0,
+          screens: +d.screens || 0,
+          noMail: Array.isArray(d.noMail) ? d.noMail.map(String) : [],
+          skipped: Array.isArray(d.skipped) ? d.skipped.map(String) : [],
+        }
+      : { sig: PHW0, at: Date.now(), err: String(d.err || 'ไม่ทราบสาเหตุ') };
     if (d.ok) {
       MQN = 'party';
       note = `ส่งเข้าหน้ามือถือแล้ว — ${+d.people || 0} คน ${+d.screens || 0} จอ • คนถ่ายรูปเปิดลิงก์เดิมเห็นข้อมูลใหม่ทันที`;
@@ -16713,16 +16753,82 @@ addEventListener('message', e => {
     view();
   }
 });
-const phCard = () => {
+/* แผงขั้นที่ 4 ในหน้างานโฟลเดอร์และรูป: วางลิงก์ครั้งแรก / ปุ่มส่ง / ผลส่ง • ส่งใบเช็คที่ใช้ชุดนี้ (หลังใส่วันที่ถ่ายเป็นฉบับที่ใส่แล้ว) */
+const phSt = () => {
+  const n = TC.length,
+    m = PHD && PHD.sig === ckSig() ? PHD : null;
+  if (!n) return ['mu', '—', '', 'ยังไม่ได้เลือกใบเช็ค'];
+  if (m && !m.err)
+    return [
+      'ok',
+      `${m.screens} จอ`,
+      'ส่งแล้ว',
+      `ส่งเมื่อ ${new Date(m.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} • ${m.people} คน`,
+    ];
+  if (m && m.err) return ['wr', '—', '', 'ส่งไม่สำเร็จ — ดูรายละเอียดด้านบน'];
+  return phUrl()
+    ? ['mu', '—', '', 'ยังไม่ได้ส่งใบเช็คชุดนี้']
+    : ['wr', '—', '', 'ยังไม่ได้วางลิงก์หน้ามือถือ'];
+};
+const vPh = () => {
   const fs = phFiles();
   if (!fs.length) return '';
   const u = phUrl(),
-    m = last.ph,
-    busy = !!PHW;
+    m = PHD && PHD.sig === ckSig() ? PHD : null,
+    busy = !!PHW,
+    D = SHOT && SHOT.done && SHOT.sig === ckSig() ? SHOT.done : null;
   if (!u || PHSET)
-    return `<div class="mrtc"><b>ส่งเข้าหน้ามือถือคนถ่ายรูป</b><small>วางลิงก์หน้ามือถือครั้งเดียว — ในชีต “หน้ามือถือคนถ่ายรูป” กดเมนู หน้ามือถือ → ลิงก์หน้ามือถือ แล้วคัดลอกมาวาง</small><label class="fld"><input id="phurl" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/…/exec" value="${esc(u)}" aria-label="ลิงก์หน้ามือถือคนถ่ายรูป"></label><div class="mrtb"><button class="btn primary" data-a="phsave">บันทึกลิงก์</button>${u ? '<button class="btn secondary" data-a="phset">ยกเลิก</button>' : ''}</div></div>`;
+    return `<div class="mrtc"><b>วางลิงก์หน้ามือถือ (ครั้งแรกครั้งเดียว)</b><small>ในชีต “หน้ามือถือคนถ่ายรูป” กดเมนู หน้ามือถือ → ลิงก์หน้ามือถือ แล้วคัดลอกลิงก์แรกมาวาง</small><label class="fld"><input id="phurl" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/…/exec" value="${esc(u)}" aria-label="ลิงก์หน้ามือถือคนถ่ายรูป"></label><div class="mrtb"><button class="btn primary" data-a="phsave">บันทึกลิงก์</button>${u ? '<button class="btn secondary" data-a="phset">ยกเลิก</button>' : ''}</div></div>`;
   const ok = m && !m.err;
-  return `<div class="mrtc"><button class="btn ${ok ? 'secondary' : 'primary'}" data-a="phsend" ${busy ? 'disabled' : ''}>${busy ? (PHW.stage === 'open' ? 'กำลังเปิดหน้ามือถือ…' : 'กำลังส่ง…') : ok ? 'ส่งเข้าหน้ามือถืออีกครั้ง' : 'ส่งเข้าหน้ามือถือ'}</button>${ok ? `<p class="mrtok"><b aria-hidden="true">✓</b><span><b>ส่งแล้ว ${new Date(m.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</b> — ${m.people} คน ${m.screens} จอ${m.noMail.length ? ` • ยังไม่มีอีเมลคนถ่ายรูปของ ${esc(m.noMail.join(', '))} (ใส่ในแท็บ ผู้ใช้และสิทธิ์)` : ''}</span></p>` : m && m.err ? `<p class="mrter">ส่งไม่สำเร็จ — ${esc(m.err)}</p><button class="mrtl" data-a="phset">เปลี่ยนลิงก์หน้ามือถือ</button>` : `<small>ส่งสรุปใบเช็คที่เติมแล้ว ${fs.length} ไฟล์ให้คนถ่ายรูปดูในมือถือ (จอ • หนังที่ยังไม่ได้ถ่าย • วันที่หนังออก) — ส่งเฉพาะรายชื่อ ไม่ส่งไฟล์</small>`}</div>`;
+  return `${!D && !ok ? alertHTML('wr', 'ยังไม่ได้ใส่วันที่ถ่ายของใบเช็คชุดนี้', '<p>ส่งได้เลย แต่ถ้ามีรูปใหม่ ใส่วันที่ถ่ายในขั้นที่ 3 ก่อน คนถ่ายรูปจะได้เห็นว่าเรื่องไหนถ่ายได้แล้ว</p>') : ''}${ok ? alertHTML('ok', `ส่งแล้ว ${new Date(m.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} — ${m.people} คน ${m.screens} จอ`, `<p>คนถ่ายรูปเปิดลิงก์เดิมเห็นข้อมูลใหม่ทันที${m.noMail.length ? ` • ยังไม่มีอีเมลคนถ่ายรูปของ ${esc(m.noMail.join(', '))} — ใส่ในแท็บ ผู้ใช้และสิทธิ์` : ''}${m.skipped.length ? ` • ไม่ได้ส่ง ${esc(m.skipped.join(', '))} (ไม่ใช่ใบที่คุณเป็นคนคัดรูป)` : ''}</p>`) : m && m.err ? alertHTML('er', 'ส่งไม่สำเร็จ', `<p>${esc(m.err)}</p>`) : ''}
+ <div class="picb"><button class="btn ${ok ? 'secondary' : 'primary'}" data-a="phsend" ${busy ? 'disabled' : ''}>${busy ? (PHW.stage === 'open' ? 'กำลังเปิดหน้ามือถือ…' : 'กำลังส่ง…') : ok ? 'ส่งอีกครั้ง' : `ส่งเข้าหน้ามือถือ (${fs.length} ไฟล์)`}</button><button class="linkb" data-a="phset">เปลี่ยนลิงก์หน้ามือถือ</button></div>
+ <p class="hint">ส่งเฉพาะรายชื่อหนังต่อจอ (ถ่ายแล้ว / ยังไม่ถ่าย / วันที่หนังออก) ไม่ส่งไฟล์ใบเช็ค • หน้าต่างเล็กเปิดขึ้นแล้วปิดเอง</p>`;
+};
+/* ภาพ “จะได้แบบนี้”: หน้ามือถือของคนแรกในชุด จากใบเช็คจริง (อ่านครั้งเดียวต่อชุด) */
+const phFig = () => {
+  if (!PHS || PHS.sig !== ckSig()) {
+    if (!PHS || !PHS.run || PHS.sig !== ckSig()) {
+      const sg = ckSig();
+      PHS = { sig: sg, run: true };
+      phSnap(TC).then(
+        sn => {
+          if (PHS && PHS.sig === sg) {
+            PHS = { sig: sg, snap: sn };
+            view();
+          }
+        },
+        () => {
+          PHS = { sig: sg, snap: { people: [] } };
+          view();
+        },
+      );
+    }
+    return { src: 'กำลังอ่านใบเช็ค…', cap: '', n: 1, html: '<p class="hint">กำลังอ่านใบเช็ค…</p>' };
+  }
+  const P = ((PHS.snap && PHS.snap.people) || []).filter(x => x.screens.length);
+  if (!P.length) return null;
+  const k0 = P.reduce((b, x, i) => (x.screens.length > P[b].screens.length ? i : b), 0),
+    k = (k0 + (PHS.k || 0)) % P.length,
+    p = P[k],
+    N = p.screens.reduce((a, c) => a + c.n, 0),
+    S = p.screens.reduce((a, c) => a + c.s, 0),
+    pc = N ? Math.round((100 * S) / N) : 100;
+  const sc = p.screens
+      .map(c => ({ c, q: c.n ? c.s / c.n : 1 }))
+      .sort((a, b) => a.q - b.q || b.c.n - b.c.s - (a.c.n - a.c.s))
+      .slice(0, 5),
+    C = 2 * Math.PI * 20,
+    arc = C * 0.75;
+  return {
+    src: 'ใบเช็คที่ใช้ (ข้อมูลจริง)',
+    cap: `หน้ามือถือของ ${esc(p.name)}`,
+    n: P.length,
+    ph: 1,
+    html: `<div class="phx" aria-hidden="true"><div class="phx-h"><b>${esc(p.name)}</b><small>ข้อมูลวันที่ (วันที่กดส่ง)</small></div>
+  <div class="phx-c"><div class="phx-r"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="none" stroke="#EFEFF1" stroke-width="5" stroke-linecap="round" stroke-dasharray="${arc.toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 24 24)"/><circle cx="24" cy="24" r="20" fill="none" stroke="#1F4FD8" stroke-width="5" stroke-linecap="round" stroke-dasharray="${((arc * pc) / 100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 24 24)"/></svg><b>${pc}%</b></div>
+  <div class="phx-n"><span><b>${S.toLocaleString()}</b>ถ่ายแล้ว</span><span><b>${(N - S).toLocaleString()}</b>ยังไม่ถ่าย</span><span><b>${p.screens.length}</b>จอ</span></div></div>
+  <div class="phx-t">จอของคุณ<small>ถ่ายน้อยอยู่บน</small></div><div class="phx-l">${sc.map(({ c }) => `<div><span><b>${esc(c.c)}</b><small>${esc(c.p)}</small></span><span class="phx-x">${c.n - c.s ? 'ค้าง ' + (c.n - c.s).toLocaleString() : 'ครบ'}<i><i style="width:${c.n ? Math.round((100 * c.s) / c.n) : 100}%"></i></i></span></div>`).join('')}</div></div>`,
+  };
 };
 function plpEnd(msg) {
   if (!PLP) return;
@@ -18069,9 +18175,9 @@ const ACT = {
       );
       return;
     }
-    PHW = { w, t: Date.now(), stage: 'open', snap: phSnap(fs) };
+    PHW = { w, t: Date.now(), stage: 'open', sig: ckSig(), snap: phSnap(fs) };
     PHW.snap.catch(() => {});
-    if (last) last.ph = null;
+    PHD = null;
     PHW.iv = setInterval(() => {
       if (!PHW) return;
       const s = (Date.now() - PHW.t) / 1000;
@@ -18092,6 +18198,9 @@ const ACT = {
   phset: () => {
     PHSET = !PHSET;
     if (PHSET) FOCUSSEL = '#phurl';
+  },
+  phnext: () => {
+    if (PHS && PHS.snap) PHS.k = (PHS.k || 0) + 1;
   },
   phsave: () => {
     const v = (($('#phurl') || {}).value || '').trim();
