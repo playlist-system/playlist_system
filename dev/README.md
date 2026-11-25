@@ -13,6 +13,7 @@
 | `README.md`, `คู่มือการใช้งาน_ระบบเติมใบเช็ครูป.txt` | เอกสารผู้ใช้ — อัปเดตทุกเวอร์ชัน (คู่มือ .txt เป็น CRLF + BOM) |
 | `apps_script/Code.gs` | Apps Script เก็บ Playlist จากอีเมลเข้า Google Drive + หน้าเว็บ PLAYLIST INBOX (เดิม "Playlist รายวัน") |
 | `apps_script/phone_view/` | หน้ามือถือคนถ่ายรูป (5.5.85): `Code.gs` รับสรุปใบเช็คจากปุ่ม “ส่งเข้าหน้ามือถือ” (`phSnap` → postMessage เหมือน MRT) เก็บ .json ต่อคนใน Drive + แท็บ “ผู้ใช้และสิทธิ์” (แต่ละคนเห็นเฉพาะของตัวเอง) • `Phone.html` หน้ามือถือ |
+| `phone/` | แอปงานถ่ายรูป (5.5.86, GitHub Pages): `index.html` (ข้อมูลจาก Apps Script `?k=` ด้วยลิงก์ส่วนตัว เก็บใน localStorage) • `sw.js` (เก็บหน้าแอป เปิดได้ตอนไม่มีเน็ต — แก้หน้าแอปแล้วเปลี่ยน `CACHE`) • `manifest.webmanifest` • ไอคอน — **ไม่มีข้อมูลใบเช็คในโฟลเดอร์นี้** • ทดสอบในเครื่องด้วย `#k=…&u=http://localhost:…` |
 | `apps_script/feedback.gs` | ที่รับปุ่ม "แจ้งปัญหา" (Web app ของบริษัท เปิดได้เฉพาะบัญชีบริษัท) — วิธีตั้งดู `apps_script/FEEDBACK.md` |
 | `n8n/` | ทางเลือกเก็บ Playlist ด้วย n8n (ไม่มีค่าตั้งส่วนตัว) |
 | `dev/` | เครื่องมือของคนดูแลระบบ (ไฟล์นี้) |
