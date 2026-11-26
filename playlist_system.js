@@ -194,6 +194,7 @@
  *   เวอร์ชัน 5.5.89: หนังที่มาช้าใน Playlist (วันเริ่มสัญญาเป็นวันที่เติมไปแล้ว) ลงใต้แถบวันที่ในชื่อหนัง ไม่ย้อนไปแถบวันเริ่มสัญญา • รายงาน “มาช้า”
  *   เวอร์ชัน 5.5.90: จอใหม่ + ฐานข้อมูลจอของเรา (โยนใบเช็คของคนที่ดูแล ใส่ช่องจอใหม่ในใบที่เติมแล้ว)
  *   เวอร์ชัน 5.5.91: ชื่อสถานที่ของจอ (Playlist / ฐานข้อมูล / ชื่อโฟลเดอร์ / พิมพ์เอง)
+ *   เวอร์ชัน 5.5.92: ชื่อจอให้ตรงกับโฟลเดอร์ (สถานที่ + Format)
  * ======================================================================
  */
 
@@ -9969,6 +9970,9 @@ let NWS = {
   fdirs: null,
   blank: null,
   locres: null,
+  diff: null,
+  dsel: new Map(),
+  fv: 0,
 }; /* pick: รหัส → {f,plan} • not: จอที่เลือกว่าไม่ใช่ของทีม • res: ผลที่ใส่แล้ว • sel: จอใหม่ที่เลือกตอนทำฐานข้อมูลครั้งแรก */
 const NSIGN = 'ไม่ใช่จอของทีมเรา';
 const nsK = c => {
@@ -10000,6 +10004,14 @@ const nsNd = f => {
   return f.nd;
 };
 const nsPk = pk => mediaOf(pk || '') || (/spare/i.test(pk || '') ? 'Spare' : null);
+/* 5.5.92: Format แบบชื่อโฟลเดอร์จอ — Playlist เขียนจอใหม่เป็น _43 / 4:3 → 43 / 4-3 */
+const nsFmt = f =>
+  String(f || '')
+    .trim()
+    .replace(/^\(+|\)+$/g, '')
+    .trim()
+    .replace(/^_+/, '')
+    .replace(/:/g, '-');
 function nsPl() {
   const seen = new Set(),
     out = [];
@@ -10012,7 +10024,7 @@ function nsPl() {
       k,
       c: String(s.c).trim(),
       pk: String(s.m || ''),
-      fmt: String(s.f || '').trim(),
+      fmt: nsFmt(s.f),
       loc,
       pd: s.pd || 0,
       bare: !loc,
@@ -10246,6 +10258,8 @@ function nsXlsx() {
 /* ===== 5.5.91: ชื่อสถานที่ของจอ — หาจาก Playlist → ฐานข้อมูลจอ → ชื่อโฟลเดอร์จอ (Gallary / โฟลเดอร์เทียบจอ) → พิมพ์เอง
    ใส่ลงช่องสถานที่ในหัวตาราง (เฉพาะช่องที่ยังว่าง) + ชื่อจอในชีต Analysis + ฐานข้อมูลจอ ===== */
 /* ชื่อโฟลเดอร์จอ “DGT999 สถานที่ตัวอย่าง (40R) (16-9)” → {k, c, loc} • ตัดแท็กแพค (40R) และ Format ท้ายชื่อ (วงเล็บภาษาอังกฤษ/ตัวเลขที่มีช่องว่างนำหน้า) */
+const NWNF = /^(?:CCTV|Spare|SP)$/i,
+  NWFF = /^(?:AT)?\d{1,2}-\d{1,2}$|^_?\d{2,3}$|^[A-Za-z][A-Za-z0-9-]{1,9}$/;
 const nsFolderLoc = n => {
   const s = String(n || '')
       .replace(/\)\s*\(/g, ') (')
@@ -10255,16 +10269,26 @@ const nsFolderLoc = n => {
     k = nsK(t);
   if (!k || k !== sdbK(t)) return null;
   let r = s.slice(t.length).replace(/^[\s_]+/, '');
-  const pt = r.search(/\s\(\s*(?:40|80)\s*[BR]\s*\)/i);
-  if (pt >= 0) r = r.slice(0, pt);
-  for (let i = 0; i < 4 && /\s\([A-Za-z0-9:\-_.+]{1,12}\)$/.test(r); i++)
-    r = r.replace(/\s*\([A-Za-z0-9:\-_.+]{1,12}\)$/, '');
+  const G =
+    []; /* วงเล็บท้ายชื่อ (มีช่องว่างนำหน้า) จากขวา: Format / CCTV / Spare จนถึงแท็กแพค (40R) — ไม่มีแท็ก ตัดเฉพาะที่หน้าตาเป็น Format */
+  for (let i = 0; i < 5; i++) {
+    const m = r.match(/\s\(([A-Za-z0-9:\-_.+]{1,12})\)$/);
+    if (!m) break;
+    const g = m[1];
+    if (/^(?:40|80)\s*[BR]$/i.test(g)) {
+      r = r.slice(0, m.index);
+      break;
+    }
+    if (!NWNF.test(g) && !NWFF.test(g.replace(/:/g, '-'))) break;
+    G.unshift(g);
+    r = r.slice(0, m.index);
+  }
   r = r.trim();
-  return r ? { k, c: t, loc: r } : null;
+  return r ? { k, c: t, loc: r, fmt: nsFmt(G.find(g => !NWNF.test(g)) || '') } : null;
 };
 /* อ่านชื่อจอจากโฟลเดอร์ (อ่านอย่างเดียว): หาโฟลเดอร์รอบ (เช่น 11 Nov 2026 16-30 / 10 Oct 16-31) ลึกไม่เกิน 3 ชั้น ใช้เฉพาะรอบล่าสุด ~2 เดือน
    รอบ → จอ หรือ รอบ → แพค → จอ • ชื่อเดียวกันหลายรอบ ใช้รอบใหม่สุด • คืน Map(รหัส → {loc, o, src}) */
-async function nsNameScan(root) {
+async function nsNameScan(root, quiet) {
   const M = new Map(),
     d0 = new Date(Date.now() + 7 * 36e5),
     Y = d0.getUTCFullYear() % 100,
@@ -10272,7 +10296,7 @@ async function nsNameScan(root) {
   let nd = 0;
   const ls = async h => {
     nd++;
-    if (nd % 15 === 0) {
+    if (!quiet && nd % 15 === 0) {
       note = `กำลังอ่านชื่อจอจากโฟลเดอร์ “${root.name}” … ${nd} โฟลเดอร์`;
       view();
       await new Promise(r => setTimeout(r, 0));
@@ -10291,7 +10315,7 @@ async function nsNameScan(root) {
     const x = nsFolderLoc(n);
     if (!x) return false;
     const e = M.get(x.k);
-    if (!e || o > e.o) M.set(x.k, { loc: x.loc, o, src });
+    if (!e || o > e.o) M.set(x.k, { loc: x.loc, fmt: x.fmt, o, src, nm: n });
     return true;
   };
   const scr = async (h, o, src, dep) => {
@@ -10318,17 +10342,24 @@ async function nsNameScan(root) {
   else await walk(root, 0);
   return M;
 }
-/* ชื่อสถานที่ของจอ: พิมพ์เอง → Playlist → ฐานข้อมูลจอ → ชื่อโฟลเดอร์ที่อ่านไว้ */
+/* ชื่อสถานที่ของจอ: พิมพ์เอง → ชื่อโฟลเดอร์ที่อ่านไว้ → Playlist → ฐานข้อมูลจอ */
 function nsLocOf(x) {
   const t = NWS.loc[x.k];
   if (t) return { loc: t, src: 'พิมพ์เอง' };
+  const f = NWS.fold && NWS.fold.get(x.k);
+  if (f && f.loc) return { loc: f.loc, src: 'โฟลเดอร์ ' + f.src };
   if (x.loc) return { loc: x.loc, src: 'Playlist' };
   const D = sdb(),
     r = D && D.rows.find(z => z.k === x.k && z.loc);
-  if (r) return { loc: r.loc, src: 'ฐานข้อมูลจอ' };
+  return r ? { loc: r.loc, src: 'ฐานข้อมูลจอ' } : { loc: '', src: '' };
+} /* 5.5.92: ชื่อโฟลเดอร์จอมาก่อน Playlist (ทีมใช้ชื่อโฟลเดอร์เป็นหลัก) */
+function nsFmtOf(x) {
   const f = NWS.fold && NWS.fold.get(x.k);
-  if (f) return { loc: f.loc, src: 'โฟลเดอร์ ' + f.src };
-  return { loc: '', src: '' };
+  if (f && f.fmt) return { fmt: f.fmt, src: 'โฟลเดอร์ ' + f.src };
+  if (x.fmt) return { fmt: nsFmt(x.fmt), src: 'Playlist' };
+  const D = sdb(),
+    r = D && D.rows.find(z => z.k === x.k && z.fmt);
+  return r ? { fmt: nsFmt(r.fmt), src: 'ฐานข้อมูลจอ' } : { fmt: '', src: '' };
 }
 /* จอในใบเช็คที่ช่องสถานที่ยังว่าง (ชีตแพค Plan B TV): ช่องรหัสแถว 9–12 = รหัสจอพอดี → สถานที่ = 2 แถวถัดไป • ทั้ง 3 คอลัมน์ของจอ 2 แถว (สถานที่ + แถวถัดไป) ต้องไม่มีข้อความ */
 function nsBlank(f) {
@@ -10450,11 +10481,16 @@ async function nsLocWrite(buf, items) {
     if (!f) continue;
     const doc = P.parseFromString(await f.async('string'), 'application/xml');
     let ch = false;
-    for (const x of L)
-      if (put(doc, x.col + x.r, x.loc)) {
+    for (const x of L) {
+      if (x.wLoc !== false && x.loc && put(doc, x.col + x.r, x.loc)) {
         n++;
         ch = true;
       }
+      if (x.wFmt && put(doc, x.col + (x.r - 1), x.wFmt)) {
+        n++;
+        ch = true;
+      }
+    }
     if (ch) zip.file(p, ser(doc), { createFolders: false });
   }
   const AE = SH.find(x => /ANALYS|วิเคราะห์/i.test(x.getAttribute('name') || '')),
@@ -10483,13 +10519,10 @@ async function nsLocWrite(buf, items) {
     let ch = false;
     const cells = [...doc.getElementsByTagNameNS(NS, 'c')];
     for (const x of items) {
-      const re = new RegExp('^' + String(x.code).replace(/[-]/g, '\\-') + '(?:\\s|\\(|$)', 'i');
-      const c = cells.find(q => {
-        const s = txt(q).trim();
-        return re.test(s) && !s.includes(x.loc);
-      });
-      if (!c) continue;
-      const nm = anaName(x.code, x.loc, x.fmt, x.sn);
+      const re = new RegExp('^' + String(x.code).replace(/[-]/g, '\\-') + '(?:\\s|\\(|$)', 'i'),
+        nm = anaName(x.code, x.loc, x.fmt, x.sn),
+        c = cells.find(q => re.test(txt(q).trim()));
+      if (!c || txt(c).trim() === nm) continue;
       while (c.firstChild) c.removeChild(c.firstChild);
       c.setAttribute('t', 'inlineStr');
       const is = doc.createElementNS(NS, 'is'),
@@ -10562,10 +10595,12 @@ const locHTML = L =>
         `<ul>${L.go.map(d => `<li><b>${esc(d.code)}</b> ${esc(d.loc)} · ใบ${esc(amvNm(d.name))} · ชีต ${esc(d.sn)} <small>(จาก${esc(d.from)})</small></li>`).join('')}</ul><p class="hint">ใส่เฉพาะช่องสถานที่ที่ยังว่าง และชื่อจอในชีต Analysis • ชื่อที่มีอยู่แล้วไม่เปลี่ยน</p>`,
       );
 /* อ่านชื่อจอจากโฟลเดอร์ที่ระบบจำไว้ (Gallary / โฟลเดอร์แยกรูป / โฟลเดอร์เทียบจอ) หรือเลือกใหม่ → NWS.fold • จดชื่อลงฐานข้อมูลจอให้จอที่ยังไม่มีชื่อ */
-async function nsFold(pick) {
+async function nsFold(pick, quiet) {
   if (!FSA) {
-    MQN = 'warn';
-    note = NOFSA;
+    if (!quiet) {
+      MQN = 'warn';
+      note = NOFSA;
+    }
     return;
   }
   const hs = [];
@@ -10575,12 +10610,15 @@ async function nsFold(pick) {
         const h = await HDB.get(key).catch(() => null);
         if (!h || hs.some(x => x.name === h.name)) continue;
         let ok = (await h.queryPermission({ mode: 'read' })) === 'granted';
-        if (!ok) ok = (await h.requestPermission({ mode: 'read' })) === 'granted';
+        if (!ok && !quiet) ok = (await h.requestPermission({ mode: 'read' })) === 'granted';
         if (ok) hs.push(h);
       }
-    if (!hs.length) hs.push(await showDirectoryPicker({ id: 'nwfd', mode: 'read' }));
+    if (!hs.length) {
+      if (quiet) return;
+      hs.push(await showDirectoryPicker({ id: 'nwfd', mode: 'read' }));
+    }
   } catch (e) {
-    if (e && e.name === 'AbortError') return;
+    if (quiet || (e && e.name === 'AbortError')) return;
     MQN = 'warn';
     note = 'เลือกโฟลเดอร์ไม่ได้';
     return;
@@ -10589,7 +10627,7 @@ async function nsFold(pick) {
   for (const h of hs) {
     let X = null;
     try {
-      X = await nsNameScan(h);
+      X = await nsNameScan(h, quiet);
     } catch (_) {
       X = null;
     }
@@ -10597,26 +10635,127 @@ async function nsFold(pick) {
   }
   NWS.fold = M;
   NWS.fdirs = hs.map(h => h.name);
+  NWS.fv = (NWS.fv || 0) + 1;
   NWS.blank = null;
   const D = sdb();
   let nd = 0;
   if (D) {
-    for (const r of D.rows)
-      if (!r.loc && M.has(r.k)) {
-        r.loc = M.get(r.k).loc;
+    for (const r of D.rows) {
+      const x = M.get(r.k);
+      if (!x) continue;
+      if (!r.loc && x.loc) {
+        r.loc = x.loc;
         nd++;
       }
+      if (!r.fmt && x.fmt) r.fmt = x.fmt;
+    }
     if (nd) {
       D.at = Date.now();
       store.set('ps_sdb', JSON.stringify(D));
       SDQ = null;
     }
   }
+  if (quiet) return;
   MQN = M.size ? 'find' : 'warn';
   note = M.size
     ? `อ่านชื่อจอจากโฟลเดอร์ ${hs.map(h => '“' + h.name + '”').join(', ')} แล้ว พบ ${M.size.toLocaleString()} จอ${nd ? ` • จดชื่อสถานที่ลงฐานข้อมูลจอ ${nd} จอ` : ''}`
     : `ไม่พบโฟลเดอร์จอที่มีรหัส DGT / ID ใน ${hs.map(h => '“' + h.name + '”').join(', ')} — กด “เลือกโฟลเดอร์อื่น” แล้วเลือก Gallary หรือโฟลเดอร์เทียบจอ`;
 }
+/* 5.5.92: จอที่ชื่อในหัวตารางไม่ตรงกับชื่อโฟลเดอร์จอ — สถานที่ต่าง (ไม่นับช่องว่าง / ขีด) หรือ Format ต่าง / ว่าง • Format แบบ Playlist (_43) แก้เป็น 43 แม้ไม่มีโฟลเดอร์ */
+const nwNz = s =>
+  String(s || '')
+    .replace(/[\s\/\\:*?"<>|]+/g, '')
+    .replace(/[–—]/g, '-')
+    .toLowerCase(); /* ไม่นับช่องว่าง และตัวอักษรที่ชื่อโฟลเดอร์ใช้ไม่ได้ (/ : ? …) */
+function nsDiff(f) {
+  const nd = nsNd(f),
+    S = (nd.S || []).filter(z => z.media && PKGS.has(z.media) && (z.codes || []).length);
+  if (!S.length) return [];
+  let wb;
+  try {
+    wb = XLSX.read(f.buf, { type: 'array', sheetRows: 16, sheets: S.map(z => z.sn) });
+  } catch (_) {
+    return [];
+  }
+  const out = [],
+    E = XLSX.utils.encode_cell;
+  for (const z of S) {
+    const ws = wb.Sheets[z.sn];
+    if (!ws || !ws['!ref']) continue;
+    const M = ws['!merges'] || [],
+      tx = (c, r) => {
+        const q = ws[E({ c, r })];
+        return q && q.v != null ? String(q.v).trim() : '';
+      },
+      inM = (c, r) =>
+        M.some(m => m.s.c <= c && c <= m.e.c && m.s.r <= r && r <= m.e.r && !(m.s.c === c && m.s.r === r)),
+      rg = XLSX.utils.decode_range(ws['!ref']);
+    for (let c = 1; c <= Math.min(rg.e.c, 600); c++)
+      for (let r = 8; r <= 11; r++) {
+        const v = tx(c, r);
+        if (!v || /\s/.test(v)) continue;
+        const k = nsK(v);
+        if (!k || k !== sdbK(v)) continue;
+        const cl = tx(c, r + 2),
+          fr = tx(c, r + 1),
+          cf = nsFmt(fr),
+          F = NWS.fold && NWS.fold.get(k),
+          why = [];
+        let nl = null,
+          nf = null;
+        if (cl && F && F.loc && nwNz(cl) !== nwNz(F.loc) && !inM(c, r + 2)) {
+          nl = F.loc;
+          why.push('loc');
+        }
+        const rf = fr.replace(/^\(+|\)+$/g, '').trim(),
+          wf = F && F.fmt ? F.fmt : /^_/.test(rf) ? cf : '';
+        if (
+          wf &&
+          rf.replace(/\s+/g, '').replace(/:/g, '-').toLowerCase() !== wf.replace(/\s+/g, '').toLowerCase() &&
+          !/^=/.test(fr) &&
+          !inM(c, r + 1)
+        ) {
+          nf = wf;
+          why.push(F && F.fmt ? 'fmt' : 'us');
+        }
+        if (why.length)
+          out.push({
+            name: f.name,
+            sn: z.sn,
+            col: XLSX.utils.encode_col(c),
+            r: r + 3,
+            code: v,
+            k,
+            curLoc: cl,
+            curFmt: fr,
+            newLoc: nl,
+            newFmt: nf,
+            why,
+            src: F ? F.src : '',
+            key: f.name + '|' + z.sn + '|' + k,
+          });
+        break;
+      }
+  }
+  return out;
+}
+const nsDiffAll = () => {
+  const s = ckSig() + '|' + (NWS.fv || 0);
+  if (NWS.diff && NWS.diff.sig === s) return NWS.diff.L;
+  const L = [];
+  for (const f of TC) {
+    try {
+      L.push(...nsDiff(f));
+    } catch (_) {}
+  }
+  NWS.diff = { sig: s, L };
+  return L;
+};
+const nwDsel = x =>
+  NWS.dsel.has(x.key)
+    ? NWS.dsel.get(x.key)
+    : !x.why.includes('loc') &&
+      !!x.curFmt; /* ค่าเริ่ม: Format ที่เขียนต่าง (เช่น _43) แก้ให้เลย • ชื่อสถานที่ต่าง / ช่อง Format ว่าง ให้เลือกเอง */
 /* จอในใบเช็คชุดนี้ที่ช่องสถานที่ยังว่าง (เก็บไว้ตามชุดใบเช็ค) */
 const nsBlankAll = () => {
   const s = ckSig();
@@ -12589,7 +12728,7 @@ async function addFiles(kind, files) {
 }
 /* ---------- หน้าจอ v2.1: ธีมสว่าง/มืด • เช็กลิสต์ Playlist 11 แบบ • ความพร้อมของใบเช็ค • ทัวร์แนะนำ • ระบบทำงานอย่างไร ---------- */
 /* ส่วนนี้คือหน้าจอ ส่วนอ่าน Playlist และเติมใบเช็ค (ด้านบน) แก้เพียงเล็กน้อย (แถบความคืบหน้า และ Show DC ไม่กำหนดวันทำงาน) — ผลการเติมของไฟล์ชุดเดียวกันเหมือนเวอร์ชัน 1.0 ทุกไบต์ */
-const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.91 (26 พ.ย. 2569)';
+const VERTXT = 'PHOTO CHECK STUDIO (ระบบเติมใบเช็ครูป) เวอร์ชัน 5.5.92 (26 พ.ย. 2569)';
 const IC = {
   up: '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>',
   folder:
@@ -16076,7 +16215,17 @@ const nwLocIn = (x, lab) => {
   return `<input class="nw-loc" id="nwl_${esc(x.k)}" data-k="${esc(x.k)}" type="text" value="${esc(L.loc)}" placeholder="${L.loc ? '' : 'ยังไม่พบชื่อ — พิมพ์เอง'}" aria-label="${esc(lab)}" autocomplete="off" spellcheck="false">${L.src ? `<small class="nw-src">จาก${esc(L.src)}</small>` : ''}`;
 };
 const nwFacts = (x, ed) =>
-  `<div class="nw-scr"><div class="nw-code">${esc(x.c)}</div><dl class="nw-dl"><dt>แพค</dt><dd>${esc(x.pk || '—')}</dd><dt>Format</dt><dd>${esc(x.fmt || '—')}</dd><dt>สถานที่</dt><dd>${ed ? `<div class="nw-lv">${nwLocIn(x, 'ชื่อสถานที่ของ ' + x.c)}${!nsLocOf(x).loc && FSA ? '<button class="linkb" data-a="nwfd">หาชื่อจากโฟลเดอร์</button>' : ''}</div>` : x.loc ? esc(x.loc) : '<span class="nw-mu">ยังไม่มีชื่อ</span>'}</dd>${x.pd ? `<dt>Playlist</dt><dd>วันที่ ${thd(new Date(x.pd))}</dd>` : ''}</dl></div>`;
+  `<div class="nw-scr"><div class="nw-code">${esc(x.c)}</div><dl class="nw-dl"><dt>แพค</dt><dd>${esc(x.pk || '—')}</dd><dt>Format</dt><dd>${
+    ed
+      ? (() => {
+          const F = nsFmtOf(x);
+          return F.fmt
+            ? esc(F.fmt) +
+                (F.src && F.src !== 'Playlist' ? ` <small class="nw-src">จาก${esc(F.src)}</small>` : '')
+            : '—';
+        })()
+      : esc(x.fmt || '—')
+  }</dd><dt>สถานที่</dt><dd>${ed ? `<div class="nw-lv">${nwLocIn(x, 'ชื่อสถานที่ของ ' + x.c)}${!nsLocOf(x).loc && FSA ? '<button class="linkb" data-a="nwfd">หาชื่อจากโฟลเดอร์</button>' : ''}</div>` : x.loc ? esc(x.loc) : '<span class="nw-mu">ยังไม่มีชื่อ</span>'}</dd>${x.pd ? `<dt>Playlist</dt><dd>วันที่ ${thd(new Date(x.pd))}</dd>` : ''}</dl></div>`;
 function vNsMk() {
   const P = nsPl(),
     H = nsHave(),
@@ -16181,23 +16330,37 @@ const nwHTML = () => {
 function vNsLoc() {
   if (!TC.length || !sdb()) return '';
   const B = nsBlankAll(),
+    DF = nsDiffAll(),
     R = NWS.locres,
     A = SDA && SDA.kind === 'loc' && SDA.sig === ckSig() ? SDA : null;
-  if (!B.length && !R) return '';
+  if (!B.length && !DF.length && !R && !FSA) return '';
   const P = new Map(nsPl().map(x => [x.k, x])),
     rows = B.map(b => ({ ...b, L: nsLocOf({ k: b.k, loc: (P.get(b.k) || {}).loc || '' }) })),
-    nOk = rows.filter(x => x.L.loc).length;
+    nOk = rows.filter(x => x.L.loc).length,
+    nSel = DF.filter(nwDsel).length;
   const res = R
-    ? `<div class="nw-done${(A && A.sv) || !A ? '' : ' wr'}">${IC.okc}<div><b>${A && A.sv ? `บันทึกใบเช็คแล้ว ${sdaL(A).length} ไฟล์` : `ใส่ชื่อสถานที่แล้ว ${R.L.length} จอ`}</b><span>${A && A.sv ? `ลงโฟลเดอร์ “${esc(A.sv.dir)}” • ไฟล์เดิมอยู่ในโฟลเดอร์ ${esc(A.sv.bk || sdaBk(A))}/${esc(A.sv.day)}` : esc(R.L.map(x => x.code + ' ' + x.loc).join(' • ')) + (R.ana ? ` • แก้ชื่อจอในชีต Analysis ${R.ana} แถว` : '') + (A ? ' • ยังไม่ได้บันทึก กดบันทึกด้านล่าง' : '')}</span></div></div>${A && !A.sv ? sdaBtns(A) : ''}`
+    ? `<div class="nw-done${A && !A.sv ? ' wr' : ''}">${IC.okc}<div><b>${A && A.sv ? `บันทึกใบเช็คแล้ว ${sdaL(A).length} ไฟล์` : `แก้ชื่อจอแล้ว ${R.L.length} จอ`}</b><span>${A && A.sv ? `ลงโฟลเดอร์ “${esc(A.sv.dir)}” • ไฟล์เดิมอยู่ในโฟลเดอร์ ${esc(A.sv.bk || sdaBk(A))}/${esc(A.sv.day)}` : esc(R.L.map(x => x.code + ' ' + [x.loc, x.fmt ? '(' + x.fmt + ')' : ''].filter(Boolean).join(' ')).join(' • ')) + (R.ana ? ` • ชื่อจอในชีต Analysis ${R.ana} แถว` : '') + (A ? ' • ยังไม่ได้บันทึก กดบันทึกด้านล่าง' : '')}</span></div></div>${A && !A.sv ? sdaBtns(A) : ''}`
     : '';
-  return `<div class="nw-card"><div><h4 class="nw-h">${B.length ? `จอที่ยังไม่มีชื่อสถานที่ ${B.length} จอ` : 'ชื่อสถานที่ของจอ'}</h4><p class="nw-sub">${B.length ? 'ช่องสถานที่ในหัวตารางยังว่าง • ระบบหาชื่อจาก Playlist ฐานข้อมูลจอ และชื่อโฟลเดอร์จอ หรือพิมพ์เอง' : 'จอในใบเช็คชุดนี้มีชื่อสถานที่ครบแล้ว'}</p></div>${res}
+  const fd = FSA
+    ? `<button class="btn ${B.length || DF.length ? 'quiet' : 'secondary'}" data-a="nwfd">${IC.folder}${NWS.fdirs ? 'อ่านชื่อจากโฟลเดอร์อีกครั้ง' : 'หาชื่อจากโฟลเดอร์'}</button>${NWS.fdirs ? '<button class="linkb" data-a="nwfd" data-k="pick">เลือกโฟลเดอร์อื่น</button>' : ''}`
+    : '';
+  const dli = x =>
+    `<li><label class="nw-ck"><input type="checkbox" class="nw-dsel" data-k="${esc(x.key)}"${nwDsel(x) ? ' checked' : ''}><span class="nw-lc"><b>${esc(x.code)}</b><small>${esc(nwBai(x.name))} · ชีต ${esc(x.sn)}</small></span></label><div class="nw-chg">${x.newLoc ? `<span><small>สถานที่</small> <s>${esc(x.curLoc)}</s> → <b>${esc(x.newLoc)}</b></span>` : ''}${x.newFmt ? `<span><small>Format</small> ${x.curFmt ? `<s>${esc(x.curFmt)}</s>` : '<span class="nw-mu">ว่าง</span>'} → <b>(${esc(x.newFmt)})</b></span>` : ''}<small class="nw-src">${x.why.includes('us') && !x.src ? 'Format แบบ Playlist มีขีดล่าง' : 'จากโฟลเดอร์ ' + esc(x.src)}</small></div></li>`;
+  return `<div class="nw-card"><div><h4 class="nw-h">ชื่อจอในใบเช็ค</h4><p class="nw-sub">${B.length || DF.length ? [B.length ? `ยังไม่มีชื่อสถานที่ ${B.length} จอ` : '', DF.length ? `ไม่ตรงกับชื่อโฟลเดอร์จอ ${DF.length} จอ` : ''].filter(Boolean).join(' • ') : NWS.fdirs ? 'ชื่อสถานที่และ Format ของทุกจอในใบเช็คชุดนี้ตรงกับชื่อโฟลเดอร์จอแล้ว' : 'ช่องสถานที่ครบ • กด “หาชื่อจากโฟลเดอร์” เพื่อเทียบชื่อจอในใบเช็คกับชื่อโฟลเดอร์จอ'}</p></div>${res}
  ${
    B.length
-     ? `<ul class="nw-ll">${rows.map(x => `<li><div class="nw-lc"><b>${esc(x.code)}</b><small>${esc(nwBai(x.name))} · ชีต ${esc(x.sn)}</small></div><div class="nw-lv">${nwLocIn({ k: x.k, loc: (P.get(x.k) || {}).loc || '' }, 'ชื่อสถานที่ของ ' + x.code)}</div></li>`).join('')}</ul>
- <div class="picb"><button class="btn primary" data-a="nwlocgo">ใส่ชื่อสถานที่${nOk ? ` (${nOk} จอ)` : ''}</button>${FSA ? `<button class="btn ${nOk ? 'quiet' : 'secondary'}" data-a="nwfd">${IC.folder}หาชื่อจากโฟลเดอร์</button>` : ''}${FSA && NWS.fdirs ? '<button class="linkb" data-a="nwfd" data-k="pick">เลือกโฟลเดอร์อื่น</button>' : ''}</div>
- <p class="hint">${NWS.fdirs ? `อ่านชื่อจากโฟลเดอร์: ${esc(NWS.fdirs.join(', '))} • ` : 'หาชื่อจากโฟลเดอร์ = อ่านชื่อโฟลเดอร์จอใน Gallary / โฟลเดอร์เทียบจอที่เคยเลือกไว้ (อ่านอย่างเดียว) • '}ใส่เฉพาะช่องที่ยังว่าง พร้อมชื่อจอในชีต Analysis • ตอนเติม ระบบใส่ชื่อจาก Playlist / ฐานข้อมูลจอให้เองด้วย</p>`
+     ? `<h5 class="nw-h5">ยังไม่มีชื่อสถานที่</h5><ul class="nw-ll">${rows.map(x => `<li><div class="nw-lc"><b>${esc(x.code)}</b><small>${esc(nwBai(x.name))} · ชีต ${esc(x.sn)}</small></div><div class="nw-lv">${nwLocIn({ k: x.k, loc: (P.get(x.k) || {}).loc || '' }, 'ชื่อสถานที่ของ ' + x.code)}</div></li>`).join('')}</ul>
+ <div class="picb"><button class="btn primary" data-a="nwlocgo">ใส่ชื่อสถานที่${nOk ? ` (${nOk} จอ)` : ''}</button></div>`
      : ''
- }</div>`;
+ }
+ ${
+   DF.length
+     ? `<h5 class="nw-h5">ไม่ตรงกับชื่อโฟลเดอร์จอ</h5><p class="hint">ติ๊กจอที่จะแก้ให้ตรงกับโฟลเดอร์ • Format ที่เขียนต่าง (เช่น _43) ติ๊กไว้ให้แล้ว • ชื่อสถานที่ต่าง หรือช่อง Format ว่าง ดูแล้วติ๊กเอง</p><ul class="nw-ll nw-dfl">${DF.map(dli).join('')}</ul>
+ <div class="picb"><button class="btn primary" data-a="nwfix">แก้ให้ตรงโฟลเดอร์${nSel ? ` (${nSel} จอ)` : ''}</button></div>`
+     : ''
+ }
+ <div class="picb">${fd}</div>
+ <p class="hint">${NWS.fdirs ? `อ่านชื่อจากโฟลเดอร์: ${esc(NWS.fdirs.join(', '))} (รอบล่าสุด) • ` : 'หาชื่อจากโฟลเดอร์ = อ่านชื่อโฟลเดอร์จอใน Gallary / โฟลเดอร์เทียบจอที่เคยเลือกไว้ (อ่านอย่างเดียว) • '}แก้ช่องสถานที่ / Format ในหัวตาราง พร้อมชื่อจอในชีต Analysis • ยังไม่แก้ไฟล์ในเครื่องจนกว่าจะกดบันทึก</p></div>`;
 }
 function vNs() {
   const D = sdb(),
@@ -16261,6 +16424,7 @@ async function nsGo() {
       ...x,
       ...NWS.pick[x.k],
       loc: nsLocOf(x).loc,
+      fmt: nsFmtOf(x).fmt,
     })),
     not = L.filter(x => NWS.not.has(x.k));
   if (!go.length && !not.length) return;
@@ -16990,7 +17154,7 @@ const vHelp =
 <li><b>ไม่พบจอนี้ใน Playlist</b> ยังไม่ได้ใส่ Playlist ของสื่อนั้น หรือรหัสจอไม่ตรง ใส่ Playlist ให้ครบแล้วเติมใหม่</li>
 <li><b>ใช้รายการของสื่ออื่น</b> ระบบเติมจากรายการใกล้เคียงให้ เทียบกับ Playlist อีกครั้ง (จอ Spare ที่ใช้รายการสื่ออื่น และจอ CITY ที่ใช้รายการ THE CITY เป็นเรื่องปกติ ไม่ขึ้นใน “ควรตรวจ”)</li>
 <li><b>รหัสนี้อยู่ในหลายสื่อ</b> ตั้งชื่อชีตในใบเช็คให้มี 40/80 + Blue/Red, CITY หรือ Spare แล้วเติมใหม่</li>
-<li><b>ชื่อสถานที่ของจอ</b> (5.5.91) ระบบหาชื่อจาก Playlist → ฐานข้อมูลจอ → ชื่อโฟลเดอร์จอ (Gallary / โฟลเดอร์เทียบจอ) → พิมพ์เอง • จอที่ช่องสถานที่ยังว่าง ใส่ได้ที่ จอใหม่ / ฐานข้อมูลจอ › “จอที่ยังไม่มีชื่อสถานที่” • ตอนเติม (มีฐานข้อมูลจอ) ระบบใส่ชื่อในช่องที่ยังว่างให้เอง ไม่ทับชื่อเดิม</li><li><b>จอใหม่</b> (5.5.90) จอ DGT / ID ใน Playlist ที่ยังไม่อยู่ในใบเช็คของใคร และไม่มีในฐานข้อมูลจอ — ไปที่งานโฟลเดอร์และรูป › จอใหม่ / ฐานข้อมูลจอ แล้วโยนใบเช็คของคนที่ดูแลจอนั้น (ใบที่เติมแล้วก็ได้) ครั้งแรกกด “บันทึกฐานข้อมูลจอของเรา” ระบบจดจอของทีมจากใบเช็คที่ใส่ไว้ ไม่ต้องรอไฟล์จากบริษัท • เติมครั้งถัดไป หนังของจอใหม่ลงให้ตั้งแต่ต้นรอบ</li><li><b>มาช้า</b> (5.5.89) หนังที่เพิ่งมีใน Playlist แต่วันเริ่มสัญญาเป็นวันที่ใบเช็คเติมไปแล้ว (เช่น ทีม Playlist ลืมใส่แล้วมาใส่ทีหลัง หรือไม่ได้เขียน “ขึ้นใหม่”) ระบบลงใต้แถบวันที่ในชื่อหนัง เช่น …_24Nov26_… ลงใต้ 24 พ.ย. ไม่ย้อนไปแถบวันเริ่มสัญญา • ชื่อไม่มีวันที่ หรือวันที่ในชื่อก่อนวันเริ่มสัญญา / หลังวันที่เติม → ลงใต้แถบวันที่เติม • ครึ่งเดือนหลัง ชื่อที่เป็นวันที่ 1–15 ลงใต้แถบ 16 • งาน Freeze Screen ลงตามวันเริ่มเหมือนเดิม • วงเล็บท้ายชื่อบอกว่าลงใต้วันไหน ไม่ต้องแก้</li><li><b>กันตกหล่น</b> (4.2.1) หนังที่มีใน Playlist แต่ยังไม่เคยลงใบเช็คของจอนี้ และวันนี้ไม่ได้ “ขึ้นใหม่” ระบบจึงไม่เพิ่มให้ (วงเล็บบอกวันเริ่มในไฟล์) ดูว่าลืมลงไปหรือเปล่า ถ้าต้องมี ลงเองในใบเช็ค หรือเปิด “เพิ่มหนังกันตกหล่นให้เอง” ในขั้นที่ 3 (4.5) ระบบจะลงให้ใต้แถบวันที่ที่เติม • ส่วน “ขึ้นซ้ำ / ต่อสัญญา ใช้แถวเดิม” อยู่ในสรุปของชีต เป็นข้อมูลเฉย ๆ ไม่ต้องแก้</li>
+<li><b>ชื่อจอให้ตรงกับโฟลเดอร์</b> (5.5.92) ใส่จอใหม่ใช้ชื่อสถานที่และ Format จากชื่อโฟลเดอร์จอ (Gallary / โฟลเดอร์เทียบจอ) • Format จาก Playlist แปลงเป็นแบบโฟลเดอร์ (_43 → 43) • การ์ด “ชื่อจอในใบเช็ค” › “ไม่ตรงกับชื่อโฟลเดอร์จอ” ติ๊กแล้วกด “แก้ให้ตรงโฟลเดอร์”</li><li><b>ชื่อสถานที่ของจอ</b> (5.5.91) ระบบหาชื่อจาก Playlist → ฐานข้อมูลจอ → ชื่อโฟลเดอร์จอ (Gallary / โฟลเดอร์เทียบจอ) → พิมพ์เอง • จอที่ช่องสถานที่ยังว่าง ใส่ได้ที่ จอใหม่ / ฐานข้อมูลจอ › “จอที่ยังไม่มีชื่อสถานที่” • ตอนเติม (มีฐานข้อมูลจอ) ระบบใส่ชื่อในช่องที่ยังว่างให้เอง ไม่ทับชื่อเดิม</li><li><b>จอใหม่</b> (5.5.90) จอ DGT / ID ใน Playlist ที่ยังไม่อยู่ในใบเช็คของใคร และไม่มีในฐานข้อมูลจอ — ไปที่งานโฟลเดอร์และรูป › จอใหม่ / ฐานข้อมูลจอ แล้วโยนใบเช็คของคนที่ดูแลจอนั้น (ใบที่เติมแล้วก็ได้) ครั้งแรกกด “บันทึกฐานข้อมูลจอของเรา” ระบบจดจอของทีมจากใบเช็คที่ใส่ไว้ ไม่ต้องรอไฟล์จากบริษัท • เติมครั้งถัดไป หนังของจอใหม่ลงให้ตั้งแต่ต้นรอบ</li><li><b>มาช้า</b> (5.5.89) หนังที่เพิ่งมีใน Playlist แต่วันเริ่มสัญญาเป็นวันที่ใบเช็คเติมไปแล้ว (เช่น ทีม Playlist ลืมใส่แล้วมาใส่ทีหลัง หรือไม่ได้เขียน “ขึ้นใหม่”) ระบบลงใต้แถบวันที่ในชื่อหนัง เช่น …_24Nov26_… ลงใต้ 24 พ.ย. ไม่ย้อนไปแถบวันเริ่มสัญญา • ชื่อไม่มีวันที่ หรือวันที่ในชื่อก่อนวันเริ่มสัญญา / หลังวันที่เติม → ลงใต้แถบวันที่เติม • ครึ่งเดือนหลัง ชื่อที่เป็นวันที่ 1–15 ลงใต้แถบ 16 • งาน Freeze Screen ลงตามวันเริ่มเหมือนเดิม • วงเล็บท้ายชื่อบอกว่าลงใต้วันไหน ไม่ต้องแก้</li><li><b>กันตกหล่น</b> (4.2.1) หนังที่มีใน Playlist แต่ยังไม่เคยลงใบเช็คของจอนี้ และวันนี้ไม่ได้ “ขึ้นใหม่” ระบบจึงไม่เพิ่มให้ (วงเล็บบอกวันเริ่มในไฟล์) ดูว่าลืมลงไปหรือเปล่า ถ้าต้องมี ลงเองในใบเช็ค หรือเปิด “เพิ่มหนังกันตกหล่นให้เอง” ในขั้นที่ 3 (4.5) ระบบจะลงให้ใต้แถบวันที่ที่เติม • ส่วน “ขึ้นซ้ำ / ต่อสัญญา ใช้แถวเดิม” อยู่ในสรุปของชีต เป็นข้อมูลเฉย ๆ ไม่ต้องแก้</li>
 <li><b>ไม่ใส่ตามหมายเหตุ / จำนวนครั้ง = 0</b> บอกหนังที่ระบบตั้งใจไม่ใส่ ดูว่าตรงกับ Playlist • งาน Freeze Screen (จำนวนครั้ง = 0) ติ๊กให้ใส่ได้ที่ขั้นที่ 3 ในการตั้งค่า</li>
 <li><b>ยังไม่ใส่ เพราะวันเริ่มในไฟล์ยังไม่ถึง</b> หนังที่เริ่มหลังวันที่ทำงาน ระบบจะใส่ให้เองเมื่อถึงวันเริ่ม</li>
 
@@ -20711,7 +20875,106 @@ const ACT = {
   },
   nwfd: async k => {
     await nsFold(k === 'pick');
+    NWS.diff = null;
   },
+  nwfix: async () => {
+    if (BUSY || FILLING) return;
+    const L = nsDiffAll().filter(nwDsel);
+    if (!L.length) {
+      MQN = 'warn';
+      note = 'ยังไม่ได้ติ๊กจอที่จะแก้';
+      return;
+    }
+    const P0 = sdaPrev(),
+      by = new Map();
+    for (const x of L) {
+      const cf = nsFmt(x.curFmt),
+        it = {
+          sn: x.sn,
+          col: x.col,
+          r: x.r,
+          code: x.code,
+          k: x.k,
+          loc: x.newLoc || x.curLoc,
+          wLoc: !!x.newLoc,
+          fmt: x.newFmt || cf,
+          wFmt: x.newFmt ? (!x.curFmt || /^\(/.test(x.curFmt) ? '(' + x.newFmt + ')' : x.newFmt) : undefined,
+        };
+      if (!by.has(x.name)) by.set(x.name, []);
+      by.get(x.name).push(it);
+    }
+    const names = [],
+      done = [];
+    let ana = 0;
+    for (const [nm, I] of by) {
+      const f = TC.find(z => z.name === nm);
+      if (!f) continue;
+      let W = null;
+      try {
+        W = await nsLocWrite(f.buf, I);
+      } catch (_) {
+        W = null;
+      }
+      if (!W || !W.n) continue;
+      f.buf = W.buf;
+      f.nd = null;
+      nsNd(f);
+      names.push(nm);
+      ana += W.ana;
+      done.push(...I);
+    }
+    if (!names.length) {
+      MQN = 'warn';
+      note = 'แก้ชื่อจอไม่ได้ — ไฟล์อาจเสีย หรือรูปแบบไม่รองรับ';
+      return;
+    }
+    {
+      const pv = PICX;
+      if (pv) pv.sig = ckSig();
+    }
+    {
+      const D = sdb();
+      if (D) {
+        let ch = false;
+        for (const x of done) {
+          const r = D.rows.find(z => z.k === x.k);
+          if (!r) continue;
+          if (x.wLoc && r.loc !== x.loc) {
+            r.loc = x.loc;
+            ch = true;
+          }
+          if (x.wFmt && r.fmt !== x.fmt) {
+            r.fmt = x.fmt;
+            ch = true;
+          }
+        }
+        if (ch) {
+          D.at = Date.now();
+          store.set('ps_sdb', JSON.stringify(D));
+        }
+      }
+    }
+    SDA = {
+      done: [],
+      names,
+      ...sdaJoin(P0, 'loc', names),
+      kind: 'loc',
+      sv: null,
+      sig: ckSig(),
+      pick: !!(P0 && P0.pick),
+    };
+    NWS.locres = {
+      L: done.map(x => ({ code: x.code, loc: x.wLoc ? x.loc : '', fmt: x.wFmt ? x.fmt : '' })),
+      ana,
+    };
+    NWS.blank = null;
+    NWS.diff = null;
+    SDQ = null;
+    await sdbRun();
+    MQN = 'done';
+    note = `แก้ชื่อจอให้ตรงโฟลเดอร์แล้ว ${done.length} จอ — บันทึก หรือดาวน์โหลด`;
+  },
+
   nwlocgo: async () => {
     if (BUSY || FILLING) return;
     const B = nsBlankAll(),
@@ -20785,8 +21048,9 @@ const ACT = {
       sig: ckSig(),
       pick: !!(P0 && P0.pick),
     };
-    NWS.locres = { L: done, ana };
+    NWS.locres = { L: done.map(x => ({ code: x.code, loc: x.loc, fmt: '' })), ana };
     NWS.blank = null;
+    NWS.diff = null;
     SDQ = null;
     await sdbRun();
     MQN = 'done';
@@ -20919,6 +21183,9 @@ const ACT = {
       fdirs: null,
       blank: null,
       locres: null,
+      diff: null,
+      dsel: new Map(),
+      fv: 0,
     };
     if (BLK) {
       BLK.plan = null;
@@ -20964,7 +21231,17 @@ const ACT = {
         () => view(),
         () => view(),
       );
-    setTimeout(() => {
+    if (k === 'sdb' && FSA && sdb() && !NWS.fold && !NWS.fq) {
+      NWS.fq = 1;
+      nsFold(false, true).then(
+        () => {
+          NWS.diff = null;
+          view();
+        },
+        () => {},
+      );
+    }
+    /* 5.5.92 */ setTimeout(() => {
       const d = $('#tdetail');
       if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 60);
@@ -21638,6 +21915,10 @@ document.addEventListener('change', e => {
     NWS.loc[t.dataset.k] = t.value.trim();
     return;
   } /* 5.5.91 */
+  if (t.classList && t.classList.contains('nw-dsel')) {
+    NWS.dsel.set(t.dataset.k, !!t.checked);
+    return;
+  } /* 5.5.92 */
   if (t.classList && t.classList.contains('pc-in')) {
     const v = t.value.slice(1).toUpperCase();
     if (/^[0-9A-F]{6}$/.test(v) && CLR.P) {

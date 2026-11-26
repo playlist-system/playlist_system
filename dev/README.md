@@ -127,7 +127,7 @@ python3 dev/day_audit.py --pl <โฟลเดอร์ Playlist ของวั
 | เติม | `fillRun` → `fillDays` (หลายวัน) → `fillWb` (เขียน .xlsm ผ่าน JSZip เก็บมาโคร) • `oldHdrFix` (หัวแบบเก่า) • `autoMv` `colWb` `xHist` (ย้าย / เพิ่มคอลัมน์ BKJ, Metro กลางเดือน) |
 | ใบเปล่า / ย้ายจอ | `sdbLoad` `sdbRun` `sdbApply` `sdbMoveApply` `sdbNewFile` (สร้างใบเปล่าให้คนใหม่) `blankWb` |
 | โฟลเดอร์รูป | `tcRead` (อ่านใบเช็คในหน้าเครื่องมือ → `PICX`) • `pzPlan` `pzScr` `pzZip` (zip โฟลเดอร์) • `picScreens` `picPlan` `picMake` (สร้างในโฟลเดอร์ที่เลือก) • `fxKind` `fxIdx` `FXP` (MRT / The 20 / Air Traveller / Gateway X / Rama 9) • `bkjAB` (ต่อท้าย (A)/(R) ของ BKJ) |
-| หน้าจอ | `view()` วาดใหม่ทั้งหน้า • `vHome` `vPl` `vCk` `vFl` `vRes` `vTools` `vSdb` (5.5.90 จอใหม่: `vNs` `nsFind` `nsPlan` `nsApply` `nsMkDb` • 5.5.91 ชื่อสถานที่: `nsLocOf` `nsBlank` `nsLocWrite` `nsNameScan` `autoLoc`) `vFb` … • ปุ่มทั้งหมดอยู่ใน `ACT` (`data-a="ชื่อ"`) |
+| หน้าจอ | `view()` วาดใหม่ทั้งหน้า • `vHome` `vPl` `vCk` `vFl` `vRes` `vTools` `vSdb` (5.5.90 จอใหม่: `vNs` `nsFind` `nsPlan` `nsApply` `nsMkDb` • 5.5.91 ชื่อสถานที่: `nsLocOf` `nsBlank` `nsLocWrite` `nsNameScan` `autoLoc` • 5.5.92 ตรงกับโฟลเดอร์: `nsFmt` `nsFmtOf` `nsDiff`) `vFb` … • ปุ่มทั้งหมดอยู่ใน `ACT` (`data-a="ชื่อ"`) |
 | แจ้งปัญหา | `FB_URL` `fbUrl` `vFb` `ACT.fbsend` (ฟอร์มในแท็บใหม่ + รับ postMessage) |
 
 ## 7. เรื่องที่รู้แล้วแต่ยังไม่ได้ทำ
